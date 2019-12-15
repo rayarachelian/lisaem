@@ -1,0 +1,83 @@
+export CXX="g++"
+export CPP=""
+export  CC="gcc" 
+export LINKOPTS="-I/usr/lib/x86_64-linux-gnu/wx/include/gtk2-unicode-3.0 -I/usr/include/wx-3.0 -D_FILE_OFFSET_BITS=64 -DWXUSINGDLL -D__WXGTK__ -L/usr/lib/x86_64-linux-gnu -pthread   -lwx_gtk2u_xrc-3.0 -lwx_gtk2u_html-3.0 -lwx_gtk2u_qa-3.0 -lwx_gtk2u_adv-3.0 -lwx_gtk2u_core-3.0 -lwx_baseu_xml-3.0 -lwx_baseu_net-3.0 -lwx_baseu-3.0 "
+export CFLAGS="-fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -I. -I../include -I../cpu68k -I../wxui -I/usr/lib/x86_64-linux-gnu/wx/include/gtk2-unicode-3.0 -I/usr/include/wx-3.0 -D_FILE_OFFSET_BITS=64 -DWXUSINGDLL -D__WXGTK__ -O2 -ffast-math -fomit-frame-pointer  -DVERSION=1.2.7-ALPHA_2019.11.11"
+export CXXFLAGS="-fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -I. -I../include -I../cpu68k -I../wxui -I/usr/lib/x86_64-linux-gnu/wx/include/gtk2-unicode-3.0 -I/usr/include/wx-3.0 -D_FILE_OFFSET_BITS=64 -DWXUSINGDLL -D__WXGTK__ -O2 -ffast-math -fomit-frame-pointer  -DVERSION=1.2.7-ALPHA_2019.11.11"
+export LDFLAGS=""
+export SYSLIBS=""
+export GCCSTATIC=""
+PREFIX="/usr/local/bin"
+PREFIXLIB="/usr/local/share/"
+
+function windres() {
+true
+}
+
+##############################################################################
+# MAKELIBS
+#
+# Creates both static and shared libraries.
+#
+# Parameters $1 target directory
+#	     $2 library name
+#            $3 version tripplet.  i.e. 0.3.6
+#            $4 mode "static", "shared", or "both"
+#            $5 is a single string containing objects to merge.
+#               i.e. "a.o b.o c.o ..."
+#
+# i.e.
+#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#
+##############################################################################
+function MAKELIBS() {
+
+dir="$1"
+libname="$2"
+ver="$3"
+mode="$4"
+objs="$5"
+
+aname="${libname}.${ver}.a"
+laname="${libname}.a"
+daname="${dir}/${aname}"
+ldaname="${dir}/${laname}"
+
+soname="${dir}/${libname}.${ver}.so"
+lsoname="${dir}/${libname}.so"
+ldsoname="${dir}/${libname}.so"
+dsoname="${soname}"
+dylibname="${dir}/${libname}.${ver}.dylib"
+ldylibname="${dir}/${libname}.dylib"
+dllname="${dir}/${libname}.${ver}.dll"
+ldllname="${dir}/${libname}.dll"
+
+[[ "$4" == "both" ]] && mode="static"
+
+
+if [[ "$mode" == "static" ]]
+then
+     echo "  Creating  $libname.a" 1>&2
+     $AR "$AROPTS" "${daname}" ${objs} || exit 1
+     ranlib ${daname}         || exit 1
+     /bin/rm -f       ${ldaname}
+     ln -sf ${daname} ${ldaname}
+fi
+
+
+[[ "$4" == "both" ]] && mode="shared"
+
+if [[ "$mode" == "shared" ]]
+then
+
+             echo "  Creating  $libname.dll" 1>&2
+             gcc -shared -o      ${dllname} ${objs}                  || exit 1
+             /bin/rm -f          ${ldllname}
+             ln -sf ${dllname}   ${ldllname}                                    ;;
+             #see: http://www.cygwin.com/cygwin-ug-net/dll.html
+fi
+
+echo -n "" >/dev/null
+}
+
+

@@ -1,0 +1,32 @@
+########################################################
+# create built by info and license (if one exists)
+########################################################
+
+function create_builtby {
+
+  local file="src/include/built_by.h"
+
+  pushd "${TLD}" >/dev/null
+
+  BUILTBY="\"Compiled on `date` by $LOGNAME@`uname -n`  (`uname -v `)  \\n options:$WITHBLITS $WITHDEBUG $WITHDEBUG $WITHTRACE $WITHUNICODE \\nusing:`$CC --version | head -1`\""
+
+  echo     "#ifndef __BUILTBY_H__"                                  > ${file}
+  echo     "#define __BUILTBY_H__"                                 >> ${file}
+  echo                                                             >> ${file}
+  echo                                                             >> ${file}
+  echo     "#define BUILTBY $BUILTBY"                              >> ${file}
+  echo     "#define VERSION \"$VERSION\""                          >> ${file}
+
+  if [[ -f ${TLD}/LICENSE ]]; then
+     echo -n  "#define LICENSE "                                   >> ${file}
+     cat ${TLD}/LICENSE | sed 's/^/"/g' | sed 's/$/\\n"      \\/g' >> ${file} 
+  fi
+
+  echo                                                             >> ${file}
+  echo                                                             >> ${file}
+  echo "#endif"                                                    >> ${file}
+  echo                                                             >> ${file}
+  echo                                                             >> ${file}
+
+  popd >/dev/null
+}

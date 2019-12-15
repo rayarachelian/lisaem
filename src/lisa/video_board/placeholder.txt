@@ -1,0 +1,4 @@
+This directory is a decoration/placeholder.
+The Lisa's video board is analog only and interfaces with the CRT.
+Perhaps some code could be moved here that deals with rendering video,
+or perhaps the crt directory instead.

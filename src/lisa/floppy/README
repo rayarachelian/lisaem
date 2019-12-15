@@ -1,0 +1,3 @@
+Nothing goes here.  This represents the actual 400K floppy drive.
+floppy.c belongs under io_board because that's where the IWM and 6504 are
+on a real Lisa.

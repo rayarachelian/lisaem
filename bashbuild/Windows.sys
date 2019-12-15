@@ -1,0 +1,234 @@
+###############################################################################
+# Unified Build Script lib Windows Specific Settings  -  A Part of LisaEm
+#                    http://lisaem.sunder.net
+#                   The Lisa Emulator Project
+#   Copyright (C) 2019 Ray A. Arachelian, All Rights Reserved
+# Released under the terms of the GNU General Public License 2.0
+#-------------------------------------------------------------------------------
+#
+#  Cygwin related options
+#
+###############################################################################
+
+[[ -z "$WXINCLUDE" ]] && export WXINCLUDE="${TLD}/scripts/wxmsw/include/"
+
+if [[ "$(uname -m)" == "x86_64" ]]; then
+   [[ -z "$WXLIB"     ]] && export WXLIB="$( ls -1d ${TLD}/scripts/wxmsw/lib/gcc???_x64_dll )"
+else
+   [[ -z "$WXLIB"     ]] && export WXLIB="$( ls -1d ${TLD}/scripts/wxmsw/lib/gcc???_dll )"
+fi
+
+if [[ -n "$(echo ${WXINCLUDE}${WXLIB} | grep ' ')" ]]; then
+   echo "Either WXCINCLUDE or WXLIB contains spaces, please move them to a path" 1>&2
+   echo "that does not contain spaces, i.e. not C:\\Program Files" 1>&2
+   echo "WXINCLUDE=\"${WXINCLUDE}\"" 1>&2
+   echo "WXLIB=\"${WXLIB}\"" 1>&2
+   exit 10
+fi
+
+if [[ -z "$(ls -1 ${WXLIB}/wxmsw*_xrc_gcc730_*.dll)" ]]; then
+   echo "Could not find wxWidgets libraries for $(uname -m) expected in $WXLIB" 1>&2 
+   echo "Please download them to this path and ensure they match your architecture" 1>&2
+   echo "Pro tip: use scripts/download-and-prepare-wxwidgets-windows-gcc730.sh" 1>&2
+   exit 10
+fi
+
+if [[ ! -f ${WXINCLUDE}/wx/msw/wx.rc ]]; then
+   echo "Could not find wxWidgets includes expected in $WXINCLUDE" 1>&2 
+   echo "Please download them to this path" 1>&2
+   echo "Pro tip: use scripts/download-and-prepare-wxwidgets-windows-gcc730.sh" 1>&2
+   exit 10
+fi
+
+pushd "${WXLIB}" >/dev/null || exit $?
+#wxbase312u_gcc730.dll
+# careful order matters here!
+for l in wxbase*u_gcc* wxmsw*u_adv_*gcc* wxmsw*u_core_*gcc* wxbase*u_net_*gcc* wxbase*u_xml_*gcc* wxmsw*u_aui_*gcc* wxmsw*u_gl_*gcc* wxmsw*u_html_*gcc* \
+        wxmsw*u_media_*gcc* wxmsw*u_propgrid_*gcc* wxmsw*u_ribbon_*gcc* wxmsw*u_richtext_*gcc* wxmsw*u_stc_*gcc* wxmsw*u_webview_*gcc* wxmsw*u_xrc_*gcc*; do
+export WXLIBLIST="${WXLIBLIST} ${WXLIB}/${l}" 
+done
+popd 2>/dev/null >/dev/null
+
+export CYGWIN="$(uname -s)"
+
+[[ -z "$AR"      ]] && export AR=/bin/x86_64-w64-mingw32-ar.exe
+[[ -z "$AS"      ]] && export AS=/bin/x86_64-w64-mingw32-as.exe
+[[ -z "$CPP"     ]] && export CPP=/bin/x86_64-w64-mingw32-cpp.exe
+[[ -z "$DLLTOOL" ]] && export DLLTOOL=/bin/x86_64-w64-mingw32-dlltool.exe
+[[ -z "$DLLWRAP" ]] && export DLLWRAP=/bin/x86_64-w64-mingw32-dllwrap.exe
+[[ -z "$CXX"     ]] && export CXX=/bin/x86_64-w64-mingw32-g++.exe
+[[ -z "$CC"      ]] && export CC=/bin/x86_64-w64-mingw32-gcc.exe
+[[ -z "$RANLIB"  ]] && export RANLIB=/bin/x86_64-w64-mingw32-ranlib.exe
+[[ -z "$GCOV"    ]] && export GCOV=/bin/x86_64-w64-mingw32-gcov.exe
+[[ -z "$GPROF"   ]] && export GPROF=/bin/x86_64-w64-mingw32-gprof.exe
+[[ -z "$LD"      ]] && export LD=/bin/x86_64-w64-mingw32-ld.exe
+[[ -z "$NM"      ]] && export NM=/bin/x86_64-w64-mingw32-nm.exe
+[[ -z "$OBJCOPY" ]] && export OBJCOPY=/bin/x86_64-w64-mingw32-objcopy.exe
+[[ -z "$OBJDUMP" ]] && export OBJDUMP=/bin/x86_64-w64-mingw32-objdump.exe
+[[ -z "$STRIP"   ]] && export STRIP=/bin/x86_64-w64-mingw32-strip.exe
+[[ -z "$WINDMC"  ]] && export WINDMC=/bin/x86_64-w64-mingw32-windmc.exe
+[[ -z "$WINDRES" ]] && export WINDRES=/bin/x86_64-w64-mingw32-windres.exe
+
+export AROPTS="crD"
+
+##############################################################################
+# MAKELIBS
+#
+# Creates both static and shared libraries.
+#
+# Parameters $1 target directory
+#	     $2 library name
+#            $3 version tripplet.  i.e. 0.3.6
+#            $4 mode "static", "shared", or "both"
+#            $5 is a single string containing objects to merge.
+#               i.e. "a.o b.o c.o ..."
+#
+# i.e.
+#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#
+##############################################################################
+function MAKELIBS() {
+
+dir="$1"
+libname="$2"
+ver="$3"
+mode="$4"
+objs="$5"
+
+aname="${libname}.${ver}.a"
+laname="${libname}.a"
+daname="${dir}/${aname}"
+ldaname="${dir}/${laname}"
+
+soname="${dir}/${libname}.${ver}.so"
+lsoname="${dir}/${libname}.so"
+ldsoname="${dir}/${libname}.so"
+dsoname="${soname}"
+dylibname="${dir}/${libname}.${ver}.dylib"
+ldylibname="${dir}/${libname}.dylib"
+dllname="${dir}/${libname}.${ver}.dll"
+ldllname="${dir}/${libname}.dll"
+
+[[ "$4" == "both" ]] && mode="static"
+
+
+if [[ "$mode" == "static" ]]; then
+     echo "  Creating  $libname.a" 1>&2
+     $AR "$AROPTS" "${daname}" ${objs} || exit 1
+     $RANLIB ${daname}         || exit 1
+     /bin/rm -f       ${ldaname}
+     ln -sf ${daname} ${ldaname}
+fi
+
+
+[[ "$4" == "both" ]] && mode="shared"
+
+if [[ "$mode" == "shared" ]]; then
+             echo "  Creating  $libname.dll" 1>&2
+             $CC -shared -o      ${dllname} ${objs}                  || exit 1
+             /bin/rm -f          ${ldllname}
+             ln -sf ${dllname}   ${ldllname}
+             #see: http://www.cygwin.com/cygwin-ug-net/dll.html
+fi
+}
+
+
+
+# Create a windows resource from a template.
+function windres() {
+
+if [[ -n "$CYGWIN" ]]; then
+    echo "win32 resources" 1>&2
+    export MINVER="`echo $VERSION| cut -f1 -d'-' | sed 's/\./,/g'`,0"
+    cat >${XTLD}/resources/windres_private.rc <<END
+#include <windows.h> // include for version info constants
+
+A ICON MOVEABLE PURE LOADONCALL DISCARDABLE "lisaem.ico"
+
+//
+// SUPPORT FOR WINDOWS XP THEMES:
+// THIS WILL MAKE THE PROGRAM USE THE COMMON CONTROLS
+// LIBRARY VERSION 6.0 (IF IT IS AVAILABLE)
+//
+1 24 "lisaem.exe.Manifest"
+
+1 VERSIONINFO
+FILEVERSION ${MINVER}
+PRODUCTVERSION ${MINVER}
+FILETYPE VFT_APP
+{
+  BLOCK "StringFileInfo"
+         {
+                 BLOCK "040904E4"
+                 {
+                         VALUE "CompanyName", "${COMPANY}"
+                         VALUE "FileVersion", "${VERSION}"
+                         VALUE "FileDescription", "${DESCRIPTION}"
+                         VALUE "InternalName", "${URL}"
+                         VALUE "LegalCopyright", "${COPYRIGHTLINE}"
+                         VALUE "LegalTrademarks", ""
+                         VALUE "OriginalFilename", "${SOFTWARE}"
+                         VALUE "ProductName", "${SOFTWARE}"
+                         VALUE "ProductVersion", "${VERSION}"
+                 }
+         }
+  BLOCK "VarFileInfo"
+         {
+                 VALUE "Translation", 0x0409, 1252
+         }
+}
+
+${WINDOWS_RES_ICONS}
+#include <wx/msw/wx.rc>
+END
+    # :TODO: add this to compileq so warnings are captured and it compiles in parallel
+    cd ../resources
+    # echo windres.exe --input-format=rc -O coff lisaem_private.rc lisaem_private.res
+    ls -l ${XTLD}/resources/windres_private.rc 1>&2
+    echo $WINDRES --input-format=rc -O coff -I $WXINCLUDE -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res 1>&2
+    $WINDRES --input-format=rc -O coff -I $WXINCLUDE -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res || exit 1
+    export LIST="$LIST ${XTLD}/obj/windres_private.res"
+    echo "${XTLD}/obj/windres_private.res"
+ fi
+}
+
+
+
+
+###############################################################################
+###############################################################################
+###  Initialize Platform specific variables    ################################
+###############################################################################
+###############################################################################
+
+export EXT=".exe"
+export EXTTYPE="exe"
+export STATIC=--static
+
+# We expect the Cygwin provided mingw64 compilers and related, so not going to usethe cygpath command anymore.
+# perhaps provide for that in the future, but not now/yet.
+
+
+export   GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
+export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"
+
+export GCCCOLORIZED=""
+[[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
+[[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
+
+
+CCOPTS="$GCCCOLORIZED -fcommon -fwrapv -fPIC -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer \
+       -fno-exceptions -fno-pcc-struct-return -malign-double -falign-loops=5 -falign-jumps=5 -falign-functions=5 \
+       -fno-pcc-struct-return"
+
+export CDEFS="-D__WXMSW__ -D__GNUWIN32__ -D__WIN95__ -fno-exceptions -fno-pcc-struct-return -fstrict-aliasing $WARNINGS -D__WXMSW__ -D__GNUWIN32__ -D__WIN95__"
+export LIBS="-L $WXLIB -mwindows ${WXLIBLIST}
+-lkernel32 -luser32 -lgdi32 -lcomdlg32 -lwinspool -lwinmm -lshell32 -lshlwapi -lcomctl32 -lole32 -loleaut32 -luuid -lrpcrt4 -ladvapi32 -lversion -lwsock32 -lwininet"
+export LINKOPTS="${STATIC} ${LINKOPTS} ${GCCCOLORIZED} ${LIBS}"
+
+export   CFLAGS="${CFLAGS} ${GCCCOLORIZED} ${CCOPTS} -I ${WXINCLUDE}"
+export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -I ${WXINCLUDE} -fno-rtti"
+# -fno-rtti is a C++ option only ^
+
+PREFIX="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"

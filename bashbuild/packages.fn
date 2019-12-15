@@ -1,0 +1,418 @@
+###############################################################################
+#          Unified Build Script lib  -  A Part of LisaEm
+#                    http://lisaem.sunder.net
+#                   The Lisa Emulator Project
+#   Copyright (C) 2010 Ray A. Arachelian, All Rights Reserved
+# Released under the terms of the GNU General Public License 2.0
+#----------------------------------------------------------------
+#
+# Package Building Functions (top level)
+#
+###############################################################################
+
+
+
+##############################################################################
+#
+# CLONESRCTREE - clones the source tree creating a compressed tar file.
+# this MUST be called from the topmost directory.  Returns the name of clone
+# via stdout.  Call should be like this:  GZFILE="`CLONESRCTREE $TARGET`"
+#
+# $1 is the target directory.  /var/tmp will be used if none is specified.
+#
+# This is used in SRPM package creation.
+#
+##############################################################################
+function CLONESRCTREE()
+{
+ # variables are quoted incase of spaces
+ TARGET="$1"
+ [ -z "$TARGET" ] && TARGET=/var/tmp
+ PWD="`/bin/pwd`"
+ DIR="`basename \"\`/bin/pwd\`\"`"
+ FILENAME="$TARGET/${DIR}.tar.gz"
+ cd ..
+ # pipe to gz since some OS bundled tars (Solaris, AIX) don't know to call gzip
+ # automatically. Prefer gzip over other since it's more likely to be preinstalled
+ # not as lame as good old .Z
+ tar cpf - "$DIR" | gzip -9 >"$FILENAME"
+ cd "$DIR"
+
+# return the file name
+ echo "$FILENAME"
+}
+
+
+##############################################################################
+#
+# This recusively calls the ./build.sh script, but strips off any install,
+# package commands and sets the PREFIX variable to inside the pkg/build/tmp
+# directory.
+#
+# This is used during package creation.  Must be called from the top level dir
+# inside the build.  this must be called with $0 $@ as parameters from the
+# main build.sh program.
+#
+# i.e. BUILDFORPKG $0 $@
+#
+# This function will then set the PREFIX variable and reinvoke the program
+# with the same parameters to compile the code into a temporary dir, and then
+# create a package from it.
+#
+##############################################################################
+
+function BUILDFORPKG()
+{
+ PWD="`/bin/pwd`"
+ DIR="`basename \"\`/bin/pwd\`\"`"
+
+ if [ -d "pkg/build/" ]
+ then
+     CMD="$1"
+     shift
+     FOO=""
+
+     for i in "$@"
+     do
+
+        # strip off any package, install, or prefix options
+        if ( [ "$i" != "--package" ] && [ "$i" !="--install" ] && [ "${i:9}" != "--prefix=" ] )
+        then
+
+          if [ -n "$FOO" ]
+          then     FOO="$FOO \"$i\"";
+          else     FOO="\"$i\"";
+          fi
+
+        fi
+
+     done
+
+     # save the old prefix, incase there is one as creating the pkg requires
+     # a temporary one.
+     OLDPREFIX="$PREFIX"
+
+     TARGETROOT="$DIR/pkg/build/tmp/root"
+     if [ -z "$PKGPREFIX" ];
+	 then  
+	     export PREFIX="$TARGETROOT/usr/local"
+     else
+	         export PREFIX="${TARGETROOT}/${PKGPREFIX}"
+	 fi
+    
+	 mkdir -pm755 $PREFIX || exit $?
+
+     # OS X requires apps be stored under applications
+     [ -n "$DARWIN" ] && mkdir -pm755 "$TARGETROOT/Applications"
+
+     # always do a clean build when installing to be safe, supporess the banner as we have already seen it.
+     $CMD clean build $FOO "--prefix=$PREFIX" --install --quiet
+     ERR="$?"
+
+     if [ "$ERR" -ne 0 ]; then echo "$ERR"; exit $ERR; fi
+
+     # and we're done
+     # restore the old PREFIX
+     PREFIX="$OLDPREFIX"
+ else
+    echo -n "Cannot find pkg/build directory. cwd is:" 1>&2
+    pwd 1>&2
+    exit 1
+ fi
+
+}
+
+
+# this builds Darwin/OS X pkg folders.  These should be archived with zip or tar.gz/tar.bz2
+function BUILD_OSX()
+{
+    TOP="`pwd`"
+    cd pkg || exit $?
+	mkdir -m755 osx || exit $?
+	cd osx || exit 1
+	TARGET="$TOP/pkg/osx"
+	
+	* * * * *
+	PKGNAME= * * * * *
+	
+	RESROOT="$TOP/pkg/osx/$PKGNAME/Resources"
+	DSTROOT="$TOP/pkg/osx/$PKGNAME/dstroot"
+
+    cd "$TOP"
+    BUILDFORPKG $BUILDARGS
+    cd "$TOP/pkg/build/tmp" || exit $?
+	mv "$TOP/pkg/build/tmp" "$DSTROOT"  # since we'll move the build dir
+    mkdir -pm755 "$TOP/pkg/build/tmp"               # recreate it
+    
+    mkdir -pm775 "$RESROOT"
+	
+	
+	# special extended perms on /Applications under OS X needed
+	# drwxrwxr-x+ 93 root  admin  3162 May 28 14:02 /Applications
+    # 0: group:everyone deny delete
+	if [ -d "$DSTROOT" ]
+	then
+	    chmod 775             "$DSTROOT/Applications" 2>/dev/null
+		chown root:admin      "$DSTROOT/Applications" 2>/dev/null
+	fi
+	
+	# we want to install files and links only - directories are dangerous - don't want
+	# this pkg to be the owner of say /opt or /usr/local/bin incase they are symlinks
+	# on target systems, or have different chmod bits than our umask provides, etc.
+	# include any pkginfo, pre/post/check, etc. as needed.
+	# remove . from the local directory.  Should say /usr/local, not ./usr/local
+	PROTO="$TOP/pkg/sol/pkgproto"
+    cat /dev/null                                               >$PROTO
+
+	# Copy and parse upgrade files and other resources.
+	for i in Welcome.rtf Readme.rtf License.rtf Welcome.txt Readme.txt License.txt Welcome.pdf Readme.pdf License.pdf \
+	         InstallationCheck VolumeCheck preflight preinstall postinstall upgrade postflight preupgrade postupgrade
+	do
+	   if [ -f "$TOP/pkg/templates/osx/Resources/$i" ]
+	   then
+		mkdir -pm775 Resources
+		# remember to insert sed filters for text files
+        FILEINFO=`file -b ${i}`
+		case $FILEINFO in
+		  
+		  # remember to insert SED filters here.
+		  Rich\ Text\ Format*|*text*)  cat $TOP/pkg/templates/osx/$i > Resources/$i ;;
+          *)                           cp  $TOP/pkg/templates/osx/$i Resources/$i
+	                                   chmod 775 Resources/$i                       ;;
+
+		esac 
+
+		chmod 755 Resources/$i
+		chown root:wheel Resources/$i
+
+		fi
+	done
+
+	
+	
+}
+
+# this builds Solaris old style packages, not IPS style packages (not yet, will be added in a different fn)
+function BUILD_SOL()
+{
+    TOP="`pwd`"
+    cd pkg || exit $?
+	mkdir -m755 sol || exit $?
+	cd sol || exit 1        # in top/pkg/sol/
+	TARGET="$TOP/pkg/sol"
+    cd "$TOP"
+    BUILDFORPKG $BUILDARGS
+    cd $TOP/pkg/build/tmp || exit $?
+
+	# we want to install files and links only - directories are dangerous - don't want
+	# this pkg to be the owner of say /opt or /usr/local/bin incase they are symlinks
+	# on target systems, or have different chmod bits than our umask provides, etc.
+	# include any pkginfo, pre/post/check, etc. as needed.
+	# remove . from the local directory.  Should say /usr/local, not ./usr/local
+	PROTO="$TOP/pkg/sol/pkgproto"
+    cat /dev/null                                               >$PROTO
+
+	for i in pkgproto preinstall postinstall checkinstall
+	do
+	   if [ -f "$TOP/pkg/templates/sol/$i" ]
+	   then
+	    # insert sed filters here.
+	    cat $TOP/pkg/templates/sol/$i >$i
+		chmod 755 $i
+	    echo "i $i"                                           >> $PROTO
+       fi
+	done
+	
+	# if there's no pkginfo, create one from our vars
+	if [ ! -f pkginfo ]
+	then
+	    (
+	    echo "PKG=\""${CONAM}${lcnam}\""    # i.e. SUNWfoobar
+		echo "NAME=\"$SOFTWARE $VER\""
+		echo "VERSION=\""$VER\""
+		echo "ARCH=\""`uname -p`\""
+        echo "DESC=\""$DESCRIPTION\""		
+		echo "CLASSES=\""none\""
+		echo "CATEGORY=\""application\""
+		echo "VENDOR=\"${VENDOR}\""
+		echo "EMAIL=\"$AUTHEMAIL\""
+		echo "ISTATES=\"S s 1 2 3\""
+		echo "RSTATES=\"S s 1 2 3\""
+		echo "BASEDIR=\"$PREFIX\""
+		) >pkginfo
+	fi
+	
+	# pkg/build/tmp/root is where the binaries were created
+	# TARGET is where the pkg dir/file will be created.
+	(cd root; find . -print ) | pkgproto >> $PROTO
+	pkgmk -o -r "$TOP/pkg/build/tmp/root" -d "$TARGET" -f $PROTO
+    cd "$TARGET"
+	
+	# prepare the pkg name to be compatible with sunfreeware.com, i.e. foobar-2.09-sol10-x86-local.gz
+	OS=`uname -r | sed 's/5\./sol'`
+	# Solaris has Generic in uname -v, open has svn_ but I'm not sure if SVN will stay, so detect generic.
+    [ -z "`uname -v | grep Generic`" ] && OS="o${OS}"
+	
+	machine="`uname -p`"
+	[ "`uname -p`" == "i386"   ] && machine=x86   # sunfreeware expects x86 for i386/x64 packages
+	[ "`uname -p`" == "x86_64" ] && machine=x86
+	
+    # unless prefix was set to /opt, then we mark it as local (for /usr/local/)
+	where=local
+	[ "`echo $PREFIX | grep /opt`" ] && where=opt
+	
+	PKGFILE="${CONAM}${lcnam}-$VER-$OS-$machine-$where"
+    pkgtrans . "$PKGFILE" ${CONAM}${lcnam}
+    gzip -9 $PKGFILE
+	PKGFILE="$PKGFILE.gz"
+	##TODO::uncomment after testing and debugging## rm -rf ${CONAM}${lcnam} "$TOP/pkg/build/tmp/*"; mkdir -pm755 "$TOP/pkg/build/tmp/root"
+	cd $TOP
+}
+
+function BUILD_DEB()
+{
+
+ echo want packagename_version_arch.deb
+
+}
+
+
+function BUILD_RPM()
+{
+    TOP="`pwd`"
+    cd pkg || exit 1
+	mkdir -m755 rpm
+	cd rpm || exit 1        # in top/pkg/rpm/
+    mkdir -m755 BUILD RPMS SOURCES SPECS SRPMS
+    cd SOURCES
+	TARGET="`pwd`"
+    cd "$TOP"
+	SRCGZ=`CLONESRCTREE "$TARGET"`
+    cd ../SPECS
+	
+	if [ -f "$TOP/pkg/templates/rpm.spec" ]
+	then
+       cat  "$TOP/pkg/templates/rpm.spec" | sed -e "s/VERSION/$VERSION/g"  >SPECS/rpm.spec
+    else
+	     (
+          echo "Name: "
+          echo "Version: "
+          echo "Release:	1%{?dist} "
+          echo "Summary:" 
+          echo "Group: "
+          echo "License:" 
+          echo "URL: "
+          echo "Source0: "
+          echo "BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%\(%\{__id_u\} -n\)"
+          echo "BuildRequires:" 
+          echo "Requires:"
+          echo "%description"
+          echo "%prep"
+          echo "%setup -q"
+          echo "%build" 
+          echo "./build.sh build"
+          echo "%install"
+		  echo "./build.sh build --install"
+          echo "%clean"
+		  echo "./build.sh clean"
+          echo "%files %defattr\(-,root,root,-\)"
+          echo "%doc"
+          echo "%changelog"
+	    ) >$TOP/pkg/spec
+	fi
+	rpmbuild -v -bb --clean SPECS/rpm.spec
+}
+
+##############################################################################
+#
+# ICANHASPKG - figures out what kind of host we're on, and returns the package
+#              type for it. Not all systems will be able to have package
+#              created for them. Some will support multiple package types.
+#              i.e. you might get back "RPM DEB" if both are supported.
+#             
+#              Note, while your system may use RPM or some other pkg manager
+#              unless the proper developer packages are installed, you might
+#              not be able to create packages.  i.e. need rpm-build needs to
+#              be installed to be able to create RPMs, even though you'll
+#              have the rpm command available.
+#
+##############################################################################
+
+function ICANHASPKG()
+{
+   PKGS=""
+
+   case `uname -s` in
+     AIX)             [ -n "`which rpmbuild 2>/dev/null`" ] && PKGS="RPM $PKGS"
+                      # add check for LPP here
+                      ;;
+
+     Darwin)          PKGS="OSX"  # also look into auto packaging a DMG with the background pngs, etc.
+	                  # Sorry opendarwin, I never knew you, but you'll be missed.
+                      ;;
+
+     SunOS)           [ -n "`which pkgmk 2>/dev/null`" ] && [ -n "`which pkgtrans 2>/dev/null`" ] && [ -n "`which pkgproto 2>/dev/null`" ] && PKGS="SOL $PKGS"
+                      # reminder, check for open solaris here too, might want to do IPS in the future
+					  
+                      # Alas, poor Sun Microsystems, Inc., I knew him well. :(
+                      ;;
+
+     CYGWIN*|Cygwin*) PKGS=""  # don't yet know how to build MSIs, but want to
+                      ;;
+
+     Linux)		     PKGS=""
+					 [ -n "`which rpm-build 2>/dev/null`" ] && PKGS="RPM $PKGS"
+					 [ -n "`which dpkg`" ]                  && PKGS="DEB $PKGS"
+                      ;;
+					  
+					  
+     OpenBSD)        PKGS=""   # don't yet know how to do these yet, but want to.
+                      ;;
+	 FreeBSD)        PKGS=""   # don't yet know how to do these yet, but want to.
+                      ;;
+
+     *)               PKGS=""
+     esac
+
+     echo "$PKGS"
+}
+
+
+##############################################################################
+#
+# MAKEPKG - figures out what kind of host we're on, and builds the appropriate
+#           package(s) for it. Not all systems will be able to have package
+#           created for them, some will have multiple types.  Such is the way
+#           of the tao
+#
+# This is a very simple fn that calls the above fn to get a list of buildable
+# pkgtypes, then calls a build function for each one, which does the work for
+# us.  The resource files and templates must be setup for each of these ahead
+# of time as no parameters are passed.
+#
+# When calling this, cwd must be at the top level of the package. i.e. for
+# lisaem v1.3.0, pwd should be ${whatever}/lisaem-1.3.0/ and the pkg dir
+# must be accessible by doing cd pkg, and its structure must be fully
+# populated with all the resources needed by the various pkg types.
+#
+##############################################################################
+
+function MAKEPKG()
+{
+
+ PKGTYPES="`ICANHASPKG`"
+ if [ -n "$PKGTYPES" ]
+ then
+    for i in `echo $PKGTYPES`
+    do
+        BUILD_${PKGTYPES}
+    done
+ else
+    if [ -z "$ALREADYSORRY" ]
+    then
+      echo "Sorry, I don't know how to make packages for your OS."
+      ALREADYSORRY="Sorry"
+    fi
+ fi
+}
+

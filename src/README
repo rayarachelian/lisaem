@@ -1,0 +1,31 @@
+LisaEm source code has been modified to mostly match the actual organization
+of a real Lisa.  Of course, not all of the dirs here have a purpose.  Some
+are here for, ornamental reasons.
+
+The idea is to structure the source code tree in the same manner as an actual
+physical Lisa as much as possible.
+
+
+host			- Host OS related files
+
+include			- common header files (links are used to the libs)
+
+lib			- libraries such as libGenerator and dc42
+
+lisa/cpu_board		- sources related to the Lisa's CPU board
+lisa/crt		- the display (placeholder)
+lisa/expansion_slots	- source code related to the expansion slots
+lisa/floppy		- source code related to the IWM/6504 floppy controller
+lisa/io_board		- source code related to the I/O board (VIA, SIO, COPS, etc.)
+lisa/keyboard		- keyboard table
+lisa/memory		- memory boards (placeholder)
+lisa/motherboard	- sources associated with motherboard devices (common C files)
+lisa/power_supply	- placeholder
+lisa/video_board	- placeholder
+
+printer			- source code that emulated printers (ImageWriter/AMDP)
+
+storage			- hard drive storage devices (profile.c)
+
+tools			- various Lisa related tools (lisafsh-tool, lisadiskinfo, etc.)
+

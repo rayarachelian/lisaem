@@ -1,0 +1,147 @@
+###############################################################################
+#          Unified Build Script lib  -  A Part of LisaEm
+#                    http://lisaem.sunder.net
+#                   The Lisa Emulator Project
+#   Copyright (C) 2010,2019 Ray A. Arachelian, All Rights Reserved
+# Released under the terms of the GNU General Public License 2.0
+#----------------------------------------------------------------
+#
+# Note that in LisaEm, there are sub-projects which simply
+# have a symbolic link to this include file in order to save
+# space and to make it easier to keep the build.sh consistent.
+#
+# If you need to split off the sub-projects, you should replace
+# the symlinks with this actual file.
+#
+# this is called src.build because it is sourced, and also I
+# didn't want to have build.sh be interfered with when using
+# tab completion within bash.
+#
+# as for why, see: http://varnish-cache.org/docs/phk/autocrap/
+#
+###############################################################################
+
+
+function is_function_defined() {
+ [[ "$( type $1 2>/dev/null | head -1 )" == "$1 is a function" ]] && return 0
+ return 1
+}
+
+
+# Walk the XTLD and look for dirs named include or lib and collect them, remove duplicates as well
+function set_includes_and_libs() {
+  local i
+  local inc
+  local inc1
+  local lib
+  local lib1
+
+  # get local subdirs as well as any already set
+  inc1="$(find ${XTLD} -type d -name include -print | sed -e 's/ /\\\\ /g' | while read i; do echo $i; done; )"
+  lib1="$(find ${XTLD} -type d -name lib     -print | sed -e 's/ /\\\\ /g' | while read i; do echo $i; done; )"
+
+  # sort and remove duplicates, any item without a - is an include dir, so prefix -I
+  for i in $( echo $INC $inc1 | sed -e 's/-I//g' | sort | uniq ); do 
+    [[ "${i:0:1}" == "-" ]] && inc="$inc $i" || inc="$inc -I $i"
+  done
+  echo "export INC=\"$INC $inc\""
+
+  # sort and remove duplicates, any item without -l prefix is a dir, so prefix -L
+  for i in $( echo $LIB $lib1 | sed -e 's/-L//g' | sort | uniq ); do 
+    [[ "${i:0:2}" == "-l" ]] && lib="$lib $i" || lib="$lib -L $i"
+  done
+  echo "export LIB=\"$LIB $lib\""
+}
+
+###############################################################################
+###############################################################################
+###  Initialize Platform specific variables    ################################
+###############################################################################
+###############################################################################
+
+# Ensure this is only loaded once when sourcing.
+if ! is_bashbuild_loaded 2>/dev/null; then
+
+  # save the current date/time in epoch seconds so we can time how long this build
+  # takes - this is used by the progress bar.
+   [[ -z "$STARTCOMPILE" ]] && export STARTCOMPILE="$(date '+%s' 2>/dev/null)"
+
+   [[ -z "$TLD" ]] && export TLD="$( /bin/pwd )"  # | sed -e's/ /?/g' )"
+   if [[ -n "$(echo $TLD | grep ' ')" ]]; then
+      echo "Please place this source code in a directory whose path does not contain spaces" 1>&2
+      echo "(shell scripts generally have issues with this and will fail to work properly)" 1>&2
+      echo "The current directory is \"${TLD}\"" 1>&2
+       exit 3
+   fi
+
+   if [[ ! -d "${TLD}/bashbuild" ]]; then
+      echo "src.build: Couldn't find the top-level dir bashbuild at ${TLD}/bashbuild even though sourced src.build!" 1>&2
+      exit 5
+   fi
+
+   # prepare globals for progressbar if they're not already set. These need to be
+   # in the .env-ext so they're not restored by save|restore_environtment()
+   [[ -z "$PERCENTPROGRESS ]] && PERCENTPROGRESS=0
+   [[ -z "$PERCENTCEILING  ]] && PERCENTCEILING=100
+  
+   # set the local top level directory for this build, as we go down into subdirs and run
+   # build, TLD will be the top, but XTLD will be the "local" build's TLD.
+   export XTLD="$( /bin/pwd )"
+
+   # save environment vars so we'll know which to save and which came in before use
+   #echo "saving to ${XTLD}/.env-ext" 1>&2
+   env                                         >${XTLD}/.env-ext-original
+   env | cut -d= -f1 | sort | egrep -v '^_=$' | sed -e 's/$/=/g' >${XTLD}/.env-ext
+
+   pushd "${TLD}/bashbuild" 2>/dev/null >/dev/null
+
+   if ! touch .xTestx; then echo "These scripts must live on a writeable mount point" 1>&2; exit 5; fi
+   rm .xTestx
+   
+   # include pre-amble functions/code
+   for fn in $(ls -1 ${TLD}/bashbuild/pre-*.fn 2>/dev/null); do source "${fn}"; done
+
+   OS="$(uname -s)"
+   # I use Cygwin as a pre-frontal cortex to Windows. If for some 
+   # reason you want to build LisaEm under Cygwin *for use* inside Cygwin
+   # (i.e. w/GTK + X11) instead of as a native Windows app, you could
+   # try to comment the line below and uncomment the line after it.
+     [[ "${OS:0:6}" == "CYGWIN" ]] && OS="Windows"
+   # [[ "${OS:0:6}" == "CYGWIN" ]] && OS="CYGWIN"
+
+   export OS
+
+   # load system specific settings/scripts and all the functions needed
+   fn=""
+   for fn in $(ls -1 $TLD/bashbuild/${OS}*.sys 2>/dev/null); do source "${fn}"; done
+   [[ -z "$fn" ]] && ( echo "Could not load settings for \"$OS\" operating system" 1>&2; exit 60; )
+
+   # :TODO: each OS file should include functions for making packages, linking, compiling, etc.
+   #        these should have a standard naming convention such as Linux-pkg.sys, etc.
+   #        Cygwin will need path translation wrappers using cygpath, they'll be loaded in order
+
+   # include normal functions/code
+   for fn in $(ls -1 $TLD/bashbuild/*.fn | grep -v pre- | grep -v post- 2>/dev/null ); do 
+      source "${fn}"
+   done
+
+   # include post functions/code
+   for fn in $(ls -1 $TLD/bashbuild/post-*.fn 2>/dev/null); do source "${fn}"; done
+
+   popd 2>/dev/null >/dev/null
+
+   # calculate all include and lib file paths, if wx-config.fn is in bashbuild
+   # they'll be included here as well. If your project doesn't rely on wxWidgets
+   # you should remove wx-config.fn
+
+   # since variables set inside bash functions are all local we have to do it like this.
+   eval $(set_includes_and_libs)
+   
+   #get_elapsed_time; echo "seconds to load fn's"
+
+fi
+#########################################################################################
+
+export BUILDWARNINGS="${TLD}/obj/build-warnings.txt"
+
+function is_bashbuild_loaded { true ; }

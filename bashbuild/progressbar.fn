@@ -1,0 +1,93 @@
+
+##############################################################################
+#
+# Display a progress bar with number of seconds elapsed as well as the
+# percentage done. Parameters are:
+#
+#   base percent for this phase
+#   current item index in this phase
+#   total items in this phase
+#   percent that represents the end of this build phase
+#
+# To print the number of seconds export STARTCOMPILE=$(date '+%s') at the
+# begining.
+#
+# Global variables used by the library are:
+#
+# export PERCENTPROCESS=35 PERCENTCEILING=75 # base and ceiling of current phase
+# export NUMJOBSINPHASE=15 number of jobs in the current phase
+# export PERCENTJOB= current job number in the current phase
+#
+# these are updated by the compileq functions.
+##############################################################################
+
+function get_elapsed_time() {
+    local now=""
+    now=$( date '+%s' )
+    [[ -n "$STARTCOMPILE" ]] && echo "$(( $now - STARTCOMPILE ))" || echo ""
+}
+
+function update_progress_bar()
+{
+  if [[ "${TERM:0:5}" == "ansi"  ]] || \
+     [[ "${TERM:0:5}" == "xterm" ]] || \
+     [[ "${TERM:0:2}" == "vt1"   ]] || \
+     [[ "${TERM:0:2}" == "vt2"   ]];     then
+
+    # percentage done so far
+    local percentbase="$1"
+    # current item in current phase
+    local phaseposition="$2"
+    # how many in this build phase total
+    local phasetotal="$3"
+    # percent end phase
+    local percentceiling="$4"
+
+    if [[ -z "$4" ]]; then
+       echo "$(/bin/pwd): update_progress_bar $@ Missing parameters" 1>&2
+       set >/tmp/buildbash.set.out
+       exit 9
+    fi 
+
+    local elapsed=""
+ 
+    local d="##################################################################"
+    local l="::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+   
+    ansi_save_cursor; ansi_set_cursor_home; ansi_bg_black; 
+
+    elapsed=$(get_elapsed_time)
+    if [[ -n "$elapsed" ]]; then
+       ansi_fg_yellow; printf "%15s seconds " "${elapsed} " 1>&2
+    fi
+ 
+    # we use 50 chars so really this is totalpercent/2 and leftpercent/2 - this is so we don't break terminals that are 80 cols.
+    #
+    # base+  / (ceiling-base)
+    #
+    totalpercent=$(( ( $percentbase + ( $phaseposition * ( $percentceiling - $percentbase ) / ( $phasetotal ) )  )  ))
+
+    ansi_fg_b_white; printf "%3d" $totalpercent 1>&2; ansi_fg_white; echo -n "%" 1>&2
+
+    totalpercent=$(( $totalpercent / 2 ))
+    local left=$(( 50 - $totalpercent ))
+
+    ansi_fg_green; echo -n "[" 1>&2
+
+    if [[ $totalpercent ]]; then
+       ansi_bg_white; ansi_fg_white
+       echo -n "${d:0:$totalpercent}" 1>&2
+    fi 
+
+    if [[ $left ]]; then
+       ansi_fg_b_red
+       ansi_bg_red
+       echo -n "${l:0:$left}" 1>&2
+    fi
+
+    ansi_bg_black; ansi_fg_green; echo -n "]  $COMPILEPHASE     " 1>&2
+    ansi_fg_b_white
+
+    ansi_restore_cursor
+  fi
+}

@@ -1,0 +1,300 @@
+###############################################################################
+#          Unified Build Script lib  -  A Part of LisaEm
+#                    http://lisaem.sunder.net
+#                   The Lisa Emulator Project
+#   Copyright (C) 2010 Ray A. Arachelian, All Rights Reserved
+# Released under the terms of the GNU General Public License 2.0
+#----------------------------------------------------------------
+#
+# Multi-processor compilation Queue
+#
+###############################################################################
+
+
+
+
+##############################################################################
+# GETCPUS
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+# This has now moved to each OS.sys file in bashbuild ::TODO:: remove me
+##############################################################################
+
+if ! is_function_defined GETCPUS; then
+function GETCPUS()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+   case `uname -s` in
+     AIX)              NUMCPUS=`lsdev -Ccprocessor | grep -ci available                                              2>/dev/null`  ;;
+     Darwin)           #NUMCPUS=`/usr/sbin/ioreg | /usr/bin/egrep -c "+-o CPU.@.*active.*|+-o MacRISC2CPU.*active.*" 2>/dev/null`  # ::TODO:: add check for G4/G5
+                       NUMCPUS=`sysctl -n hw.ncpu`                                                                                 ;;
+     SunOS)            NUMCPUS=`/usr/sbin/psrinfo  | /usr/bin/grep -ci on-line                                       2>/dev/null`  ;;
+     CYGWIN*|Linux)    NUMCPUS=`nproc 2>/dev/null`                                                                                 ;;
+     OpenBSD|FreeBSD)  NUMCPUS=`sysctl -n hw.ncpu                                                                    2>/dev/null`  ;;
+   esac
+   [[ -z "$NUMCPUS" ]] && sysctl hw.ncpu 2>/dev/null| cut -f2 -d:
+   NUMCPUS=$(( $NUMCPUS + 0 )) 2>/dev/null  # in case we get a non-numeric, normalize it.
+   [[ $NUMCPUS -lt 1 ]] && NUMCPUS=1
+  fi
+
+  #too bad there's no simple way to detect hyperthreads vs real cores on the above.
+  
+  # normalize to a number, just incase we got passed garbage
+  NUMCPUS=`printf "%d\n" "$NUMCPUS" 2>/dev/null`
+  # ensure at least 1
+  [ $NUMCPUS -lt 1 ] && NUMCPUS=1
+
+  export NUMCPUS
+  return $NUMCPUS
+}
+
+fi
+
+
+
+##############################################################################
+# QJOB
+#
+# Queues up a compilation job in the background and waits for it to complete
+#
+# Parameters $1 text to output
+#	           $2..$N command to execute
+#
+# Waits for an available queue slot, then creates a slot script, and forks it
+# off it the backgroud.  When the job is done, it will erase itself, saving us
+# cleanup steps later on.
+#
+# as it runs, the output file will be named $SLOT.out, but when it's over it
+# will be renamed to $SLOT.done on success of $SLOT.failed.
+#
+# The output will be printed to the stdout when each job finishes.  Failed jobs
+# will print last, and the build script will abort with a failure.
+#
+##############################################################################
+jobnum=0
+
+function QJOB {
+
+  if [[ -z "$2" ]]; then
+     echo "QJOB: $PWD QJOB Missing Parameters $@ passed" 1>&2
+     exit 9
+  fi
+
+  # if we only have one CPU, execute immediately, no need to waste effort queueing
+  GETCPUS
+  if [[ $NUMCPUS -eq 1 ]]
+  then
+    [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
+    export PERCENTJOB="$(( $PERCENTJOB +1 ))"
+
+    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD QJOB: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
+    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD QJOB: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
+    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD QJOB: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
+    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD QJOB: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
+    update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
+
+    if [[ "${1:0:2}" == "!!" ]]; then echo "${1:2}" 1>&2; else echo -n  "$1" 1>&2; fi
+    shift
+    $@ 1>&2
+    if [[ $? -ne 0 ]]; then exit $?; fi
+    return;
+  else
+
+    # make sure we have at least one free slot (and process any completed ones before adding more)
+    WAITQ
+
+    # create a unique job name to launch # we don't care that much about the names, we just want
+    # unique ones.
+    jobnum=$(( $jobnum + 1 ))
+    export SLOTNAME="slot.$$.${jobnum}.sh"
+    while [[ -f "$SLOTNAME" ]]; do
+      jobnum=$(( $jobnum + 1 ))
+      export SLOTNAME="slot.$$.${jobnum}.sh"
+    done
+
+    # create the compile slot script.
+    ( # shell for our slot script should also be bash
+     echo "#!/usr/bin/env bash"                          
+     # $1 is the text to output.  i.e. "!!compiling foobar.c"
+     # if $1 starts with !! then append a newline after it, otherwise, don't.
+     NAME="$1"
+     if [[ "${NAME:0:2}" == "!!" ]]; then
+        echo "echo    \"${NAME:2}\" >>/tmp/${SLOTNAME}.out"  # output $1 to the out file with newline
+     else
+        echo "echo -n \"$NAME\"     >>/tmp/${SLOTNAME}.out"  # output $1 to the out file.
+     fi
+     shift                                                   # remove $1 from the list of parameters
+     echo "( $@ 2>&1 ) 2>&1       >>/tmp/${SLOTNAME}.out"    # execute $2 with params $3..$N and append to out file
+     echo 'if [[ $? -ne 0 ]]; then'                          # check for errors.
+     echo "   mv /tmp/$SLOTNAME.out /tmp/${SLOTNAME}.failed" # rename to .failed on failure
+     echo "   cp $SLOTNAME /tmp"                             # keep the failed job for analysis
+
+     echo "   echo \"see: /tmp/${SLOTNAME} /tmp/${SLOTNAME}.failed for details\" >>/tmp/${SLOTNAME}.failed"
+     echo "   echo \"failed command was: $@\" >>/tmp/${SLOTNAME}.failed"
+     echo "   echo \"from: \$(/bin/pwd)\" >>/tmp/${SLOTNAME}.failed"
+     echo 'else'
+     echo "   mv /tmp/$SLOTNAME.out /tmp/${SLOTNAME}.done"   # rename to .done on success
+     echo 'fi'
+     echo "rm $SLOTNAME"                                     # clean up from CWD
+     echo "exit 0"                                           # and we're done.
+    )       > ./${SLOTNAME}                                  # create the slot script, make it executable
+    chmod 755 ./${SLOTNAME}                                  # make it executable by our user
+    touch  /tmp/${SLOTNAME}.out                              # avoid race conditions where QJOB is done, but output file
+                                                             # has been created, but we fall through WAITQALL
+    ./${SLOTNAME} 1>&2 &                                     # launch it in the background.
+  fi
+}
+
+
+##############################################################################
+# WAITQALL and WAITQ
+#
+# Waits until (all) queued jobs are complete and outputs results
+# If errors happen, we wait until all other jobs are done, then abort the
+# build script hard.
+#
+##############################################################################
+
+waitqc=0
+function WAITQ()
+{
+  GETCPUS
+  twirl='/-\\|' # twirly cursor
+  if [[ $NUMCPUS -eq 1 ]]; then return; fi
+  /usr/bin/tty -s && TTY="yes" || TTY=""   # don't bother with twirly cursor if non-interactive
+  OUT="/tmp/slot.$$"
+
+  # wait until we have slots open before enqueing more jobs 
+  #[[ -n "$TTY" ]] && echo -n " " 1>&2
+
+  waitqc=$(( $waitqc + 1 ))
+  [[ $waitqc -ge 5 ]] && waitqc=0
+
+  [[ -n "$TTY" ]] && printf "%c\b" "${twirl:$waitqc:1}" 1>&2
+  sleep 0.1 2>/dev/null || sleep 1 # osx, linux, cygwin support fractions, solaris, aix do not.
+
+  while [[ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -ge $NUMCPUS ]]
+  do
+     waitqc=$(( $waitqc + 1 ))
+     [[ $waitqc -ge 5 ]] && waitqc=0
+     [[ -n "$TTY" ]] && printf "%c\b" "${twirl:$waitqc:1}" 1>&2
+     sleep 0.1 2>/dev/null || sleep 1 # osx, linux, cygwin support fractions, solaris, aix do not.
+  done
+
+  # any successful jobs out there?
+  if [[  `ls -l ${OUT}.*.sh.done 2>/dev/null | wc -l` -gt 0 ]]; then
+     for z in  ${OUT}.*.sh.done; do
+        cat "$z" | head -5  1>&2
+        [[ "$( wc -l < ${z} 2>/dev/null )" -gt 2 ]] && echo "..." 1>&2  
+        echo "---------------------- $z -----------------------" >>$BUILDWARNINGS
+        cat "$z" >>$BUILDWARNINGS
+        rm -f "$z"
+        [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
+        export PERCENTJOB="$(( $PERCENTJOB +1 ))"
+
+        # if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD WAITQ: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
+        # if [[ -z "$PERCENTJOB"     ]];  then echo "$PWD WAITQ: 2 PERCENTJOB is empty"      1>&2; exit 9; fi
+        # if [[ -z "$NUMJOBSINPHASE" ]];  then echo "$PWD WAITQ: 3 NUMJOBSINPHASE is empty"  1>&2; exit 9; fi
+        # if [[ -z "$PERCENTCEILING" ]];  then echo "$PWD WAITQ: 4 PERCENTCEILING is empty"  1>&2; exit 9; fi
+
+        update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
+     done
+  fi
+
+
+ # only check for failed jobs at the end when there are no other jobs running,
+ # otherwise we'd leave behind still in flight successful jobs and junk files.
+ if [ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -eq 0 ]
+ then
+
+  #echo looking for failed: "`ls slot.$$.*.failed 2>/dev/null`"  >>/tmp/xxx.build.out
+  if [[ `ls -l ${OUT}.*.sh.failed 2>/dev/null | wc -l` -gt 0 ]]
+  then
+     sleep 5  # wait a few seconds incase there are any stragglers/failed jobs
+     for z in ${OUT}.*.sh.failed
+     do
+        echo "---------------------------------------------------------------" 1>&2
+        echo "${PWD}/WAITQ: failed job: $z"                                    1>&2
+        echo "---------------------------------------------------------------" 1>&2
+        cat $z                                                                 1>&2
+        echo "---------------------------------------------------------------" 1>&2
+        echo 1>&2
+        echo "---------------------- $z -----------------------" >>$BUILDWARNINGS
+        cat "$z"                                                 >>$BUILDWARNINGS
+        echo "------------- Compilation Aborted ------------"    >>$BUILDWARNINGS
+     done
+     # since there were failed jobs, we have to quit our build. Sorry.
+     echo "${PWD}/WAITQ: Aborted due to a failed job!" 1>&2
+     exit 9
+  fi
+ fi
+
+}
+
+
+function WAITQALL()
+{
+  # wait until we have slots open before enqueing more jobs
+  # we don't sleep inside the loop since sleep only allows a minimum of 1 second.
+  # and we want to be able to launch jobs as quickly as possible.  This is a bit of a hog.
+  # sorry.  But with any luck, the multiple copies of GCC we launch will keep our box
+  # busier than our script.
+
+  [[ -z "$NUMCPUS"  ]] && GETCPUS
+  [[ $NUMCPUS -eq 1 ]] && return
+
+  OUT="/tmp/slot.$$"  # /tmp/slot.6588.10.sh.done
+
+  while [[ `ls -l $OUT.*.sh.out 2>/dev/null | wc -l` -gt 0 ]]; do WAITQ; done
+  WAITQ    # one more to make sure nothing is left to process
+
+  [[ -n "$TTY" ]] && printf "\b \b" 1>&2
+}
+
+
+
+##############################################################################
+# "To compile or not to compile, that is the question, whether 'tis nobler in
+# the mind, to suffer the slings and arrows of source code, or by compiling
+# and linking them, to satisfy their dependencies.." -- William Shakeclang
+#
+# if the .o file exists, compare it to the .c's timestamp, if .c is newer then
+# compile. if the .o file does not exist, compile.
+#
+# $1 - source file. $2 - object file.
+#
+# if the object file does not exist, it will return true.
+# if the source is newer than the object, it will return 0, thus compiling
+# (remember in BASH 0 means true or pass, non-zero means false or fail which
+# is the opposite of in C)
+#
+# This is why we don't need make.  Essentially that's the core of what makes
+# make work.
+#
+# Looks like -ot works as far back as macos 10.4 so we should be able to use
+# it on all systems with a bash/coreutils newer than that. Also returns true
+# if "$2" does not exist, so it's perfect.
+#
+# And functions in bash return true/false based on the last expression, so
+# no need for an if/then, nor a return command.
+# 
+# Old way just incase we run into an older system and we need to fix this:
+#   #[[ "`ls -tr $1 $2 2>/dev/null| tail -1`" == "$2" ]]
+##############################################################################
+
+function NEEDED()
+{
+  [[ "$2" -ot "$1" ]]
+}
+
+#  echo "----"    1>&2
+#  echo "1: $1"   1>&2
+#  echo "2: $2"   1>&2
+#  ls -l $1 $2    1>&2
+#  pwd            1>&2
+#  [[ "$1" -nt "$2" ]] && echo "1 -nt 2 is true" 1>&2 || echo "1 -ot 2 is false" 1>&2  
+#  [[ "$2" -ot "$1" ]] && echo "2 -ot 1 is true" 1>&2 || echo "2 -ot 1 is false" 1>&2
+#  echo "----"    1>&2
+#  [[ "$2" -ot "$1" ]]

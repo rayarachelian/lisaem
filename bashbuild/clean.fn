@@ -1,0 +1,8 @@
+########################################################
+#
+# Clean assets underneath current directory tree
+#
+########################################################
+
+function CLEANARTIFACTS { for i in $@; do find . -name "${i}" -exec rm {} \; ; done; }
+

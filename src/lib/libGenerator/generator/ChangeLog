@@ -1,0 +1,208 @@
+0.03 - first release
+
+0.04.01  [68000]   Fixed DIVU and DIVS instructions
+         [68000]   Fixed ROR/ROL instruction
+         [68000]   Fixed obscure X flag bug
+         [VDP]     Added palette flag so that changed palette entries are known
+         [CORE]    Added SMD/BIN auto detect (Richard Bannister)
+         [CORE]    Fixed removal of old image when a new image is loaded
+
+0.04.02  [VDP/UI]  Added 16 bit and 24 bit support
+         [68000]   Added ability to simulaneously run UAE's CPU and perform
+                   checks as a game is played
+         [68000]   Fixed ADD.W setting X/C flags under certain circumstances
+         [68000]   Fixed ASL.W and ASL.L V flag
+         [Z80]     Added z80 sub-processor
+
+0.04.03  [SOUND]   Added FM sound
+         [68000]   Fixed ASL/ASR/LSL/LSR shifts
+         [SOUND]   Fixed FM DAC
+         [SOUND]   Fixed FM Timer
+         [68000]   Fixed bug that caused Columns score to be wrong
+         [Z80]     Swapped z80 processors and mysteriously loads of bugs are
+                   fixed (bah)
+
+0.10b1   [VDP]     Added 'simple' VDP routines to emulate the 315-5313 vdp
+         [VDP]     Added palette caching to speed up conversion
+         [VDP/UI]  Performance tuning after profiling code
+         [UI]      Added DGA direct screen plotting for xfree86 servers
+         [68000]   Added support for TRAPs
+         [VDP]     Fixed a bug when copying data to the VSRAM (warsong)
+         [CORE]    Reworked logging
+
+0.10b2   [VDP]     Fixed bug in plotters to do with the shadow/hilight (sonic 2)
+         [68000]   Fixed supervisor ANDing SR flags (world champ soccer)
+         [68000]   Added LINE10 and LINE15 emulation (yochi, ynar)
+         [VDP]     Added window support for complex vdp plotter (sonic 2,
+                     caesars palace, warsong, many more)
+         [VDP]     Added register storing after H retrace
+         [MEM68K]  Fixed joy pad buttons (ynar, juyu_gai)
+         [VDP]     Added display disabling
+         [VDP]     Added 'smooth' option, although it's not particularly good
+
+0.11     [CORE]    General cleanup so I can release the source
+         [REG68K]  Changed the order of events so that the vblank occurs at
+                   the end rather than the start
+         [CORE]    Changed everything to default to /usr/local and changed lib
+                   to be share.
+
+0.12     [VDP]     Completely reworked the VDP event system and Interrupt
+                   processing (fixes sonic water levels, outrun)
+         [MEM68K]  Fixed DMA system for addresses outside allowable bounds
+                   (altered beast)
+         [VDP]     Implemented VRAM copies and made it so that invalid
+                   copies are not blocked but truncated instead
+         [VDP]     Completely reworked the complex VDP sprite plotter, and
+                   implemented the features required by Sonic's title screen.
+                   I've also fixed the mask features, which I've been meaning
+                   to do for a while.
+         [UI]      Added support for putting a filename on the command line
+         [UI]      Added support for changing the log level at run-time
+
+0.13     [VDP]     Fixed new sprite plotter entering infinite loop on stupid
+                   games (ecco ii)
+         [VDP]     Fixed vertical scroll (oops, I think I broke it on 0.12)
+         [SOUND]   The sound routines now detect buffer overrun and underrun
+                   in order to control the 'skip'.
+         [UI]      Wrote new svgalib version that uses the above 'dynamic' skip
+         [VDP]     Fixed control port not doing 'F' flag correctly (pacman2,
+                   and probably many games just won't have worked at all)
+         [VDP]     Fixed window left/right incorrectly plotting cells
+         [VDP]     Implemented interlace mode
+
+0.14     [REG68K]  Removed a pointless addition per block that was left over
+                   from ages ago.  Simplest speed up of all times :)
+         [UI]      Added vsync toggle to svgalib interface - this results in
+                   significant speedup and much smoother emulation.
+         [68000]   Fixed Scc when false (definitions thought it was a NOP!)
+         [68000]   Fixed minor bug in LSL and ASL
+         [68000]   Fixed ADDQ.W with address registers (stupid book)
+         [68000]   Fixed MOVEMMR.W with address registers (micky mouse illusion)
+         [VDP]     Fixed shadow 'normalising' for high-priority tiles, thanks
+                   to Charles MacDonald <cgfm2@hooked.net> (ecco ii)
+         [VDP]     Added shadow layer to interlace mode
+         [VDP]     Fixed layer A appearing when it shouldn't (Battle Tank)
+         [VDP]     Fixed bounds check on vram fill (Alisia Dragoon, sega logo)
+         [VDP]     Fixed updating vdp address on vram copies (T2)
+         [VDP]     Fixed vdp fill bug when increment 2 on even addresses
+         [VDP]     Fixed write to vdp after dma thinking it's a fill (T2)
+         [VDP]     Re-worked the interrupt processing again (which breaks Out
+                   Run, but fixes Asterix and improves the Sonic water levels)
+         [VDP]     Fixed vdp dma to be banked (never seen this used)
+         [VDP]     Fixed bug in complex vertical scrolling (air diver)
+         [VDP]     Bodged together enough support for H counter reading to work
+                   for '3 Ninjas Kick Back' (authors of which should be shot).
+         [68000]   Fixed SUBQ bug for address registers (Andre Agassi Tennis)
+         [68000]   Fixed bug in CRAM copy (Andre Agassi Tennis - coo, KGen bug)
+         [CORE]    Changed the way logging works so you can compile it out
+   
+0.15     [CORE]    Several minor improvements
+         [CORE]    Added checksum code
+         [DOS]     Wrote DOS/allegro version!
+         [CORE]    Split console UI so that svgalib and DOS use same core
+         [CORE]    General cleanup
+         [CORE]    Switching to PAL and resetting ROM now works
+         [CONSOLE] Added ability to toggle layers and reset ROM
+   
+0.16     [VDP]     Fixed DMA bug (wolfchild, asterix etc)
+         [VDP]     Fixed sprite priorities, and speeded up the complex
+                   plotter by about 10% too! (sonic3d, sonic2 title,
+                   sonic1 marble zone etc)
+         [CORE]    Fixed improper 32 bit accesses to IO memory
+         [CORE]    Implemented proper port handling for controllers (sonic
+                   compilation, 3in1, awesome possom, and all 'soft reset'
+                   cartridges)
+         [VDP]     I broke VSRAM in 0.14 - how come nobody told me?! (echo ii)
+         [VDP]     Fixed bug when vertical and horizontal scrolling (echo ii)
+
+0.17     [CONSOLE] Sped up plotter by 10-20% by writing to screen memory more
+                   efficiently!
+         [CONSOLE] Implemented full-screen mode and delta buffer for it
+         [VDP]     Fixed colour DMA (sonic3d intro)
+         [CORE]    Fixed 2nd controller
+         [VDP]     Altered some stuff which may or may not affect something
+                   (thanks to Charles MacDonald <cgfm2@hooked.net>)
+         [VDP]     Fixed bug that meant that the cell-plotter didn't do
+                   highlighting properly
+         [VDP]     Re-wrote VDP plotters (20-30% slower!) - now hi-light and
+                   shadows should work correctly, this follows discussions
+                   with Charles "The Man" MacDonald <cgfm2@hooked.net>
+         [68000]   Reimplemented clock cycle counting to be more accurate
+         [VDP]     Re-wrote VDP plotters AGAIN, now it's fast again!  The
+                   plotters are now about 20% faster than 0.15's.
+   
+0.18     [VDP]     Fixed unterminated address set "feature" (fixes EA logo)
+         [VDP]     Re-wrote interrupt and H/V counters interaction
+   
+0.19     [CORE]    Fixed Z80 SRAM word read/writes from 68K
+         [CONSOLE] svgalib version detects colour bit positions better
+         [CONSOLE] svgalib version now tries both 32k and 64k colour modes
+         [68000]   Implemented STOP instruction
+
+0.20     [VDP]     Clean up of byte write to vdp data/ctrl port
+         [68000]   Addition of several duplicate memory areas
+         [68000]   Implemented pending interrupts
+         [VDP]     Re-wrote the main DMA/memory handler (twice)
+         [VDP]     Fixed/re-wrote vram fills (viewpoint, alien soldier,
+                   pacman2)
+   
+0.21     [VDP]     Re-wrote event handler
+         [VDP]     Implemented DMA transfer capacity (sonic2)
+
+0.22     [CORE]    Added save state facility
+         [CONSOLE] Added save image facility
+         [CONSOLE] Re-worked bit colours for svgalib
+         [CONSOLE] Added command line options: -l for latency, -s to save
+                   -d for the work directory, -v for verbosity
+         [68000]   Added bounds check to stop core dump with some invalid code
+         [CONSOLE] Added -c option to set the colour bit positions
+         [CONSOLE] Added -f to set the number of fragments
+
+0.23     [CONSOLE] Full-screen now uses extra lines properly in interlace mode
+         [VDP]     Upgraded interlace plotters to use better code
+         [CONSOLE] Added bob, weave and weave with vertical filtering
+                   de-interlace options using -i to configure
+
+(skip to 0.30 due to mac version numbering)
+
+0.30     [CONSOLE] Added License option
+         [CONSOLE] Moved reset options on to confirmation menu
+         [CONSOLE] Added -k frame skip option (normally automatic)
+         [CONSOLE] Sync svgalib to allegro
+
+0.31     [VDP]     Fixed dma 68k freeze (ecco)
+         [DOS]     Fixed lock-up in sound re-init code
+
+0.32     [CONSOLE] License/save screens accidentally reset YM2612 state
+         [Z80]     RAZE incorporated with simulated pending interrupts
+                   (fixes a lot of sound problems in quite a number of games)
+         [VDP]     Fixed bugs in the windowing code (Strider II, Ghostbusters)
+         [EVENT]   Fixed *major* bugs in the event code, stops all the
+                   Illegal Instruction errors in the games (oops), any game
+                   that used DMA basically would have gone wrong!
+         [CORE]    Re-organised source to use automake/autoheader
+         [CORE]    Generator now auto-detects processor and adds other
+                   optimisations for building source
+
+0.33     [SOUND]   Added PSG sound generator (SN76496)!
+         [SOUND]   Re-wrote all the sound files so that they have better
+                   separation between Generator and the hardware
+         [CONSOLE] Fixed crash if you try and reset (F12)
+         [VDP]     Fixed H/V counter which somehow I broke after 0.16 (fixes
+                   Sonic 3D, 3 Ninjas, Road Rash, etc. etc.)
+         [VDP]     Implemented Charles MacDonald's h/v size of 2 (repeat every
+                   row) for his test carts
+         [VDP]     Implemented VDP window bug (thanks to Charles MacDonald
+                   for his test cart)
+         [VDP]     Fixed interlace mode 1 (thanks to Charles MacDonald for
+                   his test cart)
+         [VDP]     Added invalid HSCR support for Populus (Charles MacDonald)
+         [VDP]     Fixed minor cram bug (possible segv)
+         [VDP]     Fixed bug in fill operation (contra hardcorps)
+         [CORE]    Re-formatted all code with indent (see .indent.pro file)
+         [CONSOLE] Add joystick framework (thanks to Lester Barrows for
+                   his code submission)
+         [SVGALIB] Add joystick support
+         [CONSOLE] Add multiple keyboard positions for two keyboard players
+         [CONSOLE] Add -j option to control input devices for players
+         [68000]   Optimised 68k writes in favour of RAM

@@ -1,0 +1,137 @@
+[[ -z "$CXX"    ]] && export CXX="g++"
+[[ -z "$CC"     ]] && export CC="gcc" 
+[[ -z "$AR"     ]] && export AR="ar"
+[[ -z "$LD"     ]] && export LD="ld"
+[[ -z "$AROPTS" ]] && export AROPTS="cru"
+
+export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
+export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"
+
+export GCCCOLORIZED=""
+[[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
+[[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
+
+
+export PREFIX="/Applications"
+export PREFIXLIB="/Library"
+export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export SYSLIBS=""
+# Since we don't want to require the end user have wxWidgets as a dylib preinstalled
+# as well as other stuff like libdc42, generator, etc. build a statically linked app
+export GCCSTATIC=""
+
+# fix to alow modern XCode/stdc++ clang compilation, see: https://stackoverflow.com/questions/12920891/std-linker-error-with-apple-llvm-4-1
+# and https://apple.stackexchange.com/questions/350627/how-can-i-specify-the-c-version-to-use-with-xcode
+# wxWidgets may also need patching, see: https://stackoverflow.com/a/37632111
+
+if  [[ "$CLANGVER" ]]; then
+    export SYSLIBS="-lstdc++"
+   #export SYSLIBS="-lc++"
+fi
+
+export AROPTS="cru"
+
+MAJOR_MAC_VERSION=$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')
+
+# Default 64 bit for MacOS 10.13+ as per Apple's deprecation efforts.
+# command line can override this of course.
+if [[ "$MAJOR_MAC_VERSION" > "10.12" ]]; then
+   export SIXTYFOURBITS="--64" 
+   export THIRTYTWOBITS=""
+   export ARCH="-m64"
+fi
+
+
+# Only used on Windows
+function windres() {
+true 
+}
+
+##############################################################################
+# GETCPUS
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+##############################################################################
+
+function GETCPUS()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+     export NUMCPUS="$( sysctl -n hw.ncpu )"
+  fi
+  return $NUMCPUS
+}
+
+
+##############################################################################
+# MAKELIBS
+#
+# Creates both static and shared libraries.
+#
+# Parameters $1 target directory
+#	     $2 library name
+#            $3 version tripplet.  i.e. 0.3.6
+#            $4 mode "static", "shared", or "both"
+#            $5 is a single string containing objects to merge.
+#               i.e. "a.o b.o c.o ..."
+#
+# i.e.
+#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#
+##############################################################################
+function MAKELIBS() {
+
+dir="$1"
+libname="$2"
+ver="$3"
+mode="$4"
+objs="$5"
+
+aname="${libname}.${ver}.a"
+laname="${libname}.a"
+daname="${dir}/${aname}"
+ldaname="${dir}/${laname}"
+
+soname="${dir}/${libname}.${ver}.so"
+lsoname="${dir}/${libname}.so"
+ldsoname="${dir}/${libname}.so"
+dsoname="${soname}"
+dylibname="${dir}/${libname}.${ver}.dylib"
+ldylibname="${dir}/${libname}.dylib"
+dllname="${dir}/${libname}.${ver}.dll"
+ldllname="${dir}/${libname}.dll"
+
+[[ "$4" == "both" ]] && mode="static"
+
+
+if [[ "$mode" == "static" ]]
+then
+     echo "  Creating  $libname.a" 1>&2
+     $AR "$AROPTS" "${daname}" ${objs} || exit 1
+     ranlib ${daname}         || exit 1
+     /bin/rm -f       ${ldaname}
+     ln -sf ${daname} ${ldaname}
+fi
+
+
+[[ "$4" == "both" ]] && mode="shared"
+
+if [[ "$mode" == "shared" ]]
+then
+
+             echo "  Creating  $libname.dylib" 1>&2
+             ##nope!##libtool -dynamic -o ${dylibname} $L64 ${objs}           || exit 1
+             $CC $ARCH -dynamiclib -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup  \
+                 -install_name /usr/local/lib/${dylibname}                               \
+                 -compatibility_version ${ver} -current_version ${ver}                   \
+                 -o ${dylibname} ${objs}                                      || exit 1
+
+             /bin/rm -f          ${ldylibname}
+             ln -sf ${dylibname} ${ldylibname}                                 
+
+fi
+
+echo -n "" >/dev/null
+}

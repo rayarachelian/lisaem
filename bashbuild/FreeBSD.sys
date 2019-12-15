@@ -1,0 +1,102 @@
+echo "This OS has not yet been implemented" 1>&2
+exit 1
+
+
+export PREFIX="/usr/local/bin"
+export PREFIXLIB="/usr/local/share/"
+export AROPTS="cru"
+
+[[ -z "$CXX" ]] && export CXX="g++"
+[[ -z "$CC"  ]] && export CC="gcc"
+
+export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
+exportCLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"
+
+exportGCCCOLORIZED=""
+[[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
+[[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
+
+export LINKOPTS="${GCCCOLORIZED}"
+export   CFLAGS="${GCCCOLORIZED} -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export CXXFLAGS="${GCCCOLORIZED} -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+
+#export LDFLAGS=""
+#export SYSLIBS=""
+#export GCCSTATIC=""
+
+
+# only used on Windows
+function windres() {
+true 
+}
+
+##############################################################################
+# MAKELIBS
+#
+# Creates both static and shared libraries.
+#
+# Parameters $1 target directory
+#	     $2 library name
+#            $3 version tripplet.  i.e. 0.3.6
+#            $4 mode "static", "shared", or "both"
+#            $5 is a single string containing objects to merge.
+#               i.e. "a.o b.o c.o ..."
+#
+# i.e.
+#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#
+##############################################################################
+function MAKELIBS() {
+
+dir="$1"
+libname="$2"
+ver="$3"
+mode="$4"
+objs="$5"
+
+aname="${libname}.${ver}.a"
+laname="${libname}.a"
+daname="${dir}/${aname}"
+ldaname="${dir}/${laname}"
+
+soname="${dir}/${libname}.${ver}.so"
+lsoname="${dir}/${libname}.so"
+ldsoname="${dir}/${libname}.so"
+dsoname="${soname}"
+dylibname="${dir}/${libname}.${ver}.dylib"
+ldylibname="${dir}/${libname}.dylib"
+dllname="${dir}/${libname}.${ver}.dll"
+ldllname="${dir}/${libname}.dll"
+
+[[ "$4" == "both" ]] && mode="static"
+
+
+if [[ "$mode" == "static" ]]
+then
+     echo "  Creating  $libname.a" 1>&2
+     $AR "$AROPTS" "${daname}" ${objs} || exit 1
+     ranlib ${daname}         || exit 1
+     /bin/rm -f       ${ldaname}
+     ln -sf ${daname} ${ldaname}
+fi
+
+
+[[ "$4" == "both" ]] && mode="shared"
+
+if [[ "$mode" == "shared" ]]
+then
+
+#pwd
+#which gcc
+             echo "  Creating  $libname.so" 1>&2
+             gcc -shared -Wl,-soname,${soname} -o ${dsoname} ${objs} || exit 1
+             /bin/rm -f          ${ldsoname}
+             ln -sf ${dsoname}   ${ldsoname}
+             ln -sf ${dsoname}   ${ldsoname}
+
+fi
+
+echo -n "" >/dev/null
+}
+
+

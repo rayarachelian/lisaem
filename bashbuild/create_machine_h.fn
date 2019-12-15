@@ -1,0 +1,24 @@
+###############################################################################
+#
+# create_machine_h
+#
+# Uses a C file to get uint/int sizes from short/char/int/long/long long
+# must be called from TLD
+###############################################################################
+
+function create_machine_h {
+
+  $CC -Wall ${TLD}/src/get-uintX-types.c -o ${TLD}/obj/get-uintX-types
+  if [[ "$?" -ne 0 ]]; then
+     echo "Could not compile ${TLD}/src/include/get-uintX-types.c to ${TLD}/obj/get-uintX-types using $CC compiler" 1>&2
+     exit 1
+  fi
+
+  pushd ${TLD}/src/include >/dev/null
+  ${TLD}/obj/get-uintX-types
+  if [[ "$?" -ne 0 ]]; then
+      echo "something went wrong finding type information. Pls check machine.h and get-uintX-types" 1>&2
+      exit 1
+  fi
+  popd >/dev/null
+}

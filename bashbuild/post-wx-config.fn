@@ -1,0 +1,31 @@
+##################################################
+#                                                #
+# Get libs, includes, etc. NOT A FUNCTION        #
+#                                                #
+##################################################
+
+if [[ "$OS" != "Windows" ]]; then
+
+   if [[ -z "$( which wx-config )" ]]; then
+      echo "Could not find wx-config command for wx-widgets" 1>&2
+      exit 8
+   fi
+
+   export        WXVERSION="$(wx-config --version)"
+   export WXCONFIGCPPFLAGS="$(wx-config --cppflags )"
+   export WXCONFIGCXXFLAGS="$(wx-config --cxxflags )"
+   export   WXCONFIGCFLAGS="$(wx-config --cflags   )"
+   export     WXCONFIGLIBS="$(wx-config $STATIC  --libs --linkdeps --cppflags)"
+
+   [[ -z "$CC"  ]] && export  CC="$(wx-config --cc)"
+   [[ -z "$LD"  ]] && export  LD="$(wx-config --ld)"
+   [[ -z "$CXX" ]] && export CXX="$(wx-config --cxx)"
+
+   export   CFLAGS="$WXCONFIGCFLAGS $CFLAGS "
+   export CPPFLAGS="$WXCONFIGCPPFLAGS $CPPFLAGS "
+   export CXXFLAGS="$WXCONFIGCXXFLAGS $CXXFLAGS "
+
+   export LIBS="$LIBS $(wx-config --libs) $LIBS "
+   # includes are par of C*FLAGS
+   set >/tmp/set.wx-config
+fi

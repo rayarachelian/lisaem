@@ -1,0 +1,72 @@
+##############################################################################
+#
+# Save and Restore environment variables that we've set in this script, that
+# way when we run a sub-build from a subdirectoryi by sourcing it, such as a
+# required library, it will create vars that conflict with our current state
+# and will get overwritten. We could just call those build commands as shell
+# scripts, but then a lot of work that has already been done, such as loading
+# the bashbuild function library and setting the STARTCOMPILE and TLD will be
+# re-instantiated, which we don't want.
+#
+# It is absolutely essential that these be run from the local TLD of the 
+# project.
+#
+# You should also add .env-* to .gitignore
+#
+# The subbuild function is a convenient wrapper around save/resotre and
+# a call to the build function.
+# pro tip: the source command in bash can pass parameters to the shell
+# script that are expanded as usual as $1..$N, so source is not too
+# different than directly calling a script, *but* this avoids having
+# to source all the bashbuild fn's again and waste time.
+#
+##############################################################################
+
+function save_environment() {
+
+   # refresh the local top level directory for this build, as we descend into
+   # subdirs and source build, TLD will be the top, but XTLD will be the 
+   # "local" build's TLD.
+   [[ "$XTLD" != "$( /bin/pwd )" ]] && export XTLD="$( /bin/pwd )"
+
+   ##debugging code commented out
+   #echo "Saving environment to ${XTLD}" 1>&2
+   #mv "${XTLD}/.env-saved.3"  "${XTLD}/.env-saved.4" 2>/dev/null
+   #mv "${XTLD}/.env-saved.2"  "${XTLD}/.env-saved.3" 2>/dev/null
+   #mv "${XTLD}/.env-saved.1"  "${XTLD}/.env-saved.2" 2>/dev/null
+   #cp "${XTLD}/.env-saved"    "${XTLD}/.env-saved.1" 2>/dev/null
+   #mv "${XTLD}/.env-set.3"    "${XTLD}/.env-set.4" 2>/dev/null
+   #mv "${XTLD}/.env-set.2"    "${XTLD}/.env-set.3" 2>/dev/null
+   #mv "${XTLD}/.env-set.1"    "${XTLD}/.env-set.2" 2>/dev/null
+   #cp "${XTLD}/.env-set"      "${XTLD}/.env-set.1" 2>/dev/null
+
+   ## This only saves the environment variables our script at this level has set
+   ## it excludes anything inside of .env-ext (external environment)
+   eval $(echo -n 'env'; cat ${XTLD}/.env-ext | while read i; do echo -n "|grep -v \"^${i}\""; done ) \
+        |  sed -e '/^$/d' | grep '=' | sed -e 's/^/export /g' -e 's/=/="/' -e 's/$/"/' >"${XTLD}/.env-saved"
+   #set >.env-set
+   #echo "saved environment to ${XTLD}" 1>&2
+}
+
+
+function restore_environment() {
+   [[ "$XTLD" != "$( /bin/pwd )" ]] && export XTLD="$( /bin/pwd )"
+   #echo "Loading env from ${XTLD}/.env-saved" 1>&2
+   source "${XTLD}/.env-saved" || exit 100
+   #echo "Loaded env from ${XTLD}/.env-saved" 1>&2
+}
+
+
+function subbuild() {
+   cd "${XTLD}"
+   [[ -z "${REUSESAVE}" ]] && save_environment #|| echo "Skipping save REUSESAVE=:$REUSEAVE:" 1>&2
+
+   unset XTLD REUSESAVE
+   pushd ${1} >/dev/null     || exit $?
+   source ./build.sh  ${@:2} || exit $?
+   popd >/dev/null           || exit $?
+
+   restore_environment
+   #echo "finished restoring environment" 1>&2
+   #echo "SOFTWARE: $SOFTWARE version: $VERSION" 1>&2
+}

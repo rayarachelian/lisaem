@@ -1,0 +1,44 @@
+####################################################
+#
+# Check to see that dirs passed as args exist.
+#
+####################################################
+
+function CHECKDIRS {
+
+  local missing=""
+  for i in $@; do [[ ! -d ./$i ]] && missing="$i $missing"; done
+
+  if [[ -n "$missing" ]]; then
+    ( echo "Please run this script from the top level directory. i.e."
+      echo
+      echo "tar xjpvf ${BUILDDIR}.tar.bz2"
+      echo "tar xJpvf ${BUILDDIR}.tar.xz"
+      echo "cd ${BUILDDIR}"
+      echo "./build.sh"
+      echo ""
+      echo "(Could not find $missing" 
+      echo "from $(/bin/pwd)"  ) 1>&2
+      exit 1
+  fi
+
+}
+
+function CHECKFILES {
+
+  local missing=""
+  for i in $@; do [[ ! -f ./$i ]] && missing="$i $missing";done
+
+  if [[ -n "$missing" ]]; then
+    ( echo "Please run this script from the top level directory. i.e."
+      echo
+      echo "tar xjpvf ${BUILDDIR}.tar.bz2"
+      echo "tar xJpvf ${BUILDDIR}.tar.xz"
+      echo "cd ${BUILDDIR}"
+      echo "./build.sh"
+      echo ""
+      echo "(Could not find $missing.)"
+      echo "from $(/bin/pwd)"   ) 1>&2
+      exit 1
+  fi
+}

@@ -1,0 +1,19 @@
+This directory contains Generator, a Sega Genesis (Mega Drive) emulator.
+
+Generator is free software.  See the file COPYING for copying permission.
+Some parts of Generator are distributed under different terms; see the
+individual source files for details.
+
+Documentation for project is maintained online on the web site, although
+the INSTALL file details information on installing the program from source.
+
+This distribution contains:
+  cpu68k/                       68000 processor files
+  raze/                         RAZE Z80 files
+  ym2612/                       YM2612 (yamaha FM) files
+  sn76496/                      SN76496 (programmable sound generator) files
+  hdr/                          header files
+  main/                         main source files
+  extra/                        extra files not used in compilation
+
+See http://www.squish.net/generator/ for more information.

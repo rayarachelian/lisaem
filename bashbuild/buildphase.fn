@@ -1,0 +1,107 @@
+##############################################################################
+#
+# Compile a list of C or C++ files by queueing them as background jobs
+#
+# On multi-core/processor systems, each processor will get one job until
+# the queue is empty
+#
+# Input variables: $DEBUGCOMPILE flag - outputs command and pwd
+#                                       when set
+#
+#                  $COMPILECOMMAND - command to eval to compile 
+#                                  - where \${i} is the input file                                     
+#                                    \${o} is object output, these
+#                                    will need to be escaped
+#
+#                  $FORCE flag - compiles all source even if not NEEDED
+#                                when non empty
+#
+#                  $OBJDIR - output object directory (s/b relative to src)
+#                            i.e. if we're inside of ./src, want "../obj"
+#
+#                  $INEXT  - infile extension i.e. "c" or "cpp" for .c/.cpp
+#                  $OUTEXT - outfile extension i.e. "o" for .o - will need
+#
+#                  $VERB   - i.e. "Compiling"
+#                  $WAIT   - if set will wait for this list to finish
+#                            before returning - useful right before linking
+#
+# arguements - list of path lists, each can contain dependencies separated
+#             by a colon, relative to CWD. The first one is the name of the
+#             source file, and will produce an output file with the same
+#             base name. i.e.:
+#
+#             src/lisa/io_board/floppy:src/include/vars.h:src/include/floppy.h
+#
+#             indicates floppy.c will be compiled to floppy.o if any of
+#             floppy.c, floppy.h or vars.h has changed since the last time
+#             that floppy.o was compiled (or if floppy.o does not exist)
+#             when INEXT="c" and OUTEXT="o"
+#
+# Outputs: list of object files.
+#
+###############################################################################
+
+function COMPILELIST {
+unset i o # ensure no conflicts from caller
+local i
+local o
+local deps=""
+local list=""
+local s
+
+if [[ -z "$INEXT" ]];           then echo "$(/bin/pwd) $0 $@ missing INEXT variable" 1>&2; exit 1; fi
+if [[ -z "$OBJDIR" ]];          then echo "$(/bin/pwd) $0 $@ missing OBJDIR variable" 1>&2; exit 1; fi
+if [[ -z "$VERB" ]];            then echo "$(/bin/pwd) $0 $@ missing VERB variable" 1>&2; exit 1; fi
+if [[ -z "$COMPILECOMMAND" ]];  then echo "$(/bin/pwd) $0 $@ missing COMPILECOMMAND variable" 1>&2; exit 1; fi
+
+for i in $@; do
+
+  # get the source file to build separated out from any dependencies it may have
+  s=$(echo "$i" | cut -d: -f1 | sed -e "s/.${INEXT}$//g" )
+  # get the object file to create.
+  o=${OBJDIR}/$( basename "$s" )
+
+  is=$( echo "$i" | sed -e 's/\//\\\//g')
+  objdir=$( echo "$OBJDIR" | sed -e 's/\//\\\//g')
+  os=${objdir}\\/$( basename "$s" )
+
+  [[ -n "$OUTEXT" ]] && out="${o}.${OUTEXT}" || ou="${o}"
+  # needs to become ../obj for linking
+  LIST="$LIST ${out}"
+
+  # have any of the dependencies changed, or is force on?
+  deps="${FORCE}"
+  if [[ -z "${deps}" ]]; then 
+     for d in $( echo $i| sed -e 's/:/ /g' -e "s/\.${INEXT}//g"); do 
+        if NEEDED "${d}.${INEXT}"  "${out}";then 
+           deps="yes"; break
+        fi
+     done
+  fi
+  i1=$( echo "$i" | cut -f1 -d: )
+  is=$( echo "$i1" | sed -e 's/\//\\\//g')
+
+
+  compilecommand=$( echo "${COMPILECOMMAND}" | sed -e "s/:INFILE:/${is}/g"  -e "s/:OUTFILE:/${os}/g"   \
+                    -e "s/:OBJDIR:/${objdir}/g"    -e "s/:VERB:/${VERB}/g"  -e "s/:INEXT:/${INEXT}/g"  \
+                    -e "s/:OUTEXT:/${OUTEXT}/g" )
+
+  if [[ -n "$deps" ]]; then
+     if [[ -n "$DEBUGCOMPILE" ]]; then
+        echo "$PWD/COMPILELIST: Queueing ${i}..."                               1>&2
+        echo "$PWD/COMPILELIST: QJOB !!  ${VERB} ${i}.c...   ${compilecommand}" 1>&2
+        echo                                                                    1>&2
+     fi
+     #export i o out
+     QJOB "!!  ${VERB} $(echo ${i} | cut -d: -f1).${INEXT}..."  "$( echo ${compilecommand} )"
+  fi
+
+done
+
+[[ "$WAIT" ]] && WAITQALL
+
+# output the object list collected for the linker
+echo "$LIST"
+
+}

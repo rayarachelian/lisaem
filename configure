@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# This is a fake ./configure which generates a wrapper Makefile
+# to call build.sh.   Sneaky!
+
+for i in $@
+do
+
+ case "$i" in
+
+   --help)   ./build.sh --help; exit $? ;;
+       *)     OPTS="$OPTS $i" ;;
+
+
+ esac
+done
+
+echo "# This is a fake Makefile.  For build environments" >Makefile
+echo "# that require ./configure && make.  You really"   >>Makefile
+echo "# should use the build.sh script directly."        >>Makefile
+echo "build:   src/host/wxui/lisaem_wx.cpp"              >>Makefile
+echo "	./build.sh build $OPTS"                          >>Makefile
+echo ""                                                  >>Makefile
+echo "clean:   src/host/wxui/lisaem_wx.cpp"              >>Makefile
+echo "	./build.sh clean"                                >>Makefile
+echo ""                                                  >>Makefile
+echo "install: src/host/wxui/lisaem_wx.cpp"              >>Makefile
+echo "	./build.sh build $OPTS --install"                >>Makefile
+echo ""                                                  >>Makefile
+echo "package: src/host/wxui/lisaem_wx.cpp"              >>Makefile
+echo "	./build.sh build $OPTS --package"                >>Makefile
+echo "me:"                                               >>Makefile
+echo "	"                                                >>Makefile
+echo "a:"                                                >>Makefile
+echo "	"                                                >>Makefile
+echo "sandwitch: me a "                                  >>Makefile
+echo '	[ `id -u` -ne 0 ] && echo "What? Make it yourself." || echo Okay' >>Makefile
+echo ""                                                  >>Makefile
+echo "love:"                                             >>Makefile
+echo '	#    "Not war?"'                                 >>Makefile
+echo ""                                                  >>Makefile
+echo "war:"                                              >>Makefile
+echo '	#    "Not love?"'                                >>Makefile

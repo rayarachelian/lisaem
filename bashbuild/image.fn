@@ -1,0 +1,8 @@
+function image() {
+  local cmd=""
+  [[ -n "$KITTY_WINDOW_ID" ]]  && [[ -n "$( which kitty )" ]] && cmd="kitty +kitten icat"
+  [[ -n "$ITERM_SESSION_ID" ]] && [[ -n "$( which icat)" ]]   && cmd="imgcat"
+  [[ -z "$cmd" ]] && [[ "which fim" ]]                        && cmd=fim
+  [[ -n "$cmd" ]] && $cmd $@ 2>/dev/null  || return 1
+  return $?
+}

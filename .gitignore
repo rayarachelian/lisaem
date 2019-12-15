@@ -1,0 +1,52 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+# Icon must end with two \r
+Icon*
+
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+.env-*
+*.bak
+*.exe
+*.o
+*.a
+*.dyld
+*.dc42
+*.tar
+*.tar.xz
+*.image
+bin/lisaem
+bin/*.conf
+experiments
+experiments/*
+experimental
+experimental/*
+.cache/*
+.ccache/*
+.vscode/*
+cpu68k/cpu68k-?.c
+.last-opts
+cpu68k/def68k
+cpu68k/gen68k
+include/built_by.h
+src/include/machine.h
+src/tools/include/machine.h
+src/lib/libdc42/include/machine.h
