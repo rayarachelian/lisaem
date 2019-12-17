@@ -39,6 +39,9 @@ fi
 export PREFIX="/usr/local/bin"
 export PREFIXLIB="/usr/local/share/"
 
+export CLICMD=""
+export GUIAPP=""
+
 # Only used on Windows
 function windres() {
 true 

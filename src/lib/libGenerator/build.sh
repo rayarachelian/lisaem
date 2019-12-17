@@ -207,11 +207,6 @@ then
    INSTALL=""
 fi
 
-if [[ -n "${WITHDEBUG}${WITHTRACE}" ]]
-then
-  WITHOPTIMIZE="-O2 -ffast-math"  #disable optimizations that break gdb operations
-fi
-
 ###########################################################################
 
 # Has the configuration changed since last time? if so we may need to do a clean build.
@@ -264,21 +259,21 @@ then
   export COMPILEPHASE="gen" VERB="compiling"
   export PERCENTJOB=0 NUMJOBSINPHASE=24  #/mnt/z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/src/lib/libGenerator/cpu68k: update_progress_bar 1 24 25 Missing parameters
   export OUTEXT=""
-  export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $INC $CFLAGS -c :INFILE:.c -o ../:OUTFILE:.o"
+  export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
   LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiling COMPILELIST tab68k def68k )
 
   cd ../obj
 
-  $CC $ARC  -o def68k tab68k.o def68k.o
+  $CC $CLICMD $ARC  -o def68k tab68k.o def68k.o
 
   cd ../cpu68k
   echo -n "  "
   ../obj/def68k || exit 1
 
   echo "  Compiling gen68k.c..."
-  $CC $ARC $WITHDEBUG $WITHTRACE $CFLAGS $INC -c gen68k.c -o ../obj/gen68k.o || exit 1
+  $CC $CLICMD $ARC $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
 
-  $CC $ARC $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o $LIB
+  $CC $CLICMD $ARC $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o $LIB
   echo -n "  "
   ../obj/gen68k || exit 1
 

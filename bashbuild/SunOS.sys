@@ -70,6 +70,8 @@ then
 echo -n "" >/dev/null
 }
 
+export CLICMD=""
+export GUIAPP=""
 
 # only used on windows
 function windres() {

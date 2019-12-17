@@ -8,8 +8,14 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2019.12.16 - Windows compiles are starting to work though skins aren't found
+             Can't use pre-compiled wxmsw binaries, added a Cygwin compile
+             script to the scripts directory and changed Windows.sys and some
+             of the other build scripts.
+
 2019.12.15 - cleaning up source and switching git repos to:
-             
+             github.com/rayarachelian/lisaem
+             Windows compiles but the resulting binaries are broken
 
 2019.12.12 - Rebuilt Windows build steps via Cygwin for new bashbuild system
              a lisaem.exe is produced, however the resulting binary is somehow

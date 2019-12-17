@@ -10,45 +10,6 @@
 #
 ###############################################################################
 
-[[ -z "$WXINCLUDE" ]] && export WXINCLUDE="${TLD}/scripts/wxmsw/include/"
-
-if [[ "$(uname -m)" == "x86_64" ]]; then
-   [[ -z "$WXLIB"     ]] && export WXLIB="$( ls -1d ${TLD}/scripts/wxmsw/lib/gcc???_x64_dll )"
-else
-   [[ -z "$WXLIB"     ]] && export WXLIB="$( ls -1d ${TLD}/scripts/wxmsw/lib/gcc???_dll )"
-fi
-
-if [[ -n "$(echo ${WXINCLUDE}${WXLIB} | grep ' ')" ]]; then
-   echo "Either WXCINCLUDE or WXLIB contains spaces, please move them to a path" 1>&2
-   echo "that does not contain spaces, i.e. not C:\\Program Files" 1>&2
-   echo "WXINCLUDE=\"${WXINCLUDE}\"" 1>&2
-   echo "WXLIB=\"${WXLIB}\"" 1>&2
-   exit 10
-fi
-
-if [[ -z "$(ls -1 ${WXLIB}/wxmsw*_xrc_gcc730_*.dll)" ]]; then
-   echo "Could not find wxWidgets libraries for $(uname -m) expected in $WXLIB" 1>&2 
-   echo "Please download them to this path and ensure they match your architecture" 1>&2
-   echo "Pro tip: use scripts/download-and-prepare-wxwidgets-windows-gcc730.sh" 1>&2
-   exit 10
-fi
-
-if [[ ! -f ${WXINCLUDE}/wx/msw/wx.rc ]]; then
-   echo "Could not find wxWidgets includes expected in $WXINCLUDE" 1>&2 
-   echo "Please download them to this path" 1>&2
-   echo "Pro tip: use scripts/download-and-prepare-wxwidgets-windows-gcc730.sh" 1>&2
-   exit 10
-fi
-
-pushd "${WXLIB}" >/dev/null || exit $?
-#wxbase312u_gcc730.dll
-# careful order matters here!
-for l in wxbase*u_gcc* wxmsw*u_adv_*gcc* wxmsw*u_core_*gcc* wxbase*u_net_*gcc* wxbase*u_xml_*gcc* wxmsw*u_aui_*gcc* wxmsw*u_gl_*gcc* wxmsw*u_html_*gcc* \
-        wxmsw*u_media_*gcc* wxmsw*u_propgrid_*gcc* wxmsw*u_ribbon_*gcc* wxmsw*u_richtext_*gcc* wxmsw*u_stc_*gcc* wxmsw*u_webview_*gcc* wxmsw*u_xrc_*gcc*; do
-export WXLIBLIST="${WXLIBLIST} ${WXLIB}/${l}" 
-done
-popd 2>/dev/null >/dev/null
-
 export CYGWIN="$(uname -s)"
 
 [[ -z "$AR"      ]] && export AR=/bin/x86_64-w64-mingw32-ar.exe
@@ -185,8 +146,8 @@ END
     cd ../resources
     # echo windres.exe --input-format=rc -O coff lisaem_private.rc lisaem_private.res
     ls -l ${XTLD}/resources/windres_private.rc 1>&2
-    echo $WINDRES --input-format=rc -O coff -I $WXINCLUDE -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res 1>&2
-    $WINDRES --input-format=rc -O coff -I $WXINCLUDE -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res || exit 1
+    echo $WINDRES --input-format=rc -O coff -I $(wx-config --prefix)/include/* -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res 1>&2
+    $WINDRES --input-format=rc -O coff -I $(wx-config --prefix)/include/* -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res || exit 1
     export LIST="$LIST ${XTLD}/obj/windres_private.res"
     echo "${XTLD}/obj/windres_private.res"
  fi
@@ -222,13 +183,15 @@ CCOPTS="$GCCCOLORIZED -fcommon -fwrapv -fPIC -fno-strict-aliasing -Wno-write-str
        -fno-pcc-struct-return"
 
 export CDEFS="-D__WXMSW__ -D__GNUWIN32__ -D__WIN95__ -fno-exceptions -fno-pcc-struct-return -fstrict-aliasing $WARNINGS -D__WXMSW__ -D__GNUWIN32__ -D__WIN95__"
-export LIBS="-L $WXLIB -mwindows ${WXLIBLIST}
--lkernel32 -luser32 -lgdi32 -lcomdlg32 -lwinspool -lwinmm -lshell32 -lshlwapi -lcomctl32 -lole32 -loleaut32 -luuid -lrpcrt4 -ladvapi32 -lversion -lwsock32 -lwininet"
+export LIBS="-L $WXLIB -lkernel32 -luser32 -lgdi32 -lcomdlg32 -lwinspool -lwinmm -lshell32 -lshlwapi -lcomctl32 -lole32 -loleaut32 -luuid -lrpcrt4 -ladvapi32 -lversion -lwsock32 -lwininet"
 export LINKOPTS="${STATIC} ${LINKOPTS} ${GCCCOLORIZED} ${LIBS}"
 
-export   CFLAGS="${CFLAGS} ${GCCCOLORIZED} ${CCOPTS} -I ${WXINCLUDE}"
-export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -I ${WXINCLUDE} -fno-rtti"
+export   CFLAGS="${CFLAGS} ${GCCCOLORIZED} ${CCOPTS}"
+export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -fno-rtti"
 # -fno-rtti is a C++ option only ^
+
+export CLICMD="-mconsole"
+export GUIAPP="-mwindows"
 
 PREFIX="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
 PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"

@@ -8305,6 +8305,9 @@ char *get_title(void)
   "... but there was a little meniscus, and that's where our dreams lived",
   "It's a feature, not a bug",
   "I AM LisaEm",
+  "But what do I know, I wasn't born into the emulation business, I f***ing earned it",
+  "How the hell did you get a flat tire in an emulator Ray? Obviously from a sharp thing in an emulator, Morty",
+  "There's literally everything in emulators, Morty, so get back in the shell!",
   ""
 };
 

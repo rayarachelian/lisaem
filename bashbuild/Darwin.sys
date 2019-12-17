@@ -42,6 +42,8 @@ if [[ "$MAJOR_MAC_VERSION" > "10.12" ]]; then
    export ARCH="-m64"
 fi
 
+export CLICMD=""
+export GUIAPP=""
 
 # Only used on Windows
 function windres() {

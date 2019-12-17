@@ -31,7 +31,7 @@ fi
 DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
         VER="1.2.7"                     # just the version number
   STABILITY="ALPHA"                     # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2019.12.12"                # release date.  must be YYYY.MM.DD
+RELEASEDATE="2019.12.16"                # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"            # name of the author
   AUTHEMAIL="ray@arachelian.com"        # email address for this software
     COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -426,16 +426,16 @@ echo
 create_builtby
 
 create_machine_h
-
+cd ${TLD}/src
 if [[ -f   include/machine.h ]]; then
     ln -sf include/machine.h tools/include/machine.h
     ln -sf include/machine.h lib/libGenerator/include/machine.h    
     ln -sf include/machine.h lib/libdc42/include/machine.h       
 else
-    echo "Could not create links to machine.h in sub builds $(pwd)" 1>&2
+    echo "machine.h failed to create $(pwd)" 1>&2
     exit 1
 fi
-
+cd ${TLD}
 # Build libraries and tools using subbuild
 export COMPILEPHASE="libGenerator"
 export PERCENTPROGRESS=0 PERCENTCEILING=25 REUSESAVE=""
@@ -558,10 +558,10 @@ export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 
 
-echo $CXX   $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
+echo $CXX   $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
             src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS 2>&1 >>$BUILDWARNINGS
 
-$CXX        $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
+$CXX        $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
             src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS 2>&1 | tee /tmp/slot.linking.out >>$BUILDWARNINGS
 if  [[ -n "$( grep -i error /tmp/slot.linking.out )" ]]; then
     grep error /tmp/slot.linking.out 1>&2

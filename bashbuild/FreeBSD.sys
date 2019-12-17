@@ -24,6 +24,8 @@ export CXXFLAGS="${GCCCOLORIZED} -fno-common -fPIC -fwrapv -fno-strict-aliasing 
 #export SYSLIBS=""
 #export GCCSTATIC=""
 
+export CLICMD=""
+export GUIAPP=""
 
 # only used on Windows
 function windres() {
