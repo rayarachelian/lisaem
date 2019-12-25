@@ -98,6 +98,10 @@ cd "$(dirname $0)"
 find . -type f -name '.env-*' -exec rm -f {} \;
 # Include and execute unified build library code - this part is critical
 [[ -z "$TLD" ]] && export TLD="${PWD}"
+# set the local top level directory for this build, as we go down into subdirs and run
+# build, TLD will be the top, but XTLD will be the "local" build's TLD.
+export XTLD="$( /bin/pwd )"
+
 if  [[ -x "${TLD}/bashbuild/src.build" ]]; then
     is_bashbuild_loaded 2>/dev/null || source ${TLD}/bashbuild/src.build
 else
@@ -112,15 +116,17 @@ fi
 ###########################################################################################
    SOFTWARE="LisaEm"                    # name of the software (can contain upper case)
      LCNAME="lisaem"                    # lower case name used for the directory
-DESCRIPTION="The Apple Lisa Emulator"   # description of the package
+DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
         VER="1.2.7"                     # just the version number
   STABILITY="ALPHA"                     # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2019.11.24"                # release date.  must be YYYY.MM.DD
+RELEASEDATE="2019.12.23"                # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"            # name of the author
   AUTHEMAIL="ray@arachelian.com"        # email address for this software
     COMPANY="Sunder.NET"                # company (vendor for sun pkg)
       CONAM="SUNDERNET"                 # company short name for Solaris pkgs
         URL="http://lisaem.sunder.net"  # url to website of package
+COPYRIGHTYEAR="2019"
+COPYRIGHTLINE="Copyright (C) ${COPYRIGHTYEAR} Ray Arachelian, All Rights Reserved"
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
 VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
@@ -145,7 +151,7 @@ Sub builds are sourced rather than executed. This is faster because we don't nee
  
 You should estimate the percentage of how many compiled files each subbuild will take and create a basepercent at each compile phase, this will allow the progress bar to display human friendly results, rather than anger the user by having it jump to 90% in the first few seconds and then take a long time for the last 10% like Windows ME used to do. :)  And likely you'll want to call the progressbar function fairly often to indicate status.
 
-The `QJOB` and `COMPILELIST` functions can be used to compile code in parallel. The `MAKELIB` function will create libraries. It's your job to maintain and properly invoke the compiler on your system and pass the proper library names and include paths. There are comments on how to use them in the function headers of each function. These interfaces may change over time, but I'll eventually document them and stabilize their interfaces.
+The `qjob` and `COMPILELIST` functions can be used to compile code in parallel. The `MAKELIB` function will create libraries. It's your job to maintain and properly invoke the compiler on your system and pass the proper library names and include paths. There are comments on how to use them in the function headers of each function. These interfaces may change over time, but I'll eventually document them and stabilize their interfaces.
 
 The build script will walk the directory tree and collect anything with the name of "include" as a directory, and anything with the name of "lib" and pass them all to the `LIB` and `INCLUDE` variables ahead of time.
 

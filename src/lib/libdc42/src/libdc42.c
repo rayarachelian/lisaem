@@ -852,7 +852,7 @@ int dc42_is_valid_image(char *filename)
     F->datasizetotal=(tempbuf[64+0]<<24)|(tempbuf[64+1]<<16)|(tempbuf[64+2]<<8)|tempbuf[64+3];
     F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
 
-    if (labs(DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
+    if (    (DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024) //labs20191225
               DC42_RET_CODE(F,0,"File size does not match headers",return F->retval);
 
     DC42_RET_CODE(F,1+is_macbin,"Is valid DC42 Image",return F->retval);
@@ -940,7 +940,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
     F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
 
 
-    if (labs(DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
+    if (    (DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024) //labs20191225
              {
               if (F->fd>2) { close(F->fd); F->fd=0;    }
               if (F->fh  ) {fclose(F->fh); F->fh=NULL; }
@@ -1163,7 +1163,7 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
     F->datasizetotal=(tempbuf[64+0]<<24)|(tempbuf[64+1]<<16)|(tempbuf[64+2]<<8)|tempbuf[64+3];
     F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
 
-    if (labs(DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
+    if (    (DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024) //labs20191225
        {
          if (F->fd>2) F->fd=0;
          if (F->fd>2) F->fh=NULL;

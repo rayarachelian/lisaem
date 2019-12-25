@@ -8,6 +8,19 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2019.12.25 - fixed macosx build/install for bashbuild, progress bar is still
+             way off
+
+2019.12.24 - various fixes, centralized upx/strip to a bash fn, removed mono-
+             lithic compiles, moved them QJOB/WAITQALL as per TODOs.
+             lowercased old 1.3.0 build uppercase function names, more cleanup
+
+2019.12.23 - Windows, fixed install, LisaEm can now find its skins and tries
+             to start, but dies on power on if HQ3X mode is used. AAG mode
+             works. There's also some flashes and some display artifacts,
+             shutdown causes the emulator to quit, or more likely crash.
+             Sound does not seem to work.
+
 2019.12.16 - Windows compiles are starting to work though skins aren't found
              Can't use pre-compiled wxmsw binaries, added a Cygwin compile
              script to the scripts directory and changed Windows.sys and some

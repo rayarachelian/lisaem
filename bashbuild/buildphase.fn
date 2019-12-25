@@ -13,7 +13,7 @@
 #                                    \${o} is object output, these
 #                                    will need to be escaped
 #
-#                  $FORCE flag - compiles all source even if not NEEDED
+#                  $FORCE flag - compiles all source even if not needed
 #                                when non empty
 #
 #                  $OBJDIR - output object directory (s/b relative to src)
@@ -74,7 +74,7 @@ for i in $@; do
   deps="${FORCE}"
   if [[ -z "${deps}" ]]; then 
      for d in $( echo $i| sed -e 's/:/ /g' -e "s/\.${INEXT}//g"); do 
-        if NEEDED "${d}.${INEXT}"  "${out}";then 
+        if needed "${d}.${INEXT}"  "${out}";then 
            deps="yes"; break
         fi
      done
@@ -90,16 +90,16 @@ for i in $@; do
   if [[ -n "$deps" ]]; then
      if [[ -n "$DEBUGCOMPILE" ]]; then
         echo "$PWD/COMPILELIST: Queueing ${i}..."                               1>&2
-        echo "$PWD/COMPILELIST: QJOB !!  ${VERB} ${i}.c...   ${compilecommand}" 1>&2
+        echo "$PWD/COMPILELIST: qjob !!  ${VERB} ${i}.c...   ${compilecommand}" 1>&2
         echo                                                                    1>&2
      fi
      #export i o out
-     QJOB "!!  ${VERB} $(echo ${i} | cut -d: -f1).${INEXT}..."  "$( echo ${compilecommand} )"
+     qjob "!!  ${VERB} $(echo ${i} | cut -d: -f1).${INEXT}..."  "$( echo ${compilecommand} )"
   fi
 
 done
 
-[[ "$WAIT" ]] && WAITQALL
+[[ "$WAIT" ]] && waitqall
 
 # output the object list collected for the linker
 echo "$LIST"

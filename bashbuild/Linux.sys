@@ -42,20 +42,22 @@ export PREFIXLIB="/usr/local/share/"
 export CLICMD=""
 export GUIAPP=""
 
+export HASHOPTS="-b --tag"
+
 # Only used on Windows
 function windres() {
 true 
 }
 
 ##############################################################################
-# GETCPUS
+# getcpus
 #
 # Gets the number of CPUs available on the machine so we can issue multiple
 # compiles simultaneously
 #
 ##############################################################################
 
-function GETCPUS()
+function getcpus()
 {
   if [[ -z "$NUMCPUS" ]]; then
      export NUMCPUS="$( nproc )"
@@ -65,7 +67,7 @@ function GETCPUS()
 
 
 ##############################################################################
-# MAKELIBS
+# makelibs
 #
 # Creates both static and shared libraries.
 #
@@ -77,10 +79,10 @@ function GETCPUS()
 #               i.e. "a.o b.o c.o ..."
 #
 # i.e.
-#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
 #
 ##############################################################################
-function MAKELIBS() {
+function makelibs() {
 
 dir="$1"
 libname="$2"

@@ -14,6 +14,10 @@ cd "$(dirname $0)"
 find . -type f -name '.env-*' -exec rm -f {} \;
 # Include and execute unified build library code - this part is critical
 [[ -z "$TLD" ]] && export TLD="${PWD}"
+# set the local top level directory for this build, as we go down into subdirs and run
+# build, TLD will be the top, but XTLD will be the "local" build's TLD.
+export XTLD="$( /bin/pwd )"
+
 if  [[ -x "${TLD}/bashbuild/src.build" ]]; then
     is_bashbuild_loaded 2>/dev/null || source ${TLD}/bashbuild/src.build
 else
@@ -31,14 +35,14 @@ fi
 DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
         VER="1.2.7"                     # just the version number
   STABILITY="ALPHA"                     # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2019.12.16"                # release date.  must be YYYY.MM.DD
+RELEASEDATE="2019.12.24"                # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"            # name of the author
   AUTHEMAIL="ray@arachelian.com"        # email address for this software
     COMPANY="Sunder.NET"                # company (vendor for sun pkg)
       CONAM="SUNDERNET"                 # company short name for Solaris pkgs
         URL="http://lisaem.sunder.net"  # url to website of package
 COPYRIGHTYEAR="2019"
-COPYRIGHTLINE="Copyright (C) ${COPYRIGHTYEAR} Ray Arachelian, All Rights Reserved"
+COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} Ray Arachelian, All Rights Reserved"
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
 VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
@@ -198,8 +202,12 @@ for j in $@; do
   --pkg-prefix=*) export PKGPREFIX="${i:9}" ;;
 
   install)
-            [[ -z "$CYGWIN" ]] && [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try sudo ./build.sh $@" && exit 1
-            INSTALL=1;
+            if [[ -z "$CYGWIN" ]]; then
+               [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
+            else
+                CygwinSudoRebuild $@
+            fi
+            export INSTALL=1
             ;;
 
   uninstall)
@@ -238,6 +246,8 @@ for j in $@; do
                                 export ARCH="-m32"                        ;;
 
 
+ --no-color-warn) export GCCCOLORIZED="" ;;
+ --no-tools) export NODC42TOOLS="yes" ;;
  --no-debug)
             WITHDEBUG=""
             LIBGENOPTS=""                                     ;;
@@ -332,6 +342,9 @@ Options:
 --with-tracelog         Enable tracelog (needs debug on, not on win32)
 --with-debug-mem        Enables debug and tracelog and memory fn debugging
 --with-debug-on-start   Enable debug output as soon as libGenerator is invoked
+--no-color-warn         don't record color ESC codes in compiler warnings
+--no-tools              don't compile dc42 tool commands
+
 --with-showcmd          Show invoked compiler/linker commandlines
 --with-static           Enables a static compile
 --without-static        Enables shared library compile (not recommended)
@@ -376,7 +389,7 @@ then
   WITHOPTIMIZE="-O2 -ffast-math"
 fi
 cd ./src || exit 1
-if NEEDED include/vars.h lisa/motherboard/unvars.c
+if needed include/vars.h lisa/motherboard/unvars.c
 then
 cd ./lisa || exit 1
 
@@ -391,8 +404,8 @@ fi
 
 needclean=0
 #debug and tracelog changes affect the whole project, so need to clean it all
-if [ "$WITHTRACE" != "$LASTTRACE" ]; then needclean=1; fi;
-if [ "$WITHDEBUG" != "$LASTDEBUG" ]; then needclean=1; fi;
+[[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
+[[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
 [[ "$SIXTYFOURBITS" != "$LASTSIXTYFOURBITS" ]] && needclean=1
 [[ "$THIRTYTWOITS" != "$LASTTHIRTYTWOBITS" ]] && needclean=1
 
@@ -402,10 +415,7 @@ if [[ "$WITHBLITS" != "$LASTBLITS" ]]; then
   touch host/wxui/lisaem_wx.cpp
 fi
 
-if [ "$needclean" -gt 0 ]
-then
-  CLEAN;
-fi
+[[ "$needclean" -gt 0 ]] && CLEAN
 
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
@@ -421,12 +431,11 @@ export CXXFLAGS="$ARCH $CXXFLAGS"
 echo Building prerequisites...
 echo
 
-[ -n "`$CC --version | grep -i llvm`" ] && LLVM="LLVM"
-
 create_builtby
 
 create_machine_h
-cd ${TLD}/src
+
+cd "${TLD}/src"
 if [[ -f   include/machine.h ]]; then
     ln -sf include/machine.h tools/include/machine.h
     ln -sf include/machine.h lib/libGenerator/include/machine.h    
@@ -439,18 +448,20 @@ cd ${TLD}
 # Build libraries and tools using subbuild
 export COMPILEPHASE="libGenerator"
 export PERCENTPROGRESS=0 PERCENTCEILING=25 REUSESAVE=""
-subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS
+subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
 unset LIST
 
 export COMPILEPHASE="libdc42"
 export PERCENTPROGRESS=25 PERCENTCEILING=27 REUSESAVE="yes"
-subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS
+subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
 unset LIST
 
-export COMPILEPHASE="tools"
-export PERCENTPROGRESS=27 PERCENTCEILING=35 REUSESAVE="yes"
-subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS
-unset LIST
+if  [[ -z "$NODC42TOOLS" ]]; then
+    export COMPILEPHASE="tools"
+    export PERCENTPROGRESS=27 PERCENTCEILING=35 REUSESAVE="yes"
+    subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS
+    unset LIST
+fi
 
 echo "Building LisaEm..."
 echo
@@ -461,7 +472,7 @@ echo "* LisaEm C Code                (./lisa)"
 export COMPILEPHASE="C code"
 export PERCENTPROCESS=35 PERCENTCEILING=75 PERCENTJOB=0 NUMJOBSINPHASE=15
 export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $CFLAGS $INC -c :INFILE:.c -o :OUTFILE:.o"
-LIST1=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiling COMPILELIST \
+LIST1=$(WAIT="" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiling COMPILELIST \
     src/lisa/io_board/floppy          \
     src/storage/profile               \
     src/lisa/motherboard/unvars       \
@@ -497,20 +508,23 @@ export WINDOWS_RES_ICONS=$( printf 'lisa2icon   ICON   "lisa2icon.ico"\r\n')
 #//power_off BITMAP "power_off.bmp"
 #//power_on  BITMAP "power_on.bmp"
 
-# :TODO: turn this into compileq
-if NEEDED lisaem_static_resources.cpp lisaem_static_resources.o; then
-  echo "  Compiling lisaem_static_resources.cpp..." 1>&2
-  $CXX $ARCH $CXXFLAGS -c lisaem_static_resources.cpp -o ${TLD}/obj/lisaem_static_resources.o || exit 1
+printf ' \r'  # eat twirly cursor, since we're not waitqing
+
+if needed lisaem_static_resources.cpp ${TLD}/obj/lisaem_static_resources.o; then
+  qjob "!!  Compiling lisaem_static_resources.cpp " $CXX $ARCH $CXXFLAGS -c lisaem_static_resources.cpp -o ${TLD}/obj/lisaem_static_resources.o
 fi
+
+printf ' \r'
+
 LIST="$LIST ${TLD}/obj/lisaem_static_resources.o $(windres)"
 # ^^ this also creates the windows resource via the windres function for Windows only. windres fn must be empty elsewhere
-
+# note the $(windres) is executing that function call
 rm -f lisaem lisaem.exe
-
 #vars.c must be linked in before any C++ source code or else there will be linking conflicts!
 
 cd .. || exit 1
 echo
+printf ' \r'
 echo "* wxWidgets C++ Code           (./wxui)"
 
 # save WARNINGS settings, add C++ extra warnings
@@ -542,224 +556,126 @@ echo
 echo '---------------------------------------------------------------' >> $BUILDWARNINGS
 
 cd "${TLD}"
-# ::TODO:: rewrite this to use QJOB or buildphase code instead.
-if [[ -n "$DARWIN" ]]; then
-  echo "* Linking ./bin/LisaEm.app"
-  echo "* Linking ./bin/LisaEm.app" >> $BUILDWARNINGS
 
-else
-  echo "* Linking ./bin/lisaem"
-  echo "* Linking ./bin/lisaem" >> $BUILDWARNINGS
-
-fi
+[[ -n "$DARWIN" ]] && LISANAME="LisaEm" || LISANAME="lisaem${EXT}"
 
 export COMPILEPHASE="linking"
 export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
-
-
-echo $CXX   $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
-            src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS 2>&1 >>$BUILDWARNINGS
-
-$CXX        $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/lisaem  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
-            src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS 2>&1 | tee /tmp/slot.linking.out >>$BUILDWARNINGS
-if  [[ -n "$( grep -i error /tmp/slot.linking.out )" ]]; then
-    grep error /tmp/slot.linking.out 1>&2
-    echo "Warnings and errors stored in: $BUILDWARNINGS"
-    exit 10
-fi
-
-rm -f /tmp/slot/linking.out
+waitqall
+qjob  "!!* Linking ./bin/${LISANAME}" $CXX $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
+      src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS
+waitqall
 export COMPILEPHASE="pack/install"
 export PERCENTPROCESS=99 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 
-if [[ -f ../bin/lisaem ]]; then
+cd "${TLD}/bin"
+if  [[ -f "$LISANAME" ]]; then
 
-cd ../bin
-echo -n " "
-
-# Report size and hashes ####
-
-if [ -z "$DARWIN" ]
-then
-    SIZE="`du -sh lisaem 2>/dev/null`"
-else
-    SIZE="`du -sh LisaEm.app 2>/dev/null`"
-fi
-
-#[[ -z "$GDB" ]] && export GDB="$( which ddd )"
-[[ -z "$GDB" ]] && export GDB="$( which gdb )"
-[[ -z "$GDB" ]] && export GDB="$( which lldb )"
-
-
-if [[ -n "$DARWIN" ]]; then
-    ::: REDO THIS CODE ::: 
-    exit 1
-    mkdir -pm775 LisaEm.app/Contents/MacOS
-    mkdir -pm775 LisaEm.app/Contents/Resources
-    sed "s/_VERSION_/$VERSION/g" <../resources/Info.plist > LisaEm.app/Contents/Info.plist
-    echo -n 'APPL????' > LisaEm.app/Contents/PkgInfo
-    for i in  LisaEm.icns floppy0.png floppy1.png floppy2.png \
-              floppy3.png floppyN.png lisaface0.png           \
-              lisaface1.png lisaface2.png lisaface3.png       \
-              power_off.png power_on.png                      \
-              floppy_eject.wav floppy_insert_sound.wav        \
-              floppy_insert_no_power.wav                      \
-              floppy_motor1.wav floppy_motor2.wav             \
-              lisa_power_switch01.wav lisa_power_switch02.wav \
-              poweroffclk.wav
-    do RESCPYLIST="$RESCPYLIST ../resources/$i"; done
-    cp $RESCPYLIST LisaEm.app/Contents/Resources/   || exit 1
-
-    if [[ -z "$WITHDEBUG" ]]; then
-        if  [[ -z "$WITHOUTSTRIP"  ]]; then  strip ./lisaem; fi
-    fi
-    chmod 755 lisaem
-    mv lisaem LisaEm
-    mv LisaEm LisaEm.app/Contents/MacOS/
-    [ -n "$WITHDEBUG" ] && echo run >gdb-run && $GDB ./LisaEm.app/Contents/MacOS/LisaEm
-    #if we turned on profiling, process the results
-    if [[ `echo "$WITHDEBUG" | grep 'p' >/dev/null 2>/dev/null` ]];then
-      $GPROF LisaEm.app/Contents/MacOS/LisaEm/lisaem >lisaem-gprof-out
-      echo lisaem-gprof-out created.
-    fi
-
-    if [[ -n "$INSTALL" ]]; then
-      cd ../bin/
-      echo Installing LisaEm.app
-      tar cf - ./LisaEm.app | (cd $PREFIX; tar xf -)
-      mkdir -pm755 /usr/local/bin
-      echo Installing lisafsh-tool, lisadiskinfo, and patchxenix to /usr/local/bin
-      chmod 755 lisafsh-tool lisadiskinfo patchxenix
-      cp lisafsh-tool lisadiskinfo patchxenix /usr/local/bin
-      echo Done Installing.
-      elapsed=$(get_elapsed_time)
-      [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
-      exit 0
-    fi
-fi
-
-# some older OS's don't support du -sh, so fall back to du -sk and convert to MB's
-if [[ -z "$SIZE" ]]; then
+    strip_and_compress ${LISANAME}
+# .
+# └── LisaEm.app
+#     └── Contents
+#         ├── MacOS
+#         └── Resources
+    
     if [[ -n "$DARWIN" ]]; then
-        SIZE="`du -sk LisaEm.app 2>/dev/null | cut -f1`"
-    else
-        SIZE="`du -sk lisaem     2>/dev/null | cut -f1`"
-    fi
-
-    SIZE=$(( $SIZE / 1024))
-    SIZE="${SIZE}M   lisaem"
-fi
-
-echo
-####
-
-
-if [[ -n "$DARWIN" ]]; then echo "Done."; exit 0; fi  # end of OS X
-
-if [[ -z "$WITHDEBUG" ]]; then
-
-  echo "Size     `du -sh lisaem`"
-  if  [ -z "$WITHOUTSTRIP"           ]; then strip lisaem${EXT};  echo "Stripped `du -sh lisaem`"; fi
-
-  # compress it if upx exists.
-  if [[ -z "$WITHOUTUPX"              ]]; then
-    if [[ -n "`which upx 2>/dev/null`" ]]; then
-      upx --best lisaem${EXT} >/dev/null 2>/dev/null
-      echo "upxed    `du -sh lisaem`"
-    fi
-  fi
-
-
-MD5BIN="`which md5 2>/dev/null`"
-if [[ -z "$MD5BIN" ]]; then MD5BIN="`which md5sum 2>/dev/null`"; fi
-
-if  [[ -n "$MD5BIN" ]]; then
-    if [[ "$DARWIN" ]]; then MD5="`$MD5BIN ./LisaEm.app/Contents/MacOS/LisaEm 2>/dev/null`"
-    else                   MD5="`$MD5BIN ./lisaem                           2>/dev/null`"; fi
-       [[ -n "$MD5" ]] && echo "  MD5:    $MD5"
-    fi
-
-MD5BIN="`which sha1 2>/dev/null`"
-if  [[ -z "$MD5BIN" ]]; then MD5BIN="`which sha1sum 2>/dev/null`"; fi
-
-if  [[ -n "$MD5BIN" ]]; then
-    if [[ "$DARWIN" ]]; then MD5="`$MD5BIN ./LisaEm.app/Contents/MacOS/LisaEm 2>/dev/null`"
-    else                     MD5="`$MD5BIN ./lisaem                           2>/dev/null`"; fi
-    [[ -n "$MD5" ]] && echo "  SHA1:   $MD5"
-fi
-
-MD5BIN="`which sha256 2>/dev/null`"
-if  [[ -z "$MD5BIN" ]]; then MD5BIN="`which sha256sum 2>/dev/null`"; fi
-
-if  [[ -n "$MD5BIN" ]]; then
-    if [[ "$DARWIN" ]]; then MD5="`$MD5BIN ./LisaEm.app/Contents/MacOS/LisaEm 2>/dev/null`"
-    else                   MD5="`$MD5BIN ./lisaem                           2>/dev/null`"; fi
-    [[ -n "$MD5" ]] && echo "  SHA256: $MD5"
-fi
-
-
-
-  ## Install ###################################################
-  if [[ -n "$INSTALL" ]]; then
-
-
-    if [[ -n "$CYGWIN" ]]; then
-          #PREFIX   ="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
-          #PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
-          echo "* Installing resources in     $PREFIXLIB/LisaEm"
-          mkdir -p $PREFIX
-          cp ../resources/*.wav $PREFIX
-          echo "* Installing lisaem binary in $PREFIX/lisaem"
-          cp ../bin/lisaem.exe $PREFIXLIB
-          echo -n "  Done Installing."
+        echo "* Creating macos X application" 1>&2
+        mkdir -pm775 "${TLD}/bin/LisaEm.app/Contents/MacOS"
+        mkdir -pm775 "${TLD}/bin/LisaEm.app/Contents/Resources"
+        sed "s/_VERSION_/$VERSION/g" <"${TLD}/resources/Info.plist" > "${TLD}/bin/LisaEm.app/Contents/Info.plist"
+        echo -n 'APPL????'          > "${TLD}/bin/LisaEm.app/Contents/PkgInfo"
+        mv "${TLD}/bin/${LISANAME}"   "${TLD}/bin/LisaEm.app/Contents/MacOS/" || exit $?
+        echo "* Copying Skins to app resources" 1>&2
+        (cd "${TLD}/resources"; tar cpf - skins ) | (cd "${TLD}/bin/LisaEm.app/Contents/Resources"; tar xpf - )
+        x=$?
+        if  [[ "$x" -ne 0 ]]; then
+            echo "Failed to copy ${TLD}/resources/skins to ${TLD}/bin/LisaEm.app/Contents/Resources" 1>&2
+            exit $x
+        fi
+    
+        [[ -n "$WITHDEBUG" ]] && echo run >gdb-run && $GDB ./LisaEm.app/Contents/MacOS/LisaEm
+        #if we turned on profiling, process the results
+        if [[ `echo "$WITHDEBUG" | grep 'p' >/dev/null 2>/dev/null` ]];then
+          $GPROF LisaEm.app/Contents/MacOS/LisaEm/lisaem >lisaem-gprof-out
+          echo lisaem-gprof-out created.
+        fi
+    
+        if [[ -n "$INSTALL" ]]; then
+          echo "* Installing LisaEm.app" 1>&2
+          (cd "${TLD}/bin"; tar cf - ./LisaEm.app ) | (cd "$PREFIX"; tar xf -)
+          x=$?
+          if  [[ "$x" -ne 0 ]]; then
+              echo "Failed to copy ${TLD}/bin/LisaEm.app to ${PREFIX}" 1>&2
+              exit $x
+          fi
+          echo "* Done Installing." 1>&2
           elapsed=$(get_elapsed_time)
           [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
           exit 0
+        fi
+        echo "Done." 1>&2; exit 0
     fi
-
-    if [[ -z "$CYGWIN" ]]; then
-
-      #   PREFIX="/usr/local/bin"
-      #   PREFIXLIB="/usr/local/share/"
-
-      echo "* Installing resources in     $PREFIXLIB/lisaem"
-      mkdir -pm755 $PREFIXLIB/LisaEm/ $PREFIX
-      cp ../resources/*.wav ../resources/*.png $PREFIXLIB/lisaem/
-      echo "* Installing lisaem binary in $PREFIX/lisaem"
-      cp lisaem $PREFIX
-      echo -n "  Done Installing."
-      elapsed=$(get_elapsed_time)
-      [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
-      exit 0
+    
+    
+    echo
+    ####
+    
+    if [[ -z "$WITHDEBUG" ]]; then
+    
+      ## Install ###################################################
+      if [[ -n "$INSTALL" ]]; then
+    
+        if [[ -n "$CYGWIN" ]]; then
+              #PREFIX   ="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+              #PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+              echo "* Installing skins in $PREFIXLIB/LisaEm"
+              mkdir -pm755 "$PREFIX"
+              (cd "${TLD}/resources"; tar cpf - skins) | (cd "$PREFIX"; tar xpf - )
+              echo "* Installing lisaem.exe binary in $PREFIX/lisaem"
+              cp "${TLD}/bin/lisaem.exe" "$PREFIX"
+              echo -n "  Done Installing."
+              elapsed=$(get_elapsed_time)
+              [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+              exit 0
+        else
+          #   PREFIX="/usr/local/bin"
+          #   PREFIXLIB="/usr/local/share/"
+    
+          echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
+          mkdir -pm755 $PREFIXLIB/LisaEm/ $PREFIX
+          cp ../resources/*.wav ../resources/*.png "$PREFIXLIB/lisaem/"
+          echo "* Installing lisaem binary in $PREFIX/lisaem" 1>&2
+          cp lisaem "$PREFIX"
+          echo -n "  Done Installing." 1>&2
+          elapsed=$(get_elapsed_time)
+          [[ -n "$elapsed" ]] && echo "$elapsed seconds" 1>&2 || echo 1>&2
+          exit 0
+        fi
+    
+      fi     # end of  INSTALL
+      ##########################################################
+    
+    else
+    
+      if [[ -z "$CYGWIN" ]]; then
+        cd ../bin
+        echo run >gdb-run
+        $GDB lisaem      -x gdb-run
+      else
+        cd ../bin
+        echo run >gdb-run
+        $GDB lisaem.exe -x gdb-run
+      fi
+    
+      if  [[ -n "$(echo -- $WITHDEBUG | grep p)" ]]; then
+          [[ -n "$CYGWIN" ]] && $GPROF lisaem.exe >lisaem-gprof-out.txt
+          [[ -z "$CYGWIN" ]] && $GPROF lisaem     >lisaem-gprof-out.txt
+          echo Profiling output written to lisaem-gprof-out.txt
+      fi
+    
     fi
-
-  fi     # end of  INSTALL
-  ##########################################################
-
-else
-
- if [ -z "$CYGWIN" ]
- then
-    cd ../bin
-    echo run >gdb-run
-    $GDB lisaem      -x gdb-run
- else
-    cd ../bin
-    echo run >gdb-run
-    $GDB lisaem.exe -x gdb-run
- fi
-
-
-  if  [[ -n "$(echo -- $WITHDEBUG | grep p)" ]]; then
-      [[ -n "$CYGWIN" ]] && $GPROF lisaem.exe >lisaem-gprof-out.txt
-      [[ -z "$CYGWIN" ]] && $GPROF lisaem     >lisaem-gprof-out.txt
-      echo Profiling output written to lisaem-gprof-out.txt
-  fi
-
-fi
-
 fi
 
 if  egrep -i 'warn|error' $BUILDWARNINGS >/dev/null 2>/dev/null; then

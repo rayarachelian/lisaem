@@ -16,7 +16,7 @@ me:
 	
 a:
 	
-sandwitch: me a 
+sandwich: me a 
 	[ `id -u` -ne 0 ] && echo "What? Make it yourself." || echo Okay
 
 love:

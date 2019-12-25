@@ -14,16 +14,16 @@
 
 ##############################################################################
 #
-# CLONESRCTREE - clones the source tree creating a compressed tar file.
+# clonesrctree - clones the source tree creating a compressed tar file.
 # this MUST be called from the topmost directory.  Returns the name of clone
-# via stdout.  Call should be like this:  GZFILE="`CLONESRCTREE $TARGET`"
+# via stdout.  Call should be like this:  GZFILE="`clonesrctree $TARGET`"
 #
 # $1 is the target directory.  /var/tmp will be used if none is specified.
 #
 # This is used in SRPM package creation.
 #
 ##############################################################################
-function CLONESRCTREE()
+function clonesrctree()
 {
  # variables are quoted incase of spaces
  TARGET="$1"
@@ -53,7 +53,7 @@ function CLONESRCTREE()
 # inside the build.  this must be called with $0 $@ as parameters from the
 # main build.sh program.
 #
-# i.e. BUILDFORPKG $0 $@
+# i.e. buildforpkg $0 $@
 #
 # This function will then set the PREFIX variable and reinvoke the program
 # with the same parameters to compile the code into a temporary dir, and then
@@ -61,7 +61,7 @@ function CLONESRCTREE()
 #
 ##############################################################################
 
-function BUILDFORPKG()
+function buildforpkg()
 {
  PWD="`/bin/pwd`"
  DIR="`basename \"\`/bin/pwd\`\"`"
@@ -124,7 +124,7 @@ function BUILDFORPKG()
 
 
 # this builds Darwin/OS X pkg folders.  These should be archived with zip or tar.gz/tar.bz2
-function BUILD_OSX()
+function build_osx()
 {
     TOP="`pwd`"
     cd pkg || exit $?
@@ -139,7 +139,7 @@ function BUILD_OSX()
 	DSTROOT="$TOP/pkg/osx/$PKGNAME/dstroot"
 
     cd "$TOP"
-    BUILDFORPKG $BUILDARGS
+    buildforpkg $BUILDARGS
     cd "$TOP/pkg/build/tmp" || exit $?
 	mv "$TOP/pkg/build/tmp" "$DSTROOT"  # since we'll move the build dir
     mkdir -pm755 "$TOP/pkg/build/tmp"               # recreate it
@@ -193,7 +193,7 @@ function BUILD_OSX()
 }
 
 # this builds Solaris old style packages, not IPS style packages (not yet, will be added in a different fn)
-function BUILD_SOL()
+function build_sol()
 {
     TOP="`pwd`"
     cd pkg || exit $?
@@ -201,7 +201,7 @@ function BUILD_SOL()
 	cd sol || exit 1        # in top/pkg/sol/
 	TARGET="$TOP/pkg/sol"
     cd "$TOP"
-    BUILDFORPKG $BUILDARGS
+    buildforpkg $BUILDARGS
     cd $TOP/pkg/build/tmp || exit $?
 
 	# we want to install files and links only - directories are dangerous - don't want
@@ -269,7 +269,7 @@ function BUILD_SOL()
 	cd $TOP
 }
 
-function BUILD_DEB()
+function build_deb()
 {
 
  echo want packagename_version_arch.deb
@@ -277,7 +277,7 @@ function BUILD_DEB()
 }
 
 
-function BUILD_RPM()
+function build_rpm()
 {
     TOP="`pwd`"
     cd pkg || exit 1
@@ -287,7 +287,7 @@ function BUILD_RPM()
     cd SOURCES
 	TARGET="`pwd`"
     cd "$TOP"
-	SRCGZ=`CLONESRCTREE "$TARGET"`
+	SRCGZ=`clonesrctree "$TARGET"`
     cd ../SPECS
 	
 	if [ -f "$TOP/pkg/templates/rpm.spec" ]
@@ -325,7 +325,7 @@ function BUILD_RPM()
 
 ##############################################################################
 #
-# ICANHASPKG - figures out what kind of host we're on, and returns the package
+# icanhaspkg - figures out what kind of host we're on, and returns the package
 #              type for it. Not all systems will be able to have package
 #              created for them. Some will support multiple package types.
 #              i.e. you might get back "RPM DEB" if both are supported.
@@ -338,7 +338,7 @@ function BUILD_RPM()
 #
 ##############################################################################
 
-function ICANHASPKG()
+function icanhaspkg()
 {
    PKGS=""
 
@@ -380,7 +380,7 @@ function ICANHASPKG()
 
 ##############################################################################
 #
-# MAKEPKG - figures out what kind of host we're on, and builds the appropriate
+# makepkg - figures out what kind of host we're on, and builds the appropriate
 #           package(s) for it. Not all systems will be able to have package
 #           created for them, some will have multiple types.  Such is the way
 #           of the tao
@@ -397,10 +397,10 @@ function ICANHASPKG()
 #
 ##############################################################################
 
-function MAKEPKG()
+function makepkg()
 {
 
- PKGTYPES="`ICANHASPKG`"
+ PKGTYPES="`icanhaspkg`"
  if [ -n "$PKGTYPES" ]
  then
     for i in `echo $PKGTYPES`

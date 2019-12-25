@@ -6253,10 +6253,6 @@ if (skins_on)
 
     wxString pngfile;
     
-   // stare not upon the insanity that predated this code, for it was written by drunkards! (*Burp*)
-   // OS X, and Unixen will use resource dirs to load png files
-#ifndef __WXMSW__
-
     #define LOADBITMAP(XpngX,XresnameX)                                                                  \
     { pngfile=skindir + skin.XresnameX; if (!XpngX) XpngX    = new wxBitmap(pngfile, wxBITMAP_TYPE_PNG); \
       ALERT_LOG(0,"Opening %s filename",(const char *)pngfile);                                          \
@@ -6278,21 +6274,6 @@ if (skins_on)
 
     LOADBITMAP(my_poweron, powerOn);
     LOADBITMAP(my_poweroff,powerOff);
-// windoze will load BMP resources from the .EXE file
-#else
-    if (!my_skin0)     my_skin0     = new wxBITMAP( lisaface0 );
-    if (!my_skin1)     my_skin1     = new wxBITMAP( lisaface1 );
-    if (!my_skin2)     my_skin2     = new wxBITMAP( lisaface2 );
-    if (!my_skin3)     my_skin3     = new wxBITMAP( lisaface3 );
-    if (!my_floppy0)   my_floppy0   = new wxBITMAP( floppy0   );
-    if (!my_floppy1)   my_floppy1   = new wxBITMAP( floppy1   );
-    if (!my_floppy2)   my_floppy2   = new wxBITMAP( floppy2   );
-    if (!my_floppy3)   my_floppy3   = new wxBITMAP( floppy3   );
-    if (!my_floppy4)   my_floppy4   = new wxBITMAP( floppyN   );
-    if (!my_poweron )  my_poweron   = new wxBITMAP( power_on  );
-    if (!my_poweroff)  my_poweroff  = new wxBITMAP( power_off );
-
-#endif
 
     if (!my_skinDC)     my_skinDC    = new wxMemoryDC;
     if (!my_skin0DC)    my_skin0DC   = new wxMemoryDC;
@@ -8302,12 +8283,22 @@ char *get_title(void)
   "I don't need to use Gilfoyle's AI in order to improve LisaEm... I need to use LisaEm to create a better AI!",
   "What you have to understand is, conventional emulation was like rubbing two sticks together, and along comes LisaEm out of nowhere with a freaking blowtorch",
   "The official emulator of Russfest!",
+  "I'm just gonna say it. This guy emulates. Am I right? 'Cause I'm looking at the rest of you guys, and this is the guy in the house doing all the emulating. Am I right?",
   "... but there was a little meniscus, and that's where our dreams lived",
   "It's a feature, not a bug",
   "I AM LisaEm",
   "But what do I know, I wasn't born into the emulation business, I f***ing earned it",
-  "How the hell did you get a flat tire in an emulator Ray? Obviously from a sharp thing in an emulator, Morty",
-  "There's literally everything in emulators, Morty, so get back in the shell!",
+  "How the hell did you get a flat tire in an emulator Ray? Obviously from a sharp thing in the Lisa Office System, Morty",
+  "There's literally everything in emulators, Morty, so get back in the z-shell!",
+  "Lisa is what the Macintosh wanted to be when it grew up, but somehow it all went wrong",
+  "If you byte your first SYN packet on the preamble, you might be a type-zero civilization packet",
+  "Nah don't touch that folder or that widget, let them be a powerful but confusing monument to our desktop's integrity",
+  "Play Snake Lotus-Jazz",
+  "I am an emulator sent forward in time by the Lisa Resistance to protect you from lame operating systems."
+  "Next time stay in the LisaList2, Morty!",
+  "That boot ROM source has everything we need to create Lisa Emulation given our 1998-2007 time"
+  "Also that's about as much CRT curvature you're gonna get from a Lisa emulation story",
+  "Wanna visit Lisa Office World, Summer?"
   ""
 };
 

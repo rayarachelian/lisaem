@@ -4,13 +4,16 @@
 [[ -z "$LD"     ]] && export LD="ld"
 [[ -z "$AROPTS" ]] && export AROPTS="cru"
 
-export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
-export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"
+export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g' 2>/dev/null)"
+export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g' 2>/dev/null)"
 
 export GCCCOLORIZED=""
 [[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
 [[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
 
+export DARWIN="Darwin"
+
+export HASHOPTS="-b --tag"
 
 export PREFIX="/Applications"
 export PREFIXLIB="/Library"
@@ -51,14 +54,14 @@ true
 }
 
 ##############################################################################
-# GETCPUS
+# getcpus
 #
 # Gets the number of CPUs available on the machine so we can issue multiple
 # compiles simultaneously
 #
 ##############################################################################
 
-function GETCPUS()
+function getcpus()
 {
   if [[ -z "$NUMCPUS" ]]; then
      export NUMCPUS="$( sysctl -n hw.ncpu )"
@@ -68,7 +71,7 @@ function GETCPUS()
 
 
 ##############################################################################
-# MAKELIBS
+# makelibs
 #
 # Creates both static and shared libraries.
 #
@@ -80,10 +83,10 @@ function GETCPUS()
 #               i.e. "a.o b.o c.o ..."
 #
 # i.e.
-#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
 #
 ##############################################################################
-function MAKELIBS() {
+function makelibs() {
 
 dir="$1"
 libname="$2"

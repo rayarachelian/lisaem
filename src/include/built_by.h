@@ -2,8 +2,8 @@
 #define __BUILTBY_H__
 
 
-#define BUILTBY "Compiled on Sat Dec 14 21:20:41 EST 2019 by ray@predator  (#81-Ubuntu SMP Tue Nov 26 12:20:02 UTC 2019)  \n options:    --unicode=yes \nusing:gcc (Ubuntu 7.4.0-1ubuntu1~18.04.1) 7.4.0"
-#define VERSION "1.2.7-ALPHA_2019.12.12"
+#define BUILTBY "Compiled on Wed Dec 25 12:20:12 EST 2019 by ray@predator  (#81-Ubuntu SMP Tue Nov 26 12:20:02 UTC 2019)  \n options:    --unicode=yes \nusing:gcc (Ubuntu 7.4.0-1ubuntu1~18.04.1) 7.4.0"
+#define VERSION "1.2.7-ALPHA_2019.12.24"
 #define LICENSE "Apple Lisa Emulator (and supporting software, documentation, etc.)\n"      \
 "Copyright (C) MMVIXX by Ray A. Arachelian, All Rights Reserved.\n"      \
 "see: http://lisaem.sunder.net for updates and other information.\n"      \

@@ -13,7 +13,12 @@ cd "$(dirname $0)"
 # ones, this next line can be optionally added/removed as needed.
 find . -type f -name '.env-*' -exec rm -f {} \;
 # Include and execute unified build library code - this part is critical
+
 [[ -z "$TLD" ]] && export TLD="${PWD}"
+# set the local top level directory for this build, as we go down into subdirs and run
+# build, TLD will be the top, but XTLD will be the "local" build's TLD.
+export XTLD="$( /bin/pwd )"
+
 if  [[ -x "${TLD}/bashbuild/src.build" ]]; then
     is_bashbuild_loaded 2>/dev/null || source ${TLD}/bashbuild/src.build
 else
@@ -100,9 +105,16 @@ do
   ;;
  build*)    echo ;;    #default - nothing to do here, this is the default.
  install)
-            [[ -z "$CYGWIN" ]] && [ "`whoami`" != "root" ] && echo "Need to be root to install. try sudo ./build.sh $@" && exit 1
-            INSTALL=1;
+            if [[ -z "$CYGWIN" ]]; then
+               [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
+            else
+                CygwinSudoRebuild $@
+            fi
+            INSTALL=1
             ;;
+
+ skipinstall)  INSTALL="" ;;    # skip install (used to disable $INSTALL passed from TLD builds)
+
 
  uninstall)
            if [[ -n "$DARWIN" ]]; then
@@ -239,10 +251,10 @@ CFLAGS="$CFLAGS   -Wno-empty-body  -Wno-duplicate-decl-specifier -Wno-incompatib
 
 cd src
 COMPILED=""
-if NEEDED libdc42.c ../obj/libdc42.o || NEEDED libdc42.c ../lib/libdc42.a; then
+if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    echo "  Compiling libdc42.c..."
    $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
-   MAKELIBS  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
+   makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi
 
 cd ..
@@ -252,10 +264,10 @@ cd ..
 if [[ -n "$INSTALL" ]]; then
       cd ../lib/
       echo Installing libGenerator $VERSION
-      mkdir -pm755 $PREFIX/lib
-      cp libdc42-$VERSION.a $PREFIX/lib/
-      [ -n "$DARWIN" ] && cp libdc42.${VERSION}.dylib $PREFIX/lib/
-      cd $PREFIX/lib
+      mkdir -pm755 "$PREFIX/lib"
+      cp libdc42-$VERSION.a "$PREFIX/lib/"
+      [ -n "$DARWIN" ] && cp libdc42.${VERSION}.dylib "$PREFIX/lib/"
+      cd "$PREFIX/lib"
       ln -s libdc42-$VERSION.a libdc42.a
 fi
 echo

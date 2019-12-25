@@ -15,6 +15,10 @@ cd "$(dirname $0)"
 find . -type f -name '.env-*' -exec rm -f {} \;
 # Include and execute unified build library code - this part is critical
 [[ -z "$TLD" ]] && export TLD="${PWD}"
+# set the local top level directory for this build, as we go down into subdirs and run
+# build, TLD will be the top, but XTLD will be the "local" build's TLD.
+export XTLD="$( /bin/pwd )"
+
 if  [[ -x "${TLD}/bashbuild/src.build" ]]; then
     is_bashbuild_loaded 2>/dev/null || source ${TLD}/bashbuild/src.build
 else
@@ -109,9 +113,15 @@ for i in $@; do
   ;;
  build*)    echo ;;    #default - nothing to do here, this is the default.
  install)
-            [[ -z "$CYGWIN" ]] && [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try sudo ./build.sh $@" && exit 1
-            INSTALL=1;
+            if [[ -z "$CYGWIN" ]]; then
+               [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
+            else
+                CygwinSudoRebuild $@
+            fi
+            INSTALL=1
             ;;
+
+ skipinstall)  INSTALL="" ;;    # skip install (used to disable $INSTALL passed from TLD builds)
 
  uninstall)
               echo "Uninstall commands not yet implemented."
@@ -245,14 +255,14 @@ echo "* Generator CPU Core OpCodes   (./cpu68k)"
 cd cpu68k
 
 DEPS=0
-[[ "$DEPS" -eq 0 ]] && if NEEDED def68k-iibs.h          ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if NEEDED def68k.def             ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if NEEDED gen68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if NEEDED tab68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if NEEDED def68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if NEEDED ../hdr/generator.h     ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k-iibs.h          ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k.def             ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed gen68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed tab68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed ../hdr/generator.h     ../obj/cpu68k-f.o; then  DEPS=1;fi
 
-GETCPUS
+getcpus
 
 if [[ "$DEPS" -gt 0 ]] ######################################################################
 then
@@ -286,10 +296,10 @@ then
   echo -n "  Compiling cpu68k-: "
   for src in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
       #echo -n "${src}. "
-      QJOB    "${src}. " $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS  -c cpu68k-${src}.c -o ../obj/cpu68k-${src}.o
+      qjob    "${src}. " $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS  -c cpu68k-${src}.c -o ../obj/cpu68k-${src}.o
       COMPILED="yes"
   done
-  WAITQALL
+  waitqall
   echo " done."
 
 
@@ -302,9 +312,9 @@ echo "* Generator CPU Library        (./generator)"
 cd ../generator
 
 DEPS=0
-[[ "$DEPS" -eq 0 ]] && if  NEEDED cpu68k.c      ../lib/libGenerator.a;then  DEPS=1; fi
-[[ "$DEPS" -eq 0 ]] && if  NEEDED reg68k.c      ../lib/libGenerator.a;then  DEPS=1; fi
-[[ "$DEPS" -eq 0 ]] && if  NEEDED diss68k.c     ../lib/libGenerator.a;then  DEPS=1; fi
+[[ "$DEPS" -eq 0 ]] && if  needed cpu68k.c      ../lib/libGenerator.a;then  DEPS=1; fi
+[[ "$DEPS" -eq 0 ]] && if  needed reg68k.c      ../lib/libGenerator.a;then  DEPS=1; fi
+[[ "$DEPS" -eq 0 ]] && if  needed diss68k.c     ../lib/libGenerator.a;then  DEPS=1; fi
 
 export COMPILEPHASE="support"
 export PERCENTJOB=18 NUMJOBSINPHASE=24
@@ -312,17 +322,17 @@ if [[ "$DEPS" -gt 0 ]]
 then
 for src in cpu68k reg68k diss68k ui_log; do  
     #only compile what we need, unlike ./cpu68k this is less sensitive
-    if NEEDED ${src}.c ../obj/${src}.o
+    if needed ${src}.c ../obj/${src}.o
     then
-      QJOB "!!  Compiling ${src}.c..." $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS -c ${src}.c -o ../obj/${src}.o|| exit 1
+      qjob "!!  Compiling ${src}.c..." $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS -c ${src}.c -o ../obj/${src}.o|| exit 1
       COMPILED="yes"
     fi
 done
-WAITQALL
+waitqall
 
 if [[ -n "$COMPILED" ]] || [[ ! -f ../lib/libGenerator.a ]]; then
   rm -f ../lib/libGenerator*
-  MAKELIBS  ../lib libGenerator "${VERSION}" static "../obj/cpu68k.o ../obj/reg68k.o ../obj/diss68k.o ../obj/tab68k.o ../obj/ui_log.o ../obj/cpu68k-?.o" # ../obj/lib68k.${VERSION}.a"
+  makelibs  ../lib libGenerator "${VERSION}" static "../obj/cpu68k.o ../obj/reg68k.o ../obj/diss68k.o ../obj/tab68k.o ../obj/ui_log.o ../obj/cpu68k-?.o" # ../obj/lib68k.${VERSION}.a"
 fi
 cd ../lib/
 
@@ -335,10 +345,10 @@ if [[ -n "$INSTALL" ]]
     then
       cd ../lib/
       echo Installing libGenerator
-      mkdir -pm755 $PREFIX/lib
-      cp libGenerator-$VERSION.a $PREFIX/lib/
-      [[ -n "$DARWIN" ]] && cp libGenerator.${VERSION}.dylib $PREFIX/lib/
-      cd $PREFIX/lib
+      mkdir -pm755 "$PREFIX/lib"
+      cp libGenerator-$VERSION.a "$PREFIX/lib/"
+      [[ -n "$DARWIN" ]] && cp libGenerator.${VERSION}.dylib "$PREFIX/lib/"
+      cd "$PREFIX/lib"
       ln -sf libGenerator-$VERSION.a libGenerator.a
     fi
 echo

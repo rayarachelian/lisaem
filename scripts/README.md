@@ -14,9 +14,7 @@ Some sample scripts as to how to build wxWidgets 3.x for LisaEm as well as
    meant to allow me to setup windows inside Virtual Box quickly, they're not
    production grade, but only provided incase they're useful to you to use to
    create your own build environment for LisaEm.
-3. A download script for use inside of Cygwin that downloads pre-compiled Windows
-   wxWidgets headers and libs for mingw gcc 7.3.0.
-4. A script to remove the lisaem preferences hidden inside ~/Library on macosx
+3. A script to remove the lisaem preferences hidden inside ~/Library on macosx
    (this might fail under Mojave/Catalina due to gatecreeper)
 
 NOTE: there are issues building LisaEm on older OS X using clang/llvm/Xcode.

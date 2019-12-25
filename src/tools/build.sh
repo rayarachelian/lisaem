@@ -14,6 +14,10 @@ cd "$(dirname $0)"
 find . -type f -name '.env-*' -exec rm -f {} \;
 # Include and execute unified build library code - this part is critical
 [[ -z "$TLD" ]] && export TLD="${PWD}"
+# set the local top level directory for this build, as we go down into subdirs and run
+# build, TLD will be the top, but XTLD will be the "local" build's TLD.
+export XTLD="$( /bin/pwd )"
+
 if  [[ -x "${TLD}/bashbuild/src.build" ]]; then
     is_bashbuild_loaded 2>/dev/null || source ${TLD}/bashbuild/src.build
 else
@@ -93,8 +97,12 @@ for i in $@; do
   ;;
  build*)    echo ;;    #default - nothing to do here, this is the default.
  install)
-            [[ -z "$CYGWIN" ]] && [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try sudo ./build.sh $@" && exit 1
-            INSTALL=1;
+            if [[ -z "$CYGWIN" ]]; then
+               [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
+            else
+                CygwinSudoRebuild $@
+            fi
+            INSTALL=1
             ;;
 
  uninstall)
@@ -255,16 +263,24 @@ cd src
 export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
 LIST1=$(WAIT="yes" OBJDIR="../bin/" INEXT=c OUTEXT="${EXTTYPE}" VERB=Compiling COMPILELIST lisadiskinfo  lisafsh-tool   dumper raw-to-dc42 dc42-to-raw patchxenix )
 
+if [[ -z "$XTLD" ]]; then
+   echo "Error XTLD is empty" 1>&2
+   exit 99
+fi
+
+cd "${XTLD}/bin"
+strip_and_compress lisadiskinfo${EXT} lisafsh-tool${EXT} dumper${EXT} raw-to-dc42${EXT} dc42-to-raw${EXT} patchxenix${EXT}
+
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd ../bin/
+      cd ${XTLD}/bin/
       [[ -n "$DARWIN" ]] && PREFIX=/usr/local/bin  # these shouldn't go into /Applications
-      echo Installing tools to $PREFIX/bin
-      mkdir -pm755 $PREFIX/bin 2>/dev/null
+      echo "Installing tools to $PREFIX/bin"
+      mkdir -pm755 "$PREFIX/bin" 2>/dev/null
       # * is for .exe on windows
       for i in lisadiskinfo*  lisafsh-tool*  patchxenix*  raw-to-dc42* dc42-to-raw*; do
-         cp ${i}* $PREFIX/bin/ || exit 1
+         cp ${i}* "$PREFIX/bin/" || exit 1
       done
       cd ..
 fi

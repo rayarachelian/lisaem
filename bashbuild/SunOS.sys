@@ -5,9 +5,51 @@ export PREFIX="/opt/SUNDERNETlisaem/bin"
 export PREFIXLIB="/opt/SUNDERNETlisaem/share/"
 export AROPTS="cru"
 
+export HASHOPTS="-b --tag"
+
 
 ##############################################################################
-# MAKELIBS
+# getcpus
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+# This has now moved to each OS.sys file in bashbuild ::TODO:: remove me
+##############################################################################
+
+if ! is_function_defined getcpus; then
+function getcpus()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+   case `uname -s` in
+     AIX)              NUMCPUS=`lsdev -Ccprocessor | grep -ci available                                              2>/dev/null`  ;;
+     Darwin)           #NUMCPUS=`/usr/sbin/ioreg | /usr/bin/egrep -c "+-o CPU.@.*active.*|+-o MacRISC2CPU.*active.*" 2>/dev/null`  # ::TODO:: add check for G4/G5
+                       NUMCPUS=`sysctl -n hw.ncpu`                                                                                 ;;
+     SunOS)            NUMCPUS=`/usr/sbin/psrinfo  | /usr/bin/grep -ci on-line                                       2>/dev/null`  ;;
+     CYGWIN*|Linux)    NUMCPUS=`nproc 2>/dev/null`                                                                                 ;;
+     OpenBSD|FreeBSD)  NUMCPUS=`sysctl -n hw.ncpu                                                                    2>/dev/null`  ;;
+   esac
+   [[ -z "$NUMCPUS" ]] && sysctl hw.ncpu 2>/dev/null| cut -f2 -d:
+   NUMCPUS=$(( $NUMCPUS + 0 )) 2>/dev/null  # in case we get a non-numeric, normalize it.
+   [[ $NUMCPUS -lt 1 ]] && NUMCPUS=1
+  fi
+
+  #too bad there's no simple way to detect hyperthreads vs real cores on the above.
+
+  # normalize to a number, just incase we got passed garbage
+  NUMCPUS=`printf "%d\n" "$NUMCPUS" 2>/dev/null`
+  # ensure at least 1
+  [ $NUMCPUS -lt 1 ] && NUMCPUS=1
+
+  export NUMCPUS
+  return $NUMCPUS
+}
+
+fi
+
+
+##############################################################################
+# makelibs
 #
 # Creates both static and shared libraries.
 #
@@ -19,10 +61,10 @@ export AROPTS="cru"
 #               i.e. "a.o b.o c.o ..."
 #
 # i.e.
-#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
 #
 ##############################################################################
-function MAKELIBS() {
+function makelibs() {
 
 dir="$1"
 libname="$2"

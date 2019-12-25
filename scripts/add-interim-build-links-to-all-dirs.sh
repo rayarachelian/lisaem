@@ -42,3 +42,4 @@ find . -type d | while read i; do
      done
   fi
 done
+rm resources/skins/default/build.sh
