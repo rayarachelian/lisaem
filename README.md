@@ -7,6 +7,14 @@
 Lisa Emulator Source Build README                    http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
+## 2019.12.25
+
+Cleaned up a bunch of stuff and fixed builds on both Windows and macos X.
+Both now install properly. There are still some bugs. Windows crashes on the
+hq3x renderer, and quits (I think on sound), but can now found its resources.
+Also cleaned up the old upper case function names in bashbuild that were a
+holdover from the 1.3.0 days.
+
 ## 2019.12.12 
 I rewrote a lot of the 1.3.0 build scripts and separated the fn's out to their
 own include files, standardized the build scripts to the new "buildbash"
