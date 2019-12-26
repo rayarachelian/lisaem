@@ -1,39 +1,46 @@
-echo "This OS has not yet been implemented" 1>&2
-exit 1
+[[ -z "$CXX"    ]] && export CXX="c++"
+[[ -z "$CC"     ]] && export CC="cc" 
+[[ -z "$AR"     ]] && export AR="ar"
+[[ -z "$LD"     ]] && export LD="ld"
+[[ -z "$AROPTS" ]] && export AROPTS="cru"
 
+export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g' 2>/dev/null)"
+export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g' 2>/dev/null)"
 
-export PREFIX="/usr/local/bin"
-export PREFIXLIB="/usr/local/share/"
-export AROPTS="cru"
-
-[[ -z "$CXX" ]] && export CXX="g++"
-[[ -z "$CC"  ]] && export CC="gcc"
-
-export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
-exportCLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"
-
-exportGCCCOLORIZED=""
+export GCCCOLORIZED=""
 [[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
 [[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
 
-export LINKOPTS="${GCCCOLORIZED}"
-export   CFLAGS="${GCCCOLORIZED} -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
-export CXXFLAGS="${GCCCOLORIZED} -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export FREEBSD="FreeBSD"
 
-#export LDFLAGS=""
-#export SYSLIBS=""
-#export GCCSTATIC=""
+export HASHOPTS="-b --tag"
+export PREFIX="/usr/local/bin"
+export PREFIXLIB="/usr/local/share/"
+
+export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export SYSLIBS=""
+export GCCSTATIC=""
+
+# is this needed for FreeBSD?
+# fix to alow modern XCode/stdc++ clang compilation, see: https://stackoverflow.com/questions/12920891/std-linker-error-with-apple-llvm-4-1
+# and https://apple.stackexchange.com/questions/350627/how-can-i-specify-the-c-version-to-use-with-xcode
+# wxWidgets may also need patching, see: https://stackoverflow.com/a/37632111
+
+if  [[ "$CLANGVER" ]]; then
+    export SYSLIBS="-lstdc++"
+   #export SYSLIBS="-lc++"
+fi
+
+export AROPTS="cru"
 
 export CLICMD=""
 export GUIAPP=""
 
-export HASHOPTS="-b --tag"
-
-# only used on Windows
+# Only used on Windows
 function windres() {
 true 
 }
-
 
 ##############################################################################
 # getcpus
@@ -41,38 +48,15 @@ true
 # Gets the number of CPUs available on the machine so we can issue multiple
 # compiles simultaneously
 #
-# This has now moved to each OS.sys file in bashbuild ::TODO:: remove me
 ##############################################################################
 
-if ! is_function_defined getcpus; then
 function getcpus()
 {
   if [[ -z "$NUMCPUS" ]]; then
-   case `uname -s` in
-     AIX)              NUMCPUS=`lsdev -Ccprocessor | grep -ci available                                              2>/dev/null`  ;;
-     Darwin)           #NUMCPUS=`/usr/sbin/ioreg | /usr/bin/egrep -c "+-o CPU.@.*active.*|+-o MacRISC2CPU.*active.*" 2>/dev/null`  # ::TODO:: add check for G4/G5
-                       NUMCPUS=`sysctl -n hw.ncpu`                                                                                 ;;
-     SunOS)            NUMCPUS=`/usr/sbin/psrinfo  | /usr/bin/grep -ci on-line                                       2>/dev/null`  ;;
-     CYGWIN*|Linux)    NUMCPUS=`nproc 2>/dev/null`                                                                                 ;;
-     OpenBSD|FreeBSD)  NUMCPUS=`sysctl -n hw.ncpu                                                                    2>/dev/null`  ;;
-   esac
-   [[ -z "$NUMCPUS" ]] && sysctl hw.ncpu 2>/dev/null| cut -f2 -d:
-   NUMCPUS=$(( $NUMCPUS + 0 )) 2>/dev/null  # in case we get a non-numeric, normalize it.
-   [[ $NUMCPUS -lt 1 ]] && NUMCPUS=1
+     export NUMCPUS="$( sysctl -n hw.ncpu )"
   fi
-
-  #too bad there's no simple way to detect hyperthreads vs real cores on the above.
-
-  # normalize to a number, just incase we got passed garbage
-  NUMCPUS=`printf "%d\n" "$NUMCPUS" 2>/dev/null`
-  # ensure at least 1
-  [ $NUMCPUS -lt 1 ] && NUMCPUS=1
-
-  export NUMCPUS
   return $NUMCPUS
 }
-
-fi
 
 
 ##############################################################################
@@ -108,10 +92,6 @@ soname="${dir}/${libname}.${ver}.so"
 lsoname="${dir}/${libname}.so"
 ldsoname="${dir}/${libname}.so"
 dsoname="${soname}"
-dylibname="${dir}/${libname}.${ver}.dylib"
-ldylibname="${dir}/${libname}.dylib"
-dllname="${dir}/${libname}.${ver}.dll"
-ldllname="${dir}/${libname}.dll"
 
 [[ "$4" == "both" ]] && mode="static"
 
@@ -130,18 +110,17 @@ fi
 
 if [[ "$mode" == "shared" ]]
 then
-
-#pwd
-#which gcc
+             # :TODO: test this
              echo "  Creating  $libname.so" 1>&2
-             gcc -shared -Wl,-soname,${soname} -o ${dsoname} ${objs} || exit 1
-             /bin/rm -f          ${ldsoname}
-             ln -sf ${dsoname}   ${ldsoname}
-             ln -sf ${dsoname}   ${ldsoname}
+             $CC $ARCH -shared- -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup  \
+                 -install_name /usr/local/lib/${libname}.so                                 \
+                 -compatibility_version ${ver} -current_version ${ver}                      \
+                 -o ${libname}.so ${objs}                                      || exit 1
+
+             /bin/rm -f          ${soname}
+             ln -sf ${lsoname}   ${soname}                                 
 
 fi
 
 echo -n "" >/dev/null
 }
-
-

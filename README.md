@@ -14,6 +14,7 @@ Both now install properly. There are still some bugs. Windows crashes on the
 hq3x renderer, and quits (I think on sound), but can now find its resources.
 Also cleaned up the old upper case function names in bashbuild that were a
 holdover from the 1.3.0 days.
+Added initial FreeBSD.sys support.
 
 ## 2019.12.12 
 I rewrote a lot of the 1.3.0 build scripts and separated the fn's out to their
