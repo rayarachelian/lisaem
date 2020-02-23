@@ -23,18 +23,28 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+go
+go-*
+*valgrind*
 .env-*
 *.bak
 *.exe
+*.dll
 *.o
 *.a
 *.dyld
 *.dc42
 *.tar
-*.tar.xz
+*.xz
+*.cpio
+*.bz2
+*.gz
+*.tgz
+*.dart
 *.image
 bin/lisaem
 bin/*.conf
+lisaem-output*
 experiments
 experiments/*
 experimental
@@ -47,6 +57,9 @@ cpu68k/cpu68k-?.c
 cpu68k/def68k
 cpu68k/gen68k
 include/built_by.h
+obj/get-uintX-types
 src/include/machine.h
 src/tools/include/machine.h
 src/lib/libdc42/include/machine.h
+hashes.txt
+output.txt

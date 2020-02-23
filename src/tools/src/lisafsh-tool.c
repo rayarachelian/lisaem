@@ -269,7 +269,7 @@ int tagcmp(const void *p1, const void *p2)
      if (next1>next2)     return -1;
      if (next1<next2)     return +1;
 
-                          return  0; // if we made it here, they're equal, uh? problem possibly.
+     return  0; // if we made it here, they're equal, uh? problem possibly.
 }
 
 
@@ -391,15 +391,16 @@ char *getfileid(int sector)
 
   snprintf(fileidtext,63,"file-%04x",fileid);
 
-  if (fileid >TAG_MAXTAG    ) snprintf(fileidtext,63,"UnKnowN-%04x",fileid);
-  if (fileid==TAG_ERASED_BLK) snprintf(fileidtext,63,"deleted-blocks-7fff");
-  if (fileid==TAG_BOOTSECTOR) snprintf(fileidtext,63,"bootsect-aaaa");
-  if (fileid==TAG_OS_LOADER ) snprintf(fileidtext,63,"OSLoader-bbbb");
-  if (fileid==TAG_FREE_BLOCK) snprintf(fileidtext,63,"freeblocks-0000");
-  if (fileid==TAG_MDDF      ) snprintf(fileidtext,63,"MDDF-0001");
-  if (fileid==TAG_FREEBITMAP) snprintf(fileidtext,63,"alloc-bitmap-0002");
-  if (fileid==TAG_S_RECORDS ) snprintf(fileidtext,63,"srecords-0003");
-  if (fileid==TAG_DIRECTORY ) snprintf(fileidtext,63,"directory-0004");
+  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",~(fileid+1));
+  else if (fileid >TAG_MAXTAG) snprintf(fileidtext,63,"UnKnowN-%04x",fileid);
+  if (fileid==TAG_ERASED_BLK)  snprintf(fileidtext,63,"deleted-blocks-7fff");
+  if (fileid==TAG_BOOTSECTOR)  snprintf(fileidtext,63,"bootsect-aaaa");
+  if (fileid==TAG_OS_LOADER )  snprintf(fileidtext,63,"OSLoader-bbbb");
+  if (fileid==TAG_FREE_BLOCK)  snprintf(fileidtext,63,"freeblocks-0000");
+  if (fileid==TAG_MDDF      )  snprintf(fileidtext,63,"MDDF-0001");
+  if (fileid==TAG_FREEBITMAP)  snprintf(fileidtext,63,"alloc-bitmap-0002");
+  if (fileid==TAG_S_RECORDS )  snprintf(fileidtext,63,"srecords-0003");
+  if (fileid==TAG_DIRECTORY )  snprintf(fileidtext,63,"directory-0004");
   return fileidtext;
 }
 
@@ -407,15 +408,15 @@ char *getfileidbyid(uint16 fileid)
 {
   static char fileidtext[64];            // needs to be static so it doesn't fall off the heap when this fn exits
   snprintf(fileidtext,63,"file-%04x",fileid);
-
-  if (fileid >TAG_MAXTAG    ) snprintf(fileidtext,63,"unknown-%04x",fileid);  // catch other unknown file id's
-  if (fileid==TAG_BOOTSECTOR) snprintf(fileidtext,63,"bootsect-aaaa");
-  if (fileid==TAG_OS_LOADER ) snprintf(fileidtext,63,"OSLoader-bbbb");
-  if (fileid==TAG_FREE_BLOCK) snprintf(fileidtext,63,"freeblocks-0000");
-  if (fileid==TAG_MDDF      ) snprintf(fileidtext,63,"MDDF-0001");
-  if (fileid==TAG_FREEBITMAP) snprintf(fileidtext,63,"alloc-bitmap-0002");
-  if (fileid==TAG_S_RECORDS ) snprintf(fileidtext,63,"srecords-0003");
-  if (fileid==TAG_DIRECTORY ) snprintf(fileidtext,63,"directory-0004");
+  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",~(fileid+1));
+  else if (fileid >TAG_MAXTAG) snprintf(fileidtext,63,"UnKnowN-%04x",fileid);
+  if (fileid==TAG_BOOTSECTOR)  snprintf(fileidtext,63,"bootsect-aaaa");
+  if (fileid==TAG_OS_LOADER )  snprintf(fileidtext,63,"OSLoader-bbbb");
+  if (fileid==TAG_FREE_BLOCK)  snprintf(fileidtext,63,"freeblocks-0000");
+  if (fileid==TAG_MDDF      )  snprintf(fileidtext,63,"MDDF-0001");
+  if (fileid==TAG_FREEBITMAP)  snprintf(fileidtext,63,"alloc-bitmap-0002");
+  if (fileid==TAG_S_RECORDS )  snprintf(fileidtext,63,"srecords-0003");
+  if (fileid==TAG_DIRECTORY )  snprintf(fileidtext,63,"directory-0004");
   return fileidtext;
 }
 
@@ -1086,45 +1087,38 @@ half=(size/2) -1;
 
 void printsectheader(FILE *out,DC42ImageType *F, uint32 sector)
 {
- uint32 fileid;
- fprintf(out,"\n-----------------------------------------------------------------------------\n");
- //fprintf(out,"Sec %d:(0x%04x) Cluster:%d, csize:%d ",sector,sector,sector/clustersize,clustersize);
+  uint32 fileid;
+  fprintf(out,"\n-----------------------------------------------------------------------------\n");
+  //fprintf(out,"Sec %d:(0x%04x) Cluster:%d, csize:%d ",sector,sector,sector/clustersize,clustersize);
 
+  fprintf(out,"Sec %d:(0x%04x)  ",sector,sector);
 
- fprintf(out,"Sec %d:(0x%04x)  ",sector,sector);
+  if  (havetags)
+      {   if (tagsaresorted)                     // when tags are sorted, allocation bitmap is extracted.
+          fprintf(out," %s Block ",
+          ((allocated[sector] & 8) ? "Used":"Free"));
+          fileid=TAGFILEID(sector);
+          fprintf(out,"Part of file %s:\"%s\"",getfileid(sector),filenames[fileid][0]);
+      }
 
- if (havetags)
- {    if (tagsaresorted)                     // when tags are sorted, allocation bitmap is extracted.
-      fprintf(out," %s Block ",
-      ((allocated[sector] & 8) ? "Used":"Free"));
-      fileid=TAGFILEID(sector);
-      fprintf(out,"Part of file %s:\"%s\"",getfileid(sector),filenames[fileid][0]);
- }
+  fprintf(out,"\n-----------------------------------------------------------------------------\n");
+  if  (F->tagsize)
+      {
+        if (F->tagsize==12) fprintf(out,"            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b\n");
+        else                fprintf(out,"            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b +c +d +e +f+10+11+12+13\n");
 
- fprintf(out,"\n-----------------------------------------------------------------------------\n");
-if (F->tagsize)
-{
-if (F->tagsize==12)
- fprintf(out,"            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b\n");
-else
- fprintf(out,"            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b +c +d +e +f+10+11+12+13\n");
+        fprintf(out,"tags:       ");
+        hexprint(out,  (char *)dc42_read_sector_tags(F,sector) ,F->tagsize,0);
 
- fprintf(out,"tags:       ");
+        if (F->tagsize==12) fprintf(out,"\n           |volid| ??  |fileid|absnext|next|previous\n");
+        else                fprintf(out,"\n           |volid|????|fileid||absnext|   ?   |    ?   |    next|previous\n");
 
- hexprint(out,  (char *)dc42_read_sector_tags(F,sector) ,F->tagsize,0);
-
-if (F->tagsize==12)
-  fprintf(out,"\n           |volid| ??  |fileid|absnext|next|previous\n");
-else
-  fprintf(out,"\n           |volid|????|fileid||absnext|   ?   |    ?   |    next|previous\n");
+      }
+  //fprintf(out,"\n\n");
+  fprintf(out,"-----------------------------------------------------------------------------\n");
+  fprintf(out,"      +0 +1 +2 +3 +4 +5 +6 +7 . +8 +9 +a +b +c +d +e +f                    \n");
+  fprintf(out,"-----------------------------------------------------------------------------\n");
 }
- //fprintf(out,"\n\n");
- fprintf(out,"-----------------------------------------------------------------------------\n");
- fprintf(out,"      +0 +1 +2 +3 +4 +5 +6 +7 . +8 +9 +a +b +c +d +e +f                    \n");
- fprintf(out,"-----------------------------------------------------------------------------\n");
-}
-
-
 
 void printtag(FILE *out,DC42ImageType *F, uint32 sector)
 {
@@ -1174,7 +1168,7 @@ void version_banner(void)
   puts("  ---------------------------------------------------------------------------");
   puts("    Lisa File System Shell Tool  v0.98     http://lisaem.sunder.net/lisafsh  ");
   puts("  ---------------------------------------------------------------------------");
-  puts("         Copyright (C) MMXII, Ray A. Arachelian, All Rights Reserved.");
+  puts("         Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.");
   puts("              Released under the GNU Public License, Version 2.0");
   puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
   puts("  ---------------------------------------------------------------------------\n");

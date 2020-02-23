@@ -499,14 +499,16 @@ void init_Profiles(void)
 
 void profile_unmount(void)
 {
-int i;
- for ( i=2; i<9; i++)
- {
-  if (via[i].ProFile)
-     { dc42_close_image(&via[i].ProFile->DC42);}
+    int i;
 
- }
-
+    for ( i=2; i<9; i++)
+    {
+        if (via[i].ProFile)
+        {
+            ALERT_LOG(0,"Shutting down profile at via #%d for shutdown/reboot. dc42:%p",i,via[i].ProFile->DC42); 
+            dc42_close_image(&via[i].ProFile->DC42);
+        }
+    }
 }
 
 int profile_mount(char *filename, ProFileType *P)

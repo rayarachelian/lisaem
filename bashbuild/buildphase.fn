@@ -13,7 +13,7 @@
 #                                    \${o} is object output, these
 #                                    will need to be escaped
 #
-#                  $FORCE flag - compiles all source even if not NEEDED
+#                  $FORCE flag - compiles all source even if not needed
 #                                when non empty
 #
 #                  $OBJDIR - output object directory (s/b relative to src)
@@ -74,7 +74,7 @@ for i in $@; do
   deps="${FORCE}"
   if [[ -z "${deps}" ]]; then 
      for d in $( echo $i| sed -e 's/:/ /g' -e "s/\.${INEXT}//g"); do 
-        if NEEDED "${d}.${INEXT}"  "${out}";then 
+        if needed "${d}.${INEXT}"  "${out}";then 
            deps="yes"; break
         fi
      done
@@ -90,18 +90,64 @@ for i in $@; do
   if [[ -n "$deps" ]]; then
      if [[ -n "$DEBUGCOMPILE" ]]; then
         echo "$PWD/COMPILELIST: Queueing ${i}..."                               1>&2
-        echo "$PWD/COMPILELIST: QJOB !!  ${VERB} ${i}.c...   ${compilecommand}" 1>&2
+        echo "$PWD/COMPILELIST: qjob !!  ${VERB} ${i}.c...   ${compilecommand}" 1>&2
         echo                                                                    1>&2
      fi
      #export i o out
-     QJOB "!!  ${VERB} $(echo ${i} | cut -d: -f1).${INEXT}..."  "$( echo ${compilecommand} )"
+     qjob "!!  ${VERB} $(echo ${i} | cut -d: -f1).${INEXT}..."  "$( echo ${compilecommand} )"
   fi
 
 done
 
-[[ "$WAIT" ]] && WAITQALL
+[[ "$WAIT" ]] && waitqall
 
 # output the object list collected for the linker
 echo "$LIST"
+
+}
+
+# similar to COMPILELIST only it just returns how many jobs there are - useful for calculating progressbar limits
+function COUNTNEEDED {
+unset i o
+local i
+local o
+local count
+local deps=""
+local list=""
+local s
+
+if [[ -z "$INEXT" ]];           then echo "$(/bin/pwd) $0 $@ missing INEXT variable" 1>&2; exit 1; fi
+if [[ -z "$OBJDIR" ]];          then echo "$(/bin/pwd) $0 $@ missing OBJDIR variable" 1>&2; exit 1; fi
+
+count=0
+for i in $@; do
+
+  # get the source file to build separated out from any dependencies it may have
+  s=$(echo "$i" | cut -d: -f1 | sed -e "s/.${INEXT}$//g" )
+  # get the object file to create.
+  o=${OBJDIR}/$( basename "$s" )
+
+  is=$( echo "$i" | sed -e 's/\//\\\//g')
+  objdir=$( echo "$OBJDIR" | sed -e 's/\//\\\//g')
+  os=${objdir}\\/$( basename "$s" )
+
+  [[ -n "$OUTEXT" ]] && out="${o}.${OUTEXT}" || ou="${o}"
+
+  # have any of the dependencies changed, or is force on?
+  deps="${FORCE}"
+  if [[ -z "${deps}" ]]; then 
+     for d in $( echo $i| sed -e 's/:/ /g' -e "s/\.${INEXT}//g"); do 
+        if needed "${d}.${INEXT}"  "${out}";then 
+           count=$(( $count + 1 )); break
+        fi
+     done
+  fi
+  i1=$( echo "$i" | cut -f1 -d: )
+  is=$( echo "$i1" | sed -e 's/\//\\\//g')
+
+done
+
+# output the count
+echo "$count"
 
 }

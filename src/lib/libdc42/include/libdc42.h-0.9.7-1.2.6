@@ -1,28 +1,49 @@
-![libDC42 Logo](resources/libdc42-banner.png)
-
-### Copyright © 2020 by Ray Arachelian, All Rights Reserved. 
-### Released under the terms of the GNU Public License v3, or LGPL
-
-***
-# libDC42
-
-## What is this thing?
-
-This is a library that allows block and tag level access to DiskImage 4.2 floppies, and is also used to hold Profile and Widget disk blocks. It also provides some translation capabilities from other file formats.
-The library itself is used by LisaEm as well as DiskCopy 4.2 specific tools.
-
-On systems that support memory mapping, it uses the mmap function to load the whole image into RAM and uses the page in/out features of your OS for speed.
-
-Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. The Disk image format is stored in .Image files, but I use .dc42 to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
-
-LibDC42 has an interface similar to the fopen, fread/frwrite fclose API of libstdc, except that creating a new disk image does not open it. A DC42ImageType structure pointer is passed arround to the functions when various operations are called. The open function can take extra parameters flagging whether to use memory mapping (when available), whether to access an image in Read Only format, and so on. Upon closing the DC42ImageType file, checksums are recalculated and saved. Additionally the errormsg structure member is used to store informational messages when an error occurs and should be used to display error messages to the user as they occur. The retval (return value) member is equivalent to the errno variable, and when set is an indicator that an error has occured and that errormsg should be passed to the user.
-
-
-## API Documentation
-
-The following is sourced from the include file and serves as the documentation for this library.
-
-```
+/**************************************************************************************\
+*                                     LibDC42                                          *
+*                                                                                      *
+*                            Version 0.9.6  2007.04.11                                 *
+*                                                                                      *
+*                       A Part of the Lisa Emulator Project                            *
+*                                                                                      *
+*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                                All Rights Reserved                                   *
+*                                                                                      *
+*           This program is free software; you can redistribute it and/or              *
+*           modify it under the terms of the GNU General Public License                *
+*           as published by the Free Software Foundation; either version 2             *
+*           of the License, or (at your option) any later version.                     *
+*                                                                                      *
+*           This program is distributed in the hope that it will be useful,            *
+*           but WITHOUT ANY WARRANTY; without even the implied warranty of             *
+*           MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
+*           GNU General Public License for more details.                               *
+*                                                                                      *
+*           You should have received a copy of the GNU General Public License          *
+*           along with this program;  if not, write to the Free Software               *
+*           Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *
+*                                                                                      *
+*                   or visit: http://www.gnu.org/licenses/gpl.html                     *
+*                                                                                      *
+*           Contact me if you need other licensing options such as LGPL, etc.          *
+*                                                                                      *
+*           LICENSING NOTE: Portions of this code rely on the LZHUFF.C code            *
+*                           released to usenet under the following conditions.         *
+*                                                                                      *
+*                                                                                      *
+*       LZHUF.C (c)1989 by Haruyasu Yoshizaki, Haruhiko Okumura, and Kenji Rikitake.   *
+*            All rights reserved. Permission granted for non-commercial use.           *
+*                                                                                      *
+*       If your application does not meet the non-commercial use clause, you must      *
+*       remove the #define USE_LZHUFF line from this library, and you may not use      *
+*       the LZHUFF routines.  Sorry.                                                   *
+* ------------------------------------------------------------------------------------ *
+*                                                                                      *
+*        Routines for access and manipulation of Disk Copy 4.2 Disk Images.            *
+*                                                                                      *
+* This code is unaffiliated with Apple, and Apple retains all trade marks for itself,  *
+* and all versions of the Disk Copy and DART programs.  Whenever you see the text      *
+* Disk Copy or DART, you are encouraged to visualize a trademark symbol following it.  *
+*                                                                                      *
 * ************************************************************************************ *
 *                                                                                      *
 * Requirements:                                                                        *
@@ -99,10 +120,10 @@ The following is sourced from the include file and serves as the documentation f
 *                                                                                      *
 * Usage of these routines:                                                             *
 *                                                                                      *
-* Allocate a DC42ImageType structure for each disk image you wish to have open.  Pass a*
+* Allocate a DC42ImageType structure for each disk image you wish to have open.  Pass a   *
 * pointer to this structure to the function calls that require it.                     *
 *                                                                                      *
-* Some of the routines do not access an opened DC42ImageType structure, and may only be*
+* Some of the routines do not access an opened DC42ImageType structure, and may only be   *
 * used with the image file in the closed state.  No checking is done, so if you ignore *
 * this warning, you'll find the image may be corrupted.                                *
 *                                                                                      *
@@ -281,6 +302,48 @@ return codes:
 #define USE_LZHUF  1
 
 
+// needed for LisaEm compatibility, you can remove this, but you must
+// define int8, int16, int32, uint8, uint16, uint32.
+#include "machine.h"
+
+
+// normal includes
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+// Windows lacks MMAP functions
+#ifndef __MSVCRT__
+#include <sys/mman.h>
+#include <glob.h>
+#define HAVE_MMAPEDIO
+#endif
+
+
+#include <errno.h>
+#include <string.h>
+#include <strings.h>
+#include <ctype.h>
+
+
+////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifndef fgetc
+#define fgetc(xx) ((unsigned)(getc(xx)))
+#endif
+
+#define DC42_HEADERSIZE 84
+#define DART_CHUNK      20960
+#define DART_CHUNK_TAGS 20480
+
+#define TWIG860KFLOPPY 0
+#define SONY800KFLOPPY 2
+#define SONY400KFLOPPY 1
+
+
+
 typedef struct                          // floppy type
 {
   int    fd;                            // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
@@ -337,23 +400,23 @@ typedef struct                          // floppy type
 
 
 
-extern int dc42_open(DC42ImageType *F, char *filename, char *options);             // open a disk image, map it and fill structure
-extern int dc42_auto_open(DC42ImageType *F, char *filename, char *options);        // oops, was missing!
+int dc42_open(DC42ImageType *F, char *filename, char *options);                    // open a disk image, map it and fill structure
+int dc42_auto_open(DC42ImageType *F, char *filename, char *options);               // oops, was missing!
 
-extern int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options);
+int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options);
                                                                                    // open an embedded dc42 image in an already
                                                                                    // opened file descriptor at the curren file
                                                                                    // position.
 
 
-extern int dc42_close_image(DC42ImageType *F);                                            // close the image: fix checksums and sync data
-extern int dc42_close_image_by_handle(DC42ImageType *F);                                  // close, but don't call close on the fd.
+int dc42_close_image(DC42ImageType *F);                                            // close the image: fix checksums and sync data
+int dc42_close_image_by_handle(DC42ImageType *F);                                  // close, but don't call close on the fd.
 
-extern int dc42_create(char *filename,char *volname, uint32 datasize,uint32 tagsize);     // create a blank new disk image
+int dc42_create(char *filename,char *volname, uint32 datasize,uint32 tagsize);     // create a blank new disk image
                                                                                    // does not open the image, may not be called
                                                                                    // while the image file is open.
 
-extern int dc42_add_tags(char *filename, uint32 tagsize);                                 // add tags to a dc42 image that lacks them.
+int dc42_add_tags(char *filename, uint32 tagsize);                                 // add tags to a dc42 image that lacks them.
                                                                                    // if tagsize is zero adds 12 bytes of tags for
                                                                                    // every 512 bytes of data.  Does not open the
                                                                                    // image, can be used pre-emptively when opening
@@ -362,62 +425,65 @@ extern int dc42_add_tags(char *filename, uint32 tagsize);                       
                                                                                    // does not open the image, may not be called
                                                                                    // while theimage file is open.
 
-extern uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-extern uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-extern int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-extern int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
+uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
+uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
+int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
+int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
 
-extern int dc42_sync_to_disk(DC42ImageType *F);                                           // like fsync, sync's writes back to file. Does
+int dc42_sync_to_disk(DC42ImageType *F);                                           // like fsync, sync's writes back to file. Does
                                                                                    // NOT write proper tag/data checksums, as that
                                                                                    // would be too slow.  Call recalc_checksums yourself
                                                                                    // when you need it, or call dc42_close_image.
 
-extern uint32 dc42_has_tags(DC42ImageType *F);                                     // returns 0 if no tags, 1 if it has tags
+uint32 dc42_has_tags(DC42ImageType *F);                                            // returns 0 if no tags, 1 if it has tags
 
-extern uint32 dc42_calc_tag_checksum(DC42ImageType *F);                            // calculate the current tag checksum
-extern uint32 dc42_calc_tag0_checksum(DC42ImageType *F);                           // used by DART
+uint32 dc42_calc_tag_checksum(DC42ImageType *F);                                   // calculate the current tag checksum
+uint32 dc42_calc_tag0_checksum(DC42ImageType *F);                                  // used by DART
 
-extern uint32 dc42_calc_data_checksum(DC42ImageType *F);                           // calculate the current sector data checksum
+uint32 dc42_calc_data_checksum(DC42ImageType *F);                                  // calculate the current sector data checksum
 
-extern int dc42_recalc_checksums(DC42ImageType *F);                                // calculate checksums and save'em in the image
+int dc42_recalc_checksums(DC42ImageType *F);                                       // calculate checksums and save'em in the image
 
-extern int dc42_check_checksums(DC42ImageType *F);                                 // 0 if both data and tags match
+int dc42_check_checksums(DC42ImageType *F);                                        // 0 if both data and tags match
                                                                                    // 1 if tags don't match
                                                                                    // 2 if data
                                                                                    // 3 if both data and tags don't match
 
 
-extern uint32 dc42_get_tagchecksum(DC42ImageType *F);                              // return the image's stored tag checksum
-extern uint32 dc42_get_datachecksum(DC42ImageType *F);                             // return the image's stored data checksum
+uint32 dc42_get_tagchecksum(DC42ImageType *F);                                     // return the image's stored tag checksum
+uint32 dc42_get_datachecksum(DC42ImageType *F);                                    // return the image's stored data checksum
 
 
 
 
 
-extern int dart_to_dc42(char *dartfilename, char *dc42filename);                   // converts a DART fast-compressed/uncompressed
+int dart_to_dc42(char *dartfilename, char *dc42filename);                          // converts a DART fast-compressed/uncompressed
                                                                                    // image to a DiskCopy42 image.  Does not (yet)
                                                                                    // work with LZH compressed images
 
 
-extern int dc42_is_valid_image(char *filename);    // returns 0 if it can't open the image, or the image is not a valid dc42 image.
+int dc42_is_valid_image(char *filename);    // returns 0 if it can't open the image, or the image is not a valid dc42 image.
 
-extern int dart_is_valid_image(char *dartfilename); // returns 0 if it can't open the image, or the image is not a valid DART image
+int dart_is_valid_image(char *dartfilename); // returns 0 if it can't open the image, or the image is not a valid DART image
 
-extern int dc42_is_valid_macbinii(char *infilename, char *creatortype);            // returns 1 if file is macbinII encapsulated
+int dc42_is_valid_macbinii(char *infilename, char *creatortype);                   // returns 1 if file is macbinII encapsulated
                                                                                    // if creatortype is passed a non-NULL ponter
                                                                                    // the Macintosh creator and type are returned
                                                                                    // by thefunction.  This must be at leat 9 bytes!
 
-extern int dc42_set_volname(DC42ImageType *F,char *name); // set/get the disk image volume name
-extern char *dc42_get_volname(DC42ImageType *F);
+int dc42_set_volname(DC42ImageType *F,char *name); // set/get the disk image volume name
+char *dc42_get_volname(DC42ImageType *F);
 
 
 
-extern int dc42_extract_macbinii(char *infilename);                                // extracts macbin2 header if one exists
+int dc42_extract_macbinii(char *infilename);                                       // extracts macbin2 header if one exists
                                                                                    // returns 1 if converted, 0 if it's not
                                                                                    // a macbinII header. negative on error
                                                                                    // NOTE: filename is overwritten with
                                                                                    // extracted file name!  On negative return
                                                                                    // the filename has been altered!
-```
 
+int searchseccount( DC42ImageType *F, int sector, int size, uint8 *s);
+int replacesec(DC42ImageType *F, int sector, int size, uint8 *s, uint8 *r);
+
+////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////

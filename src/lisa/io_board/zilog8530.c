@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -134,49 +134,49 @@ int irq_on_next_rx_char[2];
 // Protos for link to host devices - or emulation of ports
 
 int get_scc_pending_irq(void);
-void send_break(uint8 port);
-void set_dtr(uint8 port, uint8 value);
-void set_rts(uint8 port, uint8 value);
-void set_dtr_loopbackplug(uint8 port, uint8 value);
-void set_rts_loopbackplug(uint8 port, uint8 value);
-int get_dcd(uint8 port);
-int get_cts(uint8 port);
-int get_break(uint8 port);
-void signal_parity_error(uint8 port);
-void signal_crc_error(uint8 port);
-void set_even_parity(uint8 port);
-void set_odd_parity(uint8 port);
-void set_no_parity(uint8 port);
-void set_bits_per_char(uint8 port, uint8 bitsperchar);
-void set_stop_bits(uint8 port,uint8 stopbits);
-char read_serial_port(int8 port);
-void write_serial_port(int8 port, char data);
-void scc_hardware_reset_port(int8 port);
-void scc_channel_reset_port(int8 port);
+void send_break(unsigned int port);
+void set_dtr(unsigned int port, uint8 value);
+void set_rts(unsigned int port, uint8 value);
+void set_dtr_loopbackplug(unsigned int port, uint8 value);
+void set_rts_loopbackplug(unsigned int port, uint8 value);
+int get_dcd(unsigned int port);
+int get_cts(unsigned int port);
+int get_break(unsigned int port);
+void signal_parity_error(unsigned int port);
+void signal_crc_error(unsigned int port);
+void set_even_parity(unsigned int port);
+void set_odd_parity(unsigned int port);
+void set_no_parity(unsigned int port);
+void set_bits_per_char(unsigned int port, uint8 bitsperchar);
+void set_stop_bits(unsigned int port,uint8 stopbits);
+char read_serial_port(unsigned int port);
+void write_serial_port(unsigned int port, char data);
+void scc_hardware_reset_port(unsigned int port);
+void scc_channel_reset_port(unsigned int port);
 void initialize_scc(void);
 void  lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);
 uint8 lisa_rb_Oxd200_sccz8530(uint32 address);
 void scc_control_loop(void);
 void dump_scc(void);
 
-char read_serial_port(int8 port);
-char read_serial_port_nothing(int8 port);
-char read_serial_port_imagewriter(int8 port);
-char read_serial_port_loopbackplug(int8 port);
-char read_serial_port_localport(int8 port);
+char read_serial_port(unsigned int port);
+char read_serial_port_nothing(unsigned int port);
+char read_serial_port_imagewriter(unsigned int port);
+char read_serial_port_loopbackplug(unsigned int port);
+char read_serial_port_localport(unsigned int port);
 #ifndef __MSVCRT__
-char read_serial_port_telnetd(int8 port);
+char read_serial_port_telnetd(unsigned int port);
 #endif
 
-void write_serial_port_nothing(int8 port, char data);
-void write_serial_port_loopbackplug(int8 port, char data);
-void write_serial_port_localport(int8 port, char data);
-void write_serial_port_imagewriter(int8 port, char data);
+void write_serial_port_nothing(unsigned int port, char data);
+void write_serial_port_loopbackplug(unsigned int port, char data);
+void write_serial_port_localport(unsigned int port, char data);
+void write_serial_port_imagewriter(unsigned int port, char data);
 #ifndef __MSVCRT__
-void write_serial_port_telnetd(int8 port, char c);
+void write_serial_port_telnetd(unsigned int port, char c);
 #endif
 
-uint32 get_baud_rate(uint8 port);
+uint32 get_baud_rate(unsigned int port);
 void set_baud_rate(int port, uint32 baud);
 
 
@@ -224,10 +224,10 @@ uint16 crc16(uint16 crc, uint8 data)
 
 
 
-void scc_hardware_reset_port(int8 port)
+void scc_hardware_reset_port(unsigned int port)
 {
     register uint8 d;
-
+ 
     d=BITORD(scc_r[port].r[0 ]); scc_r[port].r[0]=BITORD(  (d & (8|16|32|128))  | 64 | 4);
     d=BITORD(scc_r[port].r[1 ]); scc_r[port].r[1]=BITORD((d & 1) | 2 | 4);
     d=BITORD(scc_r[port].r[10]); scc_r[port].r[10]=BITORD(d&64);
@@ -265,7 +265,7 @@ void scc_hardware_reset_port(int8 port)
 
 
 
-void scc_channel_reset_port(int8 port)
+void scc_channel_reset_port(unsigned int port)
 {
     register uint8 d;
 
@@ -319,23 +319,23 @@ void initialize_scc(void)
   }
 
   // set handlers to default methods
-  scc_fn[0].set_dtr                  = set_dtr;                       //   void (*set_dtr)(uint8 port, uint8 value);
-  scc_fn[0].send_break               = send_break;                    //   void (*send_break)(uint8 port);
-  scc_fn[0].set_rts                  = set_rts;                       //   void (*set_rts)(uint8 port, uint8 value);
-  scc_fn[0].get_dcd                  = get_dcd;                       //   int  (*get_dcd)(uint8 port);
-  scc_fn[0].get_cts                  = get_cts;                       //   int  (*get_cts)(uint8 port);
-  scc_fn[0].get_break                = get_break;                     //   int  (*get_break)(uint8 port);
-  scc_fn[0].signal_parity_error      = signal_parity_error;           //   void (*signal_parity_error)(uint8 port);
-  scc_fn[0].signal_crc_error         = signal_crc_error;              //   void (*signal_crc_error)(uint8 port);
-  scc_fn[0].set_even_parity          = set_even_parity;               //   void (*set_even_parity)(uint8 port);
-  scc_fn[0].set_odd_parity           = set_odd_parity;                //   void (*set_odd_parity)(uint8 port);
-  scc_fn[0].set_no_parity            = set_no_parity;                 //   void (*set_no_parity)(uint8 port);
-  scc_fn[0].set_bits_per_char        = set_bits_per_char;             //   void (*set_bits_per_char)(uint8 port, uint8 bitsperchar);
-  scc_fn[0].set_stop_bits            = set_stop_bits;                 //   void (*set_stop_bits)(uint8 port,uint8 stopbits);
-  scc_fn[0].read_serial_port         = read_serial_port;              //   char (*read_serial_port)(int8 port);
-  scc_fn[0].write_serial_port        = write_serial_port;             //   void (*write_serial_port)(int8 port, char data);
-  scc_fn[0].scc_hardware_reset_port  = scc_hardware_reset_port;       //   void (*scc_hardware_reset_port)(int8 port);
-  scc_fn[0].scc_channel_reset_port   = scc_channel_reset_port;        //   void (*scc_channel_reset_port)(int8 port);
+  scc_fn[0].set_dtr                  = set_dtr;                       //   void (*set_dtr)(unsigned int port, uint8 value);
+  scc_fn[0].send_break               = send_break;                    //   void (*send_break)(unsigned int port);
+  scc_fn[0].set_rts                  = set_rts;                       //   void (*set_rts)(unsigned int port, uint8 value);
+  scc_fn[0].get_dcd                  = get_dcd;                       //   int  (*get_dcd)(unsigned int port);
+  scc_fn[0].get_cts                  = get_cts;                       //   int  (*get_cts)(unsigned int port);
+  scc_fn[0].get_break                = get_break;                     //   int  (*get_break)(unsigned int port);
+  scc_fn[0].signal_parity_error      = signal_parity_error;           //   void (*signal_parity_error)(unsigned int port);
+  scc_fn[0].signal_crc_error         = signal_crc_error;              //   void (*signal_crc_error)(unsigned int port);
+  scc_fn[0].set_even_parity          = set_even_parity;               //   void (*set_even_parity)(unsigned int port);
+  scc_fn[0].set_odd_parity           = set_odd_parity;                //   void (*set_odd_parity)(unsigned int port);
+  scc_fn[0].set_no_parity            = set_no_parity;                 //   void (*set_no_parity)(unsigned int port);
+  scc_fn[0].set_bits_per_char        = set_bits_per_char;             //   void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
+  scc_fn[0].set_stop_bits            = set_stop_bits;                 //   void (*set_stop_bits)(unsigned int port,uint8 stopbits);
+  scc_fn[0].read_serial_port         = read_serial_port;              //   char (*read_serial_port)(unsigned int port);
+  scc_fn[0].write_serial_port        = write_serial_port;             //   void (*write_serial_port)(unsigned int port, char data);
+  scc_fn[0].scc_hardware_reset_port  = scc_hardware_reset_port;       //   void (*scc_hardware_reset_port)(unsigned int port);
+  scc_fn[0].scc_channel_reset_port   = scc_channel_reset_port;        //   void (*scc_channel_reset_port)(unsigned int port);
   scc_fn[0].set_baud_rate            = set_baud_rate;
 
 
@@ -511,7 +511,7 @@ void dump_scc(void) {}
 
 // this calculates the baud rate, but it also sets it if the port connection supports the set_baud_rate method.
 // so the name isn't what it seems.
-uint32 get_baud_rate(uint8 port)
+uint32 get_baud_rate(unsigned int port)
 {
   static uint32 baud=0, lastbaud[2];
   uint32 tc=0,  Clock_Freq;
@@ -1448,11 +1448,11 @@ return 0;
 
 // interface functions to host machine -- need to fill these in!
 
-void send_break(uint8 port)           {DEBUG_LOG(0,"generic Send Break on port %d",        port);        UNUSED(port);                return  ;}
-void set_dtr(uint8 port, uint8 value) {DEBUG_LOG(0,"generic Set DTR on port %d to %d",     port,value);  UNUSED(port); UNUSED(value); return  ;}
-void set_rts(uint8 port, uint8 value) {DEBUG_LOG(0,"generic Set RTS on port %d to %d",     port,value);  UNUSED(port); UNUSED(value); return  ;}
+void send_break(unsigned int port)           {DEBUG_LOG(0,"generic Send Break on port %d",        port);        UNUSED(port);                return  ;}
+void set_dtr(unsigned int port, uint8 value) {DEBUG_LOG(0,"generic Set DTR on port %d to %d",     port,value);  UNUSED(port); UNUSED(value); return  ;}
+void set_rts(unsigned int port, uint8 value) {DEBUG_LOG(0,"generic Set RTS on port %d to %d",     port,value);  UNUSED(port); UNUSED(value); return  ;}
 
-int get_dcd(uint8 port)
+int get_dcd(unsigned int port)
 {
     DEBUG_LOG(0,"generic Get Carrier Detect on port %d is %d",port, scc_r[port].s.rr0.r.dcd);
     scc_r[port].s.rr0.r.dcd=1;
@@ -1460,7 +1460,7 @@ int get_dcd(uint8 port)
     return scc_r[port].s.rr0.r.dcd;
 }
 
-int get_cts(uint8 port) 
+int get_cts(unsigned int port) 
 {
     DEBUG_LOG(0,"generic Get Clear to send on port %d is %d", port, scc_r[port].s.rr0.r.cts);
     if ((port && scc_a_IW!=-1) || (!port && scc_b_IW!=-1)) return 0;
@@ -1468,7 +1468,7 @@ int get_cts(uint8 port)
     return 1;  /*2006.07.11*/
 }
 
-int get_break(uint8 port) 
+int get_break(unsigned int port) 
 {
     UNUSED(port);
     DEBUG_LOG(0,"generic Get brk status on port %d",    port);
@@ -1477,21 +1477,21 @@ int get_break(uint8 port)
     return 0;
 }
 
-void signal_parity_error(uint8 port)  {DEBUG_LOG(0,"generic Signal parity error port %d",  port);  UNUSED(port); return  ;}
-void signal_crc_error(uint8 port)     {DEBUG_LOG(0,"generic Signal CRC error on port %d",  port);  UNUSED(port); return  ;}
+void signal_parity_error(unsigned int port)  {DEBUG_LOG(0,"generic Signal parity error port %d",  port);  UNUSED(port); return  ;}
+void signal_crc_error(unsigned int port)     {DEBUG_LOG(0,"generic Signal CRC error on port %d",  port);  UNUSED(port); return  ;}
 
-void set_even_parity(uint8 port)      {DEBUG_LOG(0,"generic Set even parity  on port %d",  port);  UNUSED(port); return  ;}
-void set_odd_parity(uint8 port)       {DEBUG_LOG(0,"generic Set  odd parity  on port %d",  port);  UNUSED(port); return  ;}
-void set_no_parity(uint8 port)        {DEBUG_LOG(0,"generic Set   no parity  on port %d",  port);  UNUSED(port); return  ;}
+void set_even_parity(unsigned int port)      {DEBUG_LOG(0,"generic Set even parity  on port %d",  port);  UNUSED(port); return  ;}
+void set_odd_parity(unsigned int port)       {DEBUG_LOG(0,"generic Set  odd parity  on port %d",  port);  UNUSED(port); return  ;}
+void set_no_parity(unsigned int port)        {DEBUG_LOG(0,"generic Set   no parity  on port %d",  port);  UNUSED(port); return  ;}
 
-void set_dtr_loopbackplug(uint8 port, uint8 value)
+void set_dtr_loopbackplug(unsigned int port, uint8 value)
 { 
   scc_r[port].s.rr0.r.dcd=value;
   DEBUG_LOG(0,"Set loopback DTR on port %d to %d", port,value); 
   return;
 }
 
-void set_rts_loopbackplug(uint8 port, uint8 value)
+void set_rts_loopbackplug(unsigned int port, uint8 value)
 { 
   scc_r[port].s.rr0.r.cts=value;
   // weird loopback test cable
@@ -1504,7 +1504,7 @@ void set_rts_loopbackplug(uint8 port, uint8 value)
 
 void set_baud_rate(int port, uint32 baud) { UNUSED(port); UNUSED(baud);}  // dummy function
 
-void set_bits_per_char(uint8 port, uint8 bitsperchar)
+void set_bits_per_char(unsigned int port, uint8 bitsperchar)
 {
   DEBUG_LOG(0,"Set bits/char on port %d to %d",     port,bitsperchar);
   switch(bitsperchar)
@@ -1518,19 +1518,19 @@ void set_bits_per_char(uint8 port, uint8 bitsperchar)
         }
 }
 
-void set_stop_bits(uint8 port,uint8 stopbits) {UNUSED(port); UNUSED(stopbits);return;} //0=0 no stop bits,1=1 stop bit,2=1.5 stop bits,3=2 stop bits
+void set_stop_bits(unsigned int port,uint8 stopbits) {UNUSED(port); UNUSED(stopbits);return;} //0=0 no stop bits,1=1 stop bit,2=1.5 stop bits,3=2 stop bits
 
-char read_serial_port_nothing(int8 port)      {UNUSED(port);return 0; }
-char read_serial_port_imagewriter(int8 port)  {UNUSED(port);return 0; }
-char read_serial_port_loopbackplug(int8 port) {UNUSED(port);return -1;}  // this should never be called!
-char read_serial_port_localport(int8 port)
+char read_serial_port_nothing(unsigned int port)      {UNUSED(port);return 0; }
+char read_serial_port_imagewriter(unsigned int port)  {UNUSED(port);return 0; }
+char read_serial_port_loopbackplug(unsigned int port) {UNUSED(port);return -1;}  // this should never be called!
+char read_serial_port_localport(unsigned int port)
 {
   if (port) {  if (scc_a_port_F) return fgetc(scc_a_port_F); else return 0;  }
   else      {  if (scc_b_port_F) return fgetc(scc_b_port_F); else return 0;  }
   return 0;
 }
 
-char read_serial_port(int8 port)                            // generic handler
+char read_serial_port(unsigned int port)                            // generic handler
 {
     DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
     DEBUG_LOG(0,"SRC:port:%d",port);
@@ -1552,10 +1552,10 @@ char read_serial_port(int8 port)                            // generic handler
 }
 
 
-void write_serial_port_nothing(int8 port, char data)      {UNUSED(port); UNUSED(data);DEBUG_LOG(0,"wrote %02x to port %d",data,port);return;}
-void write_serial_port_loopbackplug(int8 port, char data) {DEBUG_LOG(0,"wrote %02x to port %d",data,port); fliflo_buff_add(&SCC_READ[(!port)&1],data & scc_bits_per_char_mask[(!port)&1]);}
+void write_serial_port_nothing(unsigned int port, char data)      {UNUSED(port); UNUSED(data);DEBUG_LOG(0,"wrote %02x to port %d",data,port);return;}
+void write_serial_port_loopbackplug(unsigned int port, char data) {DEBUG_LOG(0,"wrote %02x to port %d",data,port); fliflo_buff_add(&SCC_READ[(!port)&1],data & scc_bits_per_char_mask[(!port)&1]);}
 
-void write_serial_port_imagewriter(int8 port, char data)
+void write_serial_port_imagewriter(unsigned int port, char data)
 {   if (port) { DEBUG_LOG(0,"wrote %02x to port %d",data,port);
                 if  (scc_a_IW!=-1)
                     {DEBUG_LOG(0,"Write %02x to imagewriter",data); ImageWriterLoop(scc_a_IW,data);} 
@@ -1567,12 +1567,12 @@ void write_serial_port_imagewriter(int8 port, char data)
               }
 }
 
-void write_serial_port_localport(int8 port, char data)
+void write_serial_port_localport(unsigned int port, char data)
 {   if (port)   {  DEBUG_LOG(0,"wrote %02x to port %d",data,port);if (serial_a==SCC_LOCALPORT) {if (scc_a_port_F) fputc(data,scc_a_port_F);  }}
     else        {  DEBUG_LOG(0,"wrote %02x to port %d",data,port);if (serial_b==SCC_LOCALPORT) {if (scc_b_port_F) fputc(data,scc_b_port_F);  }}
 }
 
-void write_serial_port(int8 port, char data)
+void write_serial_port(unsigned port, char data)
 {
     DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
     DEBUG_LOG(0,"SRC:port:%d",port);
@@ -1635,18 +1635,18 @@ int       serversock[MAX_SERIAL_PORTS],
 // stuff to send to telnet client.
 char telnethax[]={0xff,0xfb,0x01,0xff,0xfb,0x03,0xff,0xfd,0x0f3};
 
-char read_serial_port_telnetd(int8 port)
+char read_serial_port_telnetd(unsigned int port)
 {
     int c=poll_telnet_serial_read(port);
     return (c>-1) ? (char) c : 0;
 }
 
-void write_serial_port_telnetd(int8 port, char c)
+void write_serial_port_telnetd(unsigned int port, char c)
 {
   char buffer[2];
   buffer[0]=c;
   DEBUG_LOG(0,"Write char %02x %c to port %d",c,(c>31 ? c:'.'),port);
-  send(clientsock[port],buffer,1,0);  // should this be telnetserver?
+  send(clientsock[(unsigned)port],buffer,1,0);  // should this be telnetserver?
 }
 
 

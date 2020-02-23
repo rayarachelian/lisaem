@@ -636,14 +636,14 @@ int parity_check(uint32 address)
     for (sum=0,i=0; i<size && !sum; sum|=parity32[i++])
         ; // check the bits - if any are set, we keep the mem_parity array
 
-    DEBUG_LOG(100,"binary or sum of parity set bits is:%d, if zero, releasing parity memory",sum);
+    ALERT_LOG(0,"binary or sum of parity set bits is:%d, if zero, releasing parity memory",sum);
 
     if (!sum) release_parity_check();                    // if no mem_parity bits, we can free up some memory.
     //--------------------------------------------------------------------------------------------------------------------
   }
   else
   {
-   DEBUG_LOG(100,"DIAG2 is still set, I didn't try to release the parity ram");
+   ALERT_LOG(0,"DIAG2 is still set, I didn't try to release the parity ram");
   }
 
   #ifdef DEBUG
@@ -688,7 +688,8 @@ void set_parity_check(uint32 address)
 
 int getsnbit(void)
 {
- int bit=0;
+    int bit=0;
+    static uint32 lastaddr;
 
     bit=(serialnum240[serialnumshiftcount>>3]) & (1<<((serialnumshiftcount&7)^7));
 
@@ -696,7 +697,8 @@ int getsnbit(void)
 
     serialnumshiftcount=(serialnumshiftcount + 1) & 127;
 
-    ALERT_LOG(0,"Possible read of serial number from %d/%08x",context,pc24);
+    if (pc24!=lastaddr) ALERT_LOG(0,"Possible read of serial number from %d/%08x",context,pc24);
+    lastaddr=pc24;
     return (bit ? 32768:0);
 }
 

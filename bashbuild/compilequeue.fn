@@ -13,53 +13,13 @@
 
 
 
-##############################################################################
-# GETCPUS
-#
-# Gets the number of CPUs available on the machine so we can issue multiple
-# compiles simultaneously
-#
-# This has now moved to each OS.sys file in bashbuild ::TODO:: remove me
-##############################################################################
-
-if ! is_function_defined GETCPUS; then
-function GETCPUS()
-{
-  if [[ -z "$NUMCPUS" ]]; then
-   case `uname -s` in
-     AIX)              NUMCPUS=`lsdev -Ccprocessor | grep -ci available                                              2>/dev/null`  ;;
-     Darwin)           #NUMCPUS=`/usr/sbin/ioreg | /usr/bin/egrep -c "+-o CPU.@.*active.*|+-o MacRISC2CPU.*active.*" 2>/dev/null`  # ::TODO:: add check for G4/G5
-                       NUMCPUS=`sysctl -n hw.ncpu`                                                                                 ;;
-     SunOS)            NUMCPUS=`/usr/sbin/psrinfo  | /usr/bin/grep -ci on-line                                       2>/dev/null`  ;;
-     CYGWIN*|Linux)    NUMCPUS=`nproc 2>/dev/null`                                                                                 ;;
-     OpenBSD|FreeBSD)  NUMCPUS=`sysctl -n hw.ncpu                                                                    2>/dev/null`  ;;
-   esac
-   [[ -z "$NUMCPUS" ]] && sysctl hw.ncpu 2>/dev/null| cut -f2 -d:
-   NUMCPUS=$(( $NUMCPUS + 0 )) 2>/dev/null  # in case we get a non-numeric, normalize it.
-   [[ $NUMCPUS -lt 1 ]] && NUMCPUS=1
-  fi
-
-  #too bad there's no simple way to detect hyperthreads vs real cores on the above.
-  
-  # normalize to a number, just incase we got passed garbage
-  NUMCPUS=`printf "%d\n" "$NUMCPUS" 2>/dev/null`
-  # ensure at least 1
-  [ $NUMCPUS -lt 1 ] && NUMCPUS=1
-
-  export NUMCPUS
-  return $NUMCPUS
-}
-
-fi
-
-
 
 ##############################################################################
-# QJOB
+# qjob
 #
 # Queues up a compilation job in the background and waits for it to complete
 #
-# Parameters $1 text to output
+# Parameters $1 text to output if it starts w/!! newline, else nonewline
 #	           $2..$N command to execute
 #
 # Waits for an available queue slot, then creates a slot script, and forks it
@@ -75,24 +35,24 @@ fi
 ##############################################################################
 jobnum=0
 
-function QJOB {
+function qjob {
 
   if [[ -z "$2" ]]; then
-     echo "QJOB: $PWD QJOB Missing Parameters $@ passed" 1>&2
+     echo "qjob: $PWD qjob Missing Parameters $@ passed" 1>&2
      exit 9
   fi
 
   # if we only have one CPU, execute immediately, no need to waste effort queueing
-  GETCPUS
+  getcpus
   if [[ $NUMCPUS -eq 1 ]]
   then
     [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
     export PERCENTJOB="$(( $PERCENTJOB +1 ))"
 
-    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD QJOB: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
-    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD QJOB: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
-    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD QJOB: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
-    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD QJOB: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
+    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD qjob: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
+    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD qjob: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
+    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD qjob: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
+    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD qjob: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
     update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 
     if [[ "${1:0:2}" == "!!" ]]; then echo "${1:2}" 1>&2; else echo -n  "$1" 1>&2; fi
@@ -103,7 +63,7 @@ function QJOB {
   else
 
     # make sure we have at least one free slot (and process any completed ones before adding more)
-    WAITQ
+    waitq
 
     # create a unique job name to launch # we don't care that much about the names, we just want
     # unique ones.
@@ -141,15 +101,15 @@ function QJOB {
      echo "exit 0"                                           # and we're done.
     )       > ./${SLOTNAME}                                  # create the slot script, make it executable
     chmod 755 ./${SLOTNAME}                                  # make it executable by our user
-    touch  /tmp/${SLOTNAME}.out                              # avoid race conditions where QJOB is done, but output file
-                                                             # has been created, but we fall through WAITQALL
+    touch  /tmp/${SLOTNAME}.out                              # avoid race conditions where qjob is done, but output file
+                                                             # has been created, but we fall through waitqall
     ./${SLOTNAME} 1>&2 &                                     # launch it in the background.
   fi
 }
 
 
 ##############################################################################
-# WAITQALL and WAITQ
+# waitqall and waitq
 #
 # Waits until (all) queued jobs are complete and outputs results
 # If errors happen, we wait until all other jobs are done, then abort the
@@ -158,9 +118,9 @@ function QJOB {
 ##############################################################################
 
 waitqc=0
-function WAITQ()
+function waitq()
 {
-  GETCPUS
+  getcpus
   twirl='/-\\|' # twirly cursor
   if [[ $NUMCPUS -eq 1 ]]; then return; fi
   /usr/bin/tty -s && TTY="yes" || TTY=""   # don't bother with twirly cursor if non-interactive
@@ -194,10 +154,10 @@ function WAITQ()
         [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
         export PERCENTJOB="$(( $PERCENTJOB +1 ))"
 
-        # if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD WAITQ: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
-        # if [[ -z "$PERCENTJOB"     ]];  then echo "$PWD WAITQ: 2 PERCENTJOB is empty"      1>&2; exit 9; fi
-        # if [[ -z "$NUMJOBSINPHASE" ]];  then echo "$PWD WAITQ: 3 NUMJOBSINPHASE is empty"  1>&2; exit 9; fi
-        # if [[ -z "$PERCENTCEILING" ]];  then echo "$PWD WAITQ: 4 PERCENTCEILING is empty"  1>&2; exit 9; fi
+        # if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD waitq: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
+        # if [[ -z "$PERCENTJOB"     ]];  then echo "$PWD waitq: 2 PERCENTJOB is empty"      1>&2; exit 9; fi
+        # if [[ -z "$NUMJOBSINPHASE" ]];  then echo "$PWD waitq: 3 NUMJOBSINPHASE is empty"  1>&2; exit 9; fi
+        # if [[ -z "$PERCENTCEILING" ]];  then echo "$PWD waitq: 4 PERCENTCEILING is empty"  1>&2; exit 9; fi
 
         update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
      done
@@ -216,7 +176,7 @@ function WAITQ()
      for z in ${OUT}.*.sh.failed
      do
         echo "---------------------------------------------------------------" 1>&2
-        echo "${PWD}/WAITQ: failed job: $z"                                    1>&2
+        echo "${PWD}/waitq: failed job: $z"                                    1>&2
         echo "---------------------------------------------------------------" 1>&2
         cat $z                                                                 1>&2
         echo "---------------------------------------------------------------" 1>&2
@@ -226,7 +186,7 @@ function WAITQ()
         echo "------------- Compilation Aborted ------------"    >>$BUILDWARNINGS
      done
      # since there were failed jobs, we have to quit our build. Sorry.
-     echo "${PWD}/WAITQ: Aborted due to a failed job!" 1>&2
+     echo "${PWD}/waitq: Aborted due to a failed job! See $BUILDWARNINGS" 1>&2
      exit 9
   fi
  fi
@@ -234,7 +194,7 @@ function WAITQ()
 }
 
 
-function WAITQALL()
+function waitqall()
 {
   # wait until we have slots open before enqueing more jobs
   # we don't sleep inside the loop since sleep only allows a minimum of 1 second.
@@ -242,13 +202,13 @@ function WAITQALL()
   # sorry.  But with any luck, the multiple copies of GCC we launch will keep our box
   # busier than our script.
 
-  [[ -z "$NUMCPUS"  ]] && GETCPUS
+  [[ -z "$NUMCPUS"  ]] && getcpus
   [[ $NUMCPUS -eq 1 ]] && return
 
   OUT="/tmp/slot.$$"  # /tmp/slot.6588.10.sh.done
 
-  while [[ `ls -l $OUT.*.sh.out 2>/dev/null | wc -l` -gt 0 ]]; do WAITQ; done
-  WAITQ    # one more to make sure nothing is left to process
+  while [[ `ls -l $OUT.*.sh.out 2>/dev/null | wc -l` -gt 0 ]]; do waitq; done
+  waitq    # one more to make sure nothing is left to process
 
   [[ -n "$TTY" ]] && printf "\b \b" 1>&2
 }
@@ -284,7 +244,7 @@ function WAITQALL()
 #   #[[ "`ls -tr $1 $2 2>/dev/null| tail -1`" == "$2" ]]
 ##############################################################################
 
-function NEEDED()
+function needed()
 {
   [[ "$2" -ot "$1" ]]
 }

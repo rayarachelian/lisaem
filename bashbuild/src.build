@@ -37,8 +37,8 @@ function set_includes_and_libs() {
   local lib1
 
   # get local subdirs as well as any already set
-  inc1="$(find ${XTLD} -type d -name include -print | sed -e 's/ /\\\\ /g' | while read i; do echo $i; done; )"
-  lib1="$(find ${XTLD} -type d -name lib     -print | sed -e 's/ /\\\\ /g' | while read i; do echo $i; done; )"
+  inc1="$(find ${XTLD} -type d -name include -print | sed -e 's/ /\\\\ /g' | grep -v scripts | while read i; do echo $i; done; )"
+  lib1="$(find ${XTLD} -type d -name lib     -print | sed -e 's/ /\\\\ /g' | grep -v scripts | while read i; do echo $i; done; )"
 
   # sort and remove duplicates, any item without a - is an include dir, so prefix -I
   for i in $( echo $INC $inc1 | sed -e 's/-I//g' | sort | uniq ); do 
@@ -53,18 +53,16 @@ function set_includes_and_libs() {
   echo "export LIB=\"$LIB $lib\""
 }
 
-###############################################################################
-###############################################################################
-###  Initialize Platform specific variables    ################################
-###############################################################################
-###############################################################################
-
 # Ensure this is only loaded once when sourcing.
 if ! is_bashbuild_loaded 2>/dev/null; then
 
   # save the current date/time in epoch seconds so we can time how long this build
   # takes - this is used by the progress bar.
-   [[ -z "$STARTCOMPILE" ]] && export STARTCOMPILE="$(date '+%s' 2>/dev/null)"
+   if [[ -z "$STARTCOMPILE" ]]; then
+      export STARTCOMPILE="$(date '+%s' 2>/dev/null)"
+      export BUILDWARNINGS="${TLD}/obj/build-warnings.txt"
+      echo "Starting compile at $STARTCOMPILE $(date)" >"${BUILDWARNINGS}"
+   fi
 
    [[ -z "$TLD" ]] && export TLD="$( /bin/pwd )"  # | sed -e's/ /?/g' )"
    if [[ -n "$(echo $TLD | grep ' ')" ]]; then
@@ -84,10 +82,6 @@ if ! is_bashbuild_loaded 2>/dev/null; then
    [[ -z "$PERCENTPROGRESS ]] && PERCENTPROGRESS=0
    [[ -z "$PERCENTCEILING  ]] && PERCENTCEILING=100
   
-   # set the local top level directory for this build, as we go down into subdirs and run
-   # build, TLD will be the top, but XTLD will be the "local" build's TLD.
-   export XTLD="$( /bin/pwd )"
-
    # save environment vars so we'll know which to save and which came in before use
    #echo "saving to ${XTLD}/.env-ext" 1>&2
    env                                         >${XTLD}/.env-ext-original
@@ -136,12 +130,79 @@ if ! is_bashbuild_loaded 2>/dev/null; then
 
    # since variables set inside bash functions are all local we have to do it like this.
    eval $(set_includes_and_libs)
+
+   #------------------------------------------------------------
+   # If we haven't defined tools, find them now using which
+   #------------------------------------------------------------
+   
+   [[ -z "$STRIP"   ]] && export   STRIP="$( which strip     2>/dev/null )"
+   [[ -z "$UPXCMD"  ]] && export  UPXCMD="$( which upx       2>/dev/null )"
+   [[ -z "$GDB"     ]] && export     GDB="$( which gdb       2>/dev/null )"
+   [[ -z "$GDB"     ]] && export     GDB="$( which lldb      2>/dev/null )"
+   [[ -z "$AR"      ]] && export      AR="$( which ar        2>/dev/null )"
+   [[ -z "$AS"      ]] && export      AS="$( which as        2>/dev/null )"
+   [[ -z "$CPP"     ]] && export     CPP="$( which cpp       2>/dev/null )"
+   [[ -z "$CXX"     ]] && export     CXX="$( which g++       2>/dev/null )"
+   [[ -z "$CC"      ]] && export      CC="$( which gcc       2>/dev/null )"
+   [[ -z "$RANLIB"  ]] && export  RANLIB="$( which ranlib    2>/dev/null )"
+   [[ -z "$GCOV"    ]] && export    GCOV="$( which gcov      2>/dev/null )"
+   [[ -z "$GCOV"    ]] && export    GCOV="$( which llvm-gcov 2>/dev/null )"
+   [[ -z "$GPROF"   ]] && export   GPROF="$( which gprof     2>/dev/null )"
+   [[ -z "$LD"      ]] && export      LD="$( which ld        2>/dev/null )"
+   [[ -z "$NM"      ]] && export      NM="$( which nm        2>/dev/null )"
+   [[ -z "$OBJCOPY" ]] && export OBJCOPY="$( which objcopy   2>/dev/null )"
+   [[ -z "$OBJDUMP" ]] && export OBJDUMP="$( which objdump   2>/dev/null )"
+   [[ -z "$MD5SUM"  ]] && export  MD5SUM="$( which md5sum    2>/dev/null )"
+   [[ -z "$SHA1SUM" ]] && export SHA1SUM="$( which sha1sum   2>/dev/null )"
+   [[ -z "$SHA256"  ]] && export  SHA256="$( which sha256sum 2>/dev/null )"
    
    #get_elapsed_time; echo "seconds to load fn's"
 
 fi
 #########################################################################################
 
-export BUILDWARNINGS="${TLD}/obj/build-warnings.txt"
+
+function strip_and_compress() {
+  local app
+
+  # there's some weird sync issues on my machine with zfs where du shows 512 bytes
+  # doing sync here once before seems to fix it some of the time.
+  sync
+  for app in $@; do
+      #echo "  Compiled size:        $(du -h ${app} 2>/dev/null)" 1>&2
+      echo  "  Compiled size:        $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+  done
+
+  # strip is fast, don't bother producing output
+  if [[ -z "$WITHOUTSTRIP" ]]; then
+     if [[ -n "$STRIP" ]]; then
+        for app in $@; do
+          qjob "" "$STRIP" "${app}" "|| true"
+        done
+      fi
+  fi
+  waitqall
+  if [[ -z "$WITHOUTUPX" ]]; then
+     if [[ -n "$UPXCMD" ]]; then
+        for app in $@; do
+          qjob "!!  Compressing with upx:     $app" "${TLD}/bashbuild/upxcmd.sh" "$UPXCMD" "${app}" "|| true"
+        done
+      fi
+  fi
+  waitqall
+
+  # hashes are relatively fast, don't bother producing output
+  for app in $@; do
+      [[ -n "$MD5SUM"  ]] && qjob "" $MD5SUM  $HASOPTS "${app}" ">>hashes.txt"
+      [[ -n "$SHA1SUM" ]] && qjob "" $SHA1SUM $HASOPTS "${app}" ">>hashes.txt"
+      [[ -n "$SHA256"  ]] && qjob "" $SHA256  $HASOPTS "${app}" ">>hashes.txt"
+  done
+  waitqall
+  sync
+  for app in $@; do
+      #echo "  Final size:           $(du -h ${app} 2>/dev/null)" 1>&2
+      echo  "  Final size:           $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+  done
+}
 
 function is_bashbuild_loaded { true ; }

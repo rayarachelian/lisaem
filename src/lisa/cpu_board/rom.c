@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -239,6 +239,8 @@ int has_xl_screenmod(void)
 * The main reason for this is so that during debugging I can see what the ROM is       *
 * attempting to execute and the results.  This way I can output the ROM source instead *
 * of hard to read uncommented machine code without symbols.                            *
+*                                                                                      *
+* Valgrind reports memory leak here, don't really care.                                *
 \**************************************************************************************/
 
 int16 read_dtc_rom(char *filename, uint8 *ROM)
@@ -319,7 +321,8 @@ int16 read_dtc_rom(char *filename, uint8 *ROM)
   if ( !rom_source_file && ok)
   {  fprintf(buglog,"Warning! Lisa rom source is filled with 'holes' - the emulator will fail!\n");
      fprintf(buglog,"Add the object code file, or use a real ROM, but the source won't match it.\n\n");
-         return ok ? 0:1;
+     free(line);
+     return ok ? 0:1;
 
   // "Imagine if every Thursday your shoes exploded if you tied them the
   //  usual way.  This happens to us all the time with computers, and nobody
@@ -413,7 +416,7 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     size_t c;
 
     if (!filename || !ROMMX) return -3;
-    strncpy(infilename,filename,FILENAME_MAX);         // copy the original file name
+    strncpy(infilename,filename,FILENAME_MAX-1);         // copy the original file name
 
     s=strstr(infilename,".lo");  if (s) *s=0;  // strip off any possible .lo
     s=strstr(infilename,".hi");  if (s) *s=0;  // strip off any possible .hi
@@ -421,13 +424,13 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     ROMLO=(uint8 *) calloc(1,8194); if (!ROMLO) {return -2;}
     ROMHI=(uint8 *) calloc(1,8194); if (!ROMHI) {free(ROMLO); return -2;}
 
-    snprintf(myfilename,FILENAME_MAX,"%s.lo",infilename);
+    snprintf(myfilename,FILENAME_MAX-1,"%s.lo",infilename);
     low=fopen(myfilename,"rb");
     if (!low) {free(ROMHI); free(ROMLO); return -1;}
     DEBUG_LOG(0,"Opened %s\n",myfilename);
 
 
-    snprintf(myfilename,FILENAME_MAX,"%s.hi",infilename);
+    snprintf(myfilename,FILENAME_MAX-1,"%s.hi",infilename);
     high=fopen(myfilename,"rb");
     if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
     DEBUG_LOG(0,"Opened %s\n",myfilename);

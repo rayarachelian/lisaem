@@ -1,28 +1,49 @@
-![libDC42 Logo](resources/libdc42-banner.png)
-
-### Copyright © 2020 by Ray Arachelian, All Rights Reserved. 
-### Released under the terms of the GNU Public License v3, or LGPL
-
-***
-# libDC42
-
-## What is this thing?
-
-This is a library that allows block and tag level access to DiskImage 4.2 floppies, and is also used to hold Profile and Widget disk blocks. It also provides some translation capabilities from other file formats.
-The library itself is used by LisaEm as well as DiskCopy 4.2 specific tools.
-
-On systems that support memory mapping, it uses the mmap function to load the whole image into RAM and uses the page in/out features of your OS for speed.
-
-Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. The Disk image format is stored in .Image files, but I use .dc42 to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
-
-LibDC42 has an interface similar to the fopen, fread/frwrite fclose API of libstdc, except that creating a new disk image does not open it. A DC42ImageType structure pointer is passed arround to the functions when various operations are called. The open function can take extra parameters flagging whether to use memory mapping (when available), whether to access an image in Read Only format, and so on. Upon closing the DC42ImageType file, checksums are recalculated and saved. Additionally the errormsg structure member is used to store informational messages when an error occurs and should be used to display error messages to the user as they occur. The retval (return value) member is equivalent to the errno variable, and when set is an indicator that an error has occured and that errormsg should be passed to the user.
-
-
-## API Documentation
-
-The following is sourced from the include file and serves as the documentation for this library.
-
-```
+/**************************************************************************************\
+*                                     LibDC42                                          *
+*                                                                                      *
+*                            Version 0.9.6  2007.04.11                                 *
+*                                                                                      *
+*                       A Part of the Lisa Emulator Project                            *
+*                                                                                      *
+*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                                All Rights Reserved                                   *
+*                                                                                      *
+*           This program is free software; you can redistribute it and/or              *
+*           modify it under the terms of the GNU General Public License                *
+*           as published by the Free Software Foundation; either version 2             *
+*           of the License, or (at your option) any later version.                     *
+*                                                                                      *
+*           This program is distributed in the hope that it will be useful,            *
+*           but WITHOUT ANY WARRANTY; without even the implied warranty of             *
+*           MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
+*           GNU General Public License for more details.                               *
+*                                                                                      *
+*           You should have received a copy of the GNU General Public License          *
+*           along with this program;  if not, write to the Free Software               *
+*           Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *
+*                                                                                      *
+*                   or visit: http://www.gnu.org/licenses/gpl.html                     *
+*                                                                                      *
+*           Contact me if you need other licensing options such as LGPL, etc.          *
+*                                                                                      *
+*           LICENSING NOTE: Portions of this code rely on the LZHUFF.C code            *
+*                           released to usenet under the following conditions.         *
+*                                                                                      *
+*                                                                                      *
+*       LZHUF.C (c)1989 by Haruyasu Yoshizaki, Haruhiko Okumura, and Kenji Rikitake.   *
+*            All rights reserved. Permission granted for non-commercial use.           *
+*                                                                                      *
+*       If your application does not meet the non-commercial use clause, you must      *
+*       remove the #define USE_LZHUFF line from this library, and you may not use      *
+*       the LZHUFF routines.  Sorry.                                                   *
+* ------------------------------------------------------------------------------------ *
+*                                                                                      *
+*        Routines for access and manipulation of Disk Copy 4.2 Disk Images.            *
+*                                                                                      *
+* This code is unaffiliated with Apple, and Apple retains all trade marks for itself,  *
+* and all versions of the Disk Copy and DART programs.  Whenever you see the text      *
+* Disk Copy or DART, you are encouraged to visualize a trademark symbol following it.  *
+*                                                                                      *
 * ************************************************************************************ *
 *                                                                                      *
 * Requirements:                                                                        *
@@ -99,10 +120,10 @@ The following is sourced from the include file and serves as the documentation f
 *                                                                                      *
 * Usage of these routines:                                                             *
 *                                                                                      *
-* Allocate a DC42ImageType structure for each disk image you wish to have open.  Pass a*
+* Allocate a DC42ImageType structure for each disk image you wish to have open.  Pass a   *
 * pointer to this structure to the function calls that require it.                     *
 *                                                                                      *
-* Some of the routines do not access an opened DC42ImageType structure, and may only be*
+* Some of the routines do not access an opened DC42ImageType structure, and may only be   *
 * used with the image file in the closed state.  No checking is done, so if you ignore *
 * this warning, you'll find the image may be corrupted.                                *
 *                                                                                      *
@@ -281,6 +302,48 @@ return codes:
 #define USE_LZHUF  1
 
 
+// needed for LisaEm compatibility, you can remove this, but you must
+// define int8, int16, int32, uint8, uint16, uint32.
+#include "machine.h"
+
+
+// normal includes
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+// Windows lacks MMAP functions
+#ifndef __MSVCRT__
+#include <sys/mman.h>
+#include <glob.h>
+#define HAVE_MMAPEDIO
+#endif
+
+
+#include <errno.h>
+#include <string.h>
+#include <strings.h>
+#include <ctype.h>
+
+
+////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifndef fgetc
+#define fgetc(xx) ((unsigned)(getc(xx)))
+#endif
+
+#define DC42_HEADERSIZE 84
+#define DART_CHUNK      20960
+#define DART_CHUNK_TAGS 20480
+
+#define TWIG860KFLOPPY 0
+#define SONY800KFLOPPY 2
+#define SONY400KFLOPPY 1
+
+
+
 typedef struct                          // floppy type
 {
   int    fd;                            // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
@@ -289,6 +352,8 @@ typedef struct                          // floppy type
 
   uint32 size;                          // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
                                         // used for mmap fn's
+  long *ptrtags;					              // offset into file/RAM for fast access, and also to optimize
+  long *ptrdata;					               // LisaEm to use other uncompressed disk formats by direct access.
 
   char   fname[FILENAME_MAX];           // File name of this disk image (needed for future use to re-create/re-open the image)
                                         // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
@@ -322,18 +387,19 @@ typedef struct                          // floppy type
   uint16 sectorsize;                    // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
   uint32 tagstart;                      // how far into the file to 1st tag - similar to sectoroffset
 
-  uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by the Lisa Emulator
+  uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by LisaEm
 
   uint8 *RAM;                           // memory mapped file pointer - or a single sector's tags + data
 
   long  dc42seekstart;                  // when opening an existing fd, points to start of dc42 image
 
-  char returnmsg[256];                  // error message buffer - used internally for storage, instead, access error via errormsg
-  char *errormsg;                       // pointer to error message, use this to read text of error returned.
+  char returnmsg[512];                  // error message buffer - used internally for storage, instead, access error via errormsg
+  char *errormsg;                       // pointer to error message, use this to read text of error returned - might point to a static message
+										// omight point to returnmsg.  Always use this ptr.
   int retval;                           // error number of last operation
 
+  
 } DC42ImageType;
-
 
 
 
@@ -419,5 +485,4 @@ extern int dc42_extract_macbinii(char *infilename);                             
                                                                                    // NOTE: filename is overwritten with
                                                                                    // extracted file name!  On negative return
                                                                                    // the filename has been altered!
-```
-
+////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////

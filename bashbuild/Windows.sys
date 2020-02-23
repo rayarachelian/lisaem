@@ -31,9 +31,26 @@ export CYGWIN="$(uname -s)"
 [[ -z "$WINDRES" ]] && export WINDRES=/bin/x86_64-w64-mingw32-windres.exe
 
 export AROPTS="crD"
+export HASHOPTS="-b --tag"
 
 ##############################################################################
-# MAKELIBS
+# getcpus
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+##############################################################################
+
+function getcpus()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+     export NUMCPUS="$( nproc )"
+  fi
+}
+
+
+##############################################################################
+# makelibs
 #
 # Creates both static and shared libraries.
 #
@@ -45,10 +62,10 @@ export AROPTS="crD"
 #               i.e. "a.o b.o c.o ..."
 #
 # i.e.
-#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
 #
 ##############################################################################
-function MAKELIBS() {
+function makelibs() {
 
 dir="$1"
 libname="$2"
@@ -99,7 +116,6 @@ fi
 function windres() {
 
 if [[ -n "$CYGWIN" ]]; then
-    echo "win32 resources" 1>&2
     export MINVER="`echo $VERSION| cut -f1 -d'-' | sed 's/\./,/g'`,0"
     cat >${XTLD}/resources/windres_private.rc <<END
 #include <windows.h> // include for version info constants
@@ -142,17 +158,39 @@ FILETYPE VFT_APP
 ${WINDOWS_RES_ICONS}
 #include <wx/msw/wx.rc>
 END
-    # :TODO: add this to compileq so warnings are captured and it compiles in parallel
-    cd ../resources
-    # echo windres.exe --input-format=rc -O coff lisaem_private.rc lisaem_private.res
-    ls -l ${XTLD}/resources/windres_private.rc 1>&2
-    echo $WINDRES --input-format=rc -O coff -I $(wx-config --prefix)/include/* -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res 1>&2
-    $WINDRES --input-format=rc -O coff -I $(wx-config --prefix)/include/* -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res || exit 1
+    qjob "!!  win32 resources $app" $WINDRES --input-format=rc -O coff -I $(wx-config --prefix)/include/* -i ${XTLD}/resources/windres_private.rc -o ${XTLD}/obj/windres_private.res
     export LIST="$LIST ${XTLD}/obj/windres_private.res"
     echo "${XTLD}/obj/windres_private.res"
  fi
 }
 
+# /home/User/code/lisaem-1.2.7/.env-7707.reload.sh: line 3: /tmp//home/User/code/lisaem-1.2.7/.env-7707.reload.sh.env: No such file or directory
+
+function CygwinSudoRebuild() {
+  if [[ -z "$(id | grep Administrator)" ]]; then
+     echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
+     echo "Enter yes to start this build script in an Administrative shell or hit ^c to abort" 1>&2
+     read x
+     if [[ "$x" == "yes" ]]; then
+        file=${TLD}/.env-$$.reload.sh
+        (
+          echo '#!/usr/bin/env bash'
+          echo "cd \"${XTLD}\""
+          echo "export PATH=\"$PATH\""
+          echo "./build.sh $@"
+          echo "echo Press ENTER to close window"
+          echo "read x"
+        ) >$file
+       chmod 755 $file
+       cygstart -w --action=runas mintty.exe -w max -h -e /usr/bin/bash $file
+       echo "Completed in Admin mintty window" 1>&2
+       exit 0
+     else
+       export INSTALL=""
+       echo "Skipping install" 1>&2
+     fi
+  fi
+}
 
 
 

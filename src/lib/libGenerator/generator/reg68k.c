@@ -74,7 +74,7 @@ void extprintregs(FILE *buglog,char *tag);
 
 #endif
 
-extern char *slrname(uint16 slr);       // from memory.c
+//extern char *slrname(uint16 slr);       // from memory.c
 #include <diss68k.h>
 // Make sure that the bitfield unions work correctly - if they're in the wrong order, they won't.  This double checks
 // that ./configure got the right order.
@@ -215,6 +215,18 @@ static uint8 pending_vector_bitmap=0;
 
 #ifdef DEBUG
 extern void append_floppy_log(char *s);
+
+//mmu.c
+extern char *printslr(char *x, long size, uint16 slr);
+// symbols.c
+extern char *getvector(int v);
+extern void lisaos_trap5(void);
+// glue.c
+extern void debug_on(char *reason);
+extern void debug_off(void);
+
+
+
 #endif
 
 // only two are available: empty or dual parallel
@@ -1262,6 +1274,10 @@ void reg68k_ext_core_tester(void)
 #endif // end of if DEBUG for reg68k_external_execute debug inlines //////////////////////////////////////////////////////
 //------------------------------------------------------------------------------------------------------------------------
 
+#ifdef DEBUG
+extern void   check_ipct_memory(void);
+#endif
+
 int32 reg68k_external_execute(int32 clocks)
 {
   XTIMER entry=cpu68k_clocks;
@@ -1328,7 +1344,6 @@ static uint32 last_pc;
             abort_opcode=0;
             SET_CPU_FNC_CODE();
 
-
             pc24 = reg68k_pc; //20180401// & 0x00ffffff;
             if (reg68k_pc & 1)  LISA_REBOOTED(0);
 
@@ -1363,6 +1378,7 @@ static uint32 last_pc;
             lastsflag=reg68k_sr.sr_struct.s;
 
             #ifdef DEBUG
+              //if (debug_log_enabled) check_ipct_memory();
               #ifdef SUPPRESS_LOOP_DISASM
               reg68k_exec_suppress_loop_disasm();
               #else
@@ -1399,7 +1415,7 @@ static uint32 last_pc;
                 #endif
                 {
                     if (abort_opcode==1) break;
-                    if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct
+                    if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct since there's one already here.
                     abort_opcode=2; cpu68k_makeipclist(pc24 & 0x00ffffff); if (abort_opcode==1) break; //==24726== Conditional jump or move depends on uninitialised value(s)
                     ipc=&(mt->table->ipc[(pc24 & 0x1ff)>>1]);
                 }

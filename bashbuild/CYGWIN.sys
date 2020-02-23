@@ -1,3 +1,11 @@
+(
+echo "Note: could not build wxWidgets 3.x on Cygwin-GTK natively due to a whole slew of errors"
+echo "so for now Cygwin is not supported"
+echo "If you're building a non wxWidgets app, you can try copying Linux.sys and parts of Windows.sys"
+echo "to bashbuild/CYGWIN.sys"
+) 1>&2
+exit 1
+
 export CXX="g++"
 export CPP=""
 export  CC="gcc" 
@@ -13,13 +21,30 @@ PREFIXLIB="/usr/local/share/"
 export CLICMD=""
 export GUIAPP=""
 
+export HASHOPTS="-b --tag"
 
 function windres() {
 true
 }
 
 ##############################################################################
-# MAKELIBS
+# getcpus
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+##############################################################################
+
+function getcpus()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+     export NUMCPUS="$( nproc )"
+  fi
+}
+
+
+##############################################################################
+# makelibs
 #
 # Creates both static and shared libraries.
 #
@@ -31,10 +56,10 @@ true
 #               i.e. "a.o b.o c.o ..."
 #
 # i.e.
-#            MAKELIBS  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
 #
 ##############################################################################
-function MAKELIBS() {
+function makelibs() {
 
 dir="$1"
 libname="$2"

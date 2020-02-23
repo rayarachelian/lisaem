@@ -742,12 +742,12 @@ void procline(char *line, int lineno, FILE *outiibs, FILE *outfuncs,
       /* loop through 'e' EA or just once if no EA 'e' to loop on */
 
       for (ea_e = (t_datatype)ea_Dreg;
-       (ea_e == ea_Dreg) || (num[bite] && (ea_e <= ea_Imm)); ea_e++) {
+       ((t_datatype)ea_e == (t_datatype)ea_Dreg) || (num[bite] && ((t_datatype)ea_e <= (t_datatype)ea_Imm)); ea_e++) {
 
     /* loop through 'f' EA or just once if no EA 'e' to loop on */
 
     for (ea_f = (t_datatype)ea_Dreg;
-         (ea_f == ea_Dreg) || (num[bitf] && (ea_f <= ea_Imm)); ea_f++) {
+         ((t_datatype)ea_f == (t_datatype)ea_Dreg) || (num[bitf] && ((t_datatype)ea_f <= (t_datatype)ea_Imm)); ea_f++) {
 
       for (cc = 0; (cc == 0) || (num[bitc] && (cc < 16)); cc++) {
 
@@ -809,7 +809,7 @@ void procline(char *line, int lineno, FILE *outiibs, FILE *outfuncs,
           mask &= ~(7<<start[bitE]); /* clear mask for EEE */
           bits &= ~(7<<start[bite]); /* clear bits in eee */
           bits &= ~(7<<start[bitE]); /* clear bits in EEE */
-          if (ea_e <= ea_Aidx) {
+          if ((t_datatype)ea_e <= (t_datatype)ea_Aidx) {
         /* ea mode with register in second part */
         bits |= (ea_e<<start[bite]);
         switch (ea_e) {
@@ -858,7 +858,7 @@ void procline(char *line, int lineno, FILE *outiibs, FILE *outfuncs,
           mask &= ~(7<<start[bitE]); /* clear mask for EEE */
           bits &= ~(7<<start[bite]); /* clear bits in eee */
           bits &= ~(7<<start[bitE]); /* clear bits in EEE */
-          if (ea_e <= ea_Aidx) {
+          if ((t_datatype)ea_e <= (t_datatype)ea_Aidx) {
         /* ea mode with register in second part */
         bits |= (ea_e<<start[bite]);
         switch (ea_e) {
@@ -907,7 +907,7 @@ void procline(char *line, int lineno, FILE *outiibs, FILE *outfuncs,
           mask &= ~(7<<start[bitF]); /* clear mask for FFF */
           bits &= ~(7<<start[bitf]); /* clear bits in fff */
           bits &= ~(7<<start[bitF]); /* clear bits in FFF */
-          if (ea_f <= ea_Aidx) {
+          if ((t_datatype)ea_f <= (t_datatype)ea_Aidx) {
         /* ea mode with register in second part */
         bits |= (ea_f<<start[bitf]);
         switch (ea_f) {

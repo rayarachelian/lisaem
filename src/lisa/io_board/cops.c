@@ -284,12 +284,12 @@ int get_cops_pending_irq(void )
 void keystroke_cops(unsigned char c)
 {
     uint8 k;
-    int8 j,len;
+    uint8 j,len;
 
 //    DEBUG_LOG(0,"SRC: COPS Keystroke %02x %c",c,c>31 && c<127 ? c:'*');
 
     for (len=0,j=0; j<9; j++)
-            if (keydecodetable[c][j]) len=j;
+            if (keydecodetable[(unsigned)c][j]) len=j;
 
     DEBUG_LOG(0,"key length is:%d",len);
 
@@ -1058,7 +1058,7 @@ uint8 via1_ira(uint8 regnum)
 	register int16 i;
     copsqueuefull=0;  // since the Lisa is reading the queue, assume it's alive,
                       // clear the copsqueuefull watchdog.
-    DEBUG_LOG(0,"IRA1 copsqueuelen:%d, mousequeuelen:%d cops_mouse:%d",copsqueuelen,mousequeuelen,cops_mouse);
+    //ALERT_LOG(0,"IRA1 copsqueuelen:%d, mousequeuelen:%d cops_mouse:%d",copsqueuelen,mousequeuelen,cops_mouse);
 
     #ifdef DEBUG
 
@@ -1198,62 +1198,31 @@ void seek_mouse_event(void)
 
 
   // do we need to move some more?  If so move, otherwise see if there has been a click, and send that.
-  if ( (dx|dy) )
-     {
+  if  ( (dx|dy) )
+      {
 
-      for (i=0; anti_jitter_decellerate_xt[i]; i++)
-          if (abs(dx)<anti_jitter_decellerate_xt[i]) {dx=dx>>anti_jitter_decellerate_xn[i]; break;}
+        for (i=0; anti_jitter_decellerate_xt[i]; i++)
+            if (abs(dx)<anti_jitter_decellerate_xt[i]) {dx=dx>>anti_jitter_decellerate_xn[i]; break;}
 
-      for (i=0; anti_jitter_decellerate_yt[i]; i++)
-          if (abs(dy)<anti_jitter_decellerate_yt[i]) {dy=dy>>anti_jitter_decellerate_yn[i]; break;}
-
-
-      /*
-            if (abs(dx)<8 ) dx=dx>>1;
-       else if (abs(dx)<32) dx=dx>>2;
-       else if (abs(dx)<64) dx=dx>>4;
-
-
-            if (abs(dy)<8 ) dy=dy>>1;
-       else if (abs(dy)<32) dy=dy>>2;
-       else if (abs(dy)<64) dy=dy>>3;
-
-      */
-
+        for (i=0; anti_jitter_decellerate_yt[i]; i++)
+            if (abs(dy)<anti_jitter_decellerate_yt[i]) {dy=dy>>anti_jitter_decellerate_yn[i]; break;}
 
         bigm_delta(dx,dy);
         DEBUG_LOG(0,"mouse dx,dy is (%d,%d) non zero, won't send it yet - still moving.",dx,dy);
-
-        // if the delta is small and we're in LisaTest mouseland, fall through and click, so it's off by
-        // upto 8x8 pixels in any dir, so what!  Hack to LisaTest  - probably need a better test for this
-
-        // mouse jitter here!  mousejitter
-        //if (!(   abs(dx)<8 && abs(dy)<8 && lisa_os_mouse_x_ptr!=0x486 && lisa_os_mouse_x_ptr!=0xcc00f0 ))return;
-        //if (!(   abs(dx)<8 && abs(dy)<8 && mousequeue[1].button && lisa_os_boot_mouse_x_ptr!=0x486  ))return;
-
-        /*
-        if ( (   abs(dx)>2 || abs(dy)>2) && mousequeue[1].button && !last_mouse_button_state)
-               {
-                DEBUG_LOG(0,"Mouse is too far away for button press. (%d,%d)",dx,dy);
-                return;
-               }
-        */
-     }
+      }
+  
+  if ( !(mouse_pending_x|mouse_pending_y) && mousequeuelen==1 && copsqueuelen==0) mousequeuelen=0; //20200131 as reported by Tom Stepleton
   //DEBUG_LOG(0,"mouse dx,dy is (%d,%d) button is %d so we might send it.",dx,dy,mousequeue[1].button);
 
-
-
   switch ( mousequeue[1].button)
-  { case -1 : if (last_mouse_button_state!=0)
-              {
-               set_mouse_button(0); //DEBUG_LOG(0,"mouse button set to 0 (up)");   // mouse is now up
-               last_mouse_button_state=0;
+  { case -1 : if (last_mouse_button_state!=0) {
+                  set_mouse_button(0); //DEBUG_LOG(0,"mouse button set to 0 (up)");   // mouse is now up
+                  last_mouse_button_state=0;
               }
               break;
-    case +1 : if (last_mouse_button_state!=1)
-              {
-                set_mouse_button(1); //DEBUG_LOG(0,"mouse button set 1 (down)");   // mouse is now down
-                last_mouse_button_state=1;
+    case +1 : if (last_mouse_button_state!=1) {
+                  set_mouse_button(1); //DEBUG_LOG(0,"mouse button set 1 (down)");   // mouse is now down
+                  last_mouse_button_state=1;
               }
 
     case  0 : break;
@@ -1261,8 +1230,7 @@ void seek_mouse_event(void)
   }
 
   // shift the mouse queue over
-  if (mousequeuelen>1)
-     {
+  if (mousequeuelen>1) {
         for ( i=0;i<mousequeuelen;i++)
          {  mousequeue[i].x      = mousequeue[i+1].x;
             mousequeue[i].y      = mousequeue[i+1].y;

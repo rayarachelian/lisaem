@@ -57,10 +57,10 @@ struct Skins{ -- moved to the LisaSkins class now - no longer a struct
 
 void LisaSkin::Load(wxFileConfig* config)
 {
-      power_button_tl_x       = (int)config->Read(_T("/power/power_button/tl_x"),(long)   1143);
-      power_button_tl_y       = (int)config->Read(_T("/power/power_button/tl_y"),(long)    836);
-      power_button_br_x       = (int)config->Read(_T("/power/power_button/br_y"),(long)   1185);
-      power_button_br_y       = (int)config->Read(_T("/power/power_button/br_y"),(long)    876);
+      power_button_tl_x       = (int)config->Read(_T("/power/power_button/tl_x"),(long)   1138);
+      power_button_tl_y       = (int)config->Read(_T("/power/power_button/tl_y"),(long)    827);
+      power_button_br_x       = (int)config->Read(_T("/power/power_button/br_x"),(long)   1192);
+      power_button_br_y       = (int)config->Read(_T("/power/power_button/br_y"),(long)    879);
 
       power_frame_left        = (int)config->Read(_T("/power/power_frame_left"), (long)      0); // 4th segment of skin
       power_frame_top         = (int)config->Read(_T("/power/power_frame_top"),  (long)    736);

@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 
 # https://github.com/wxWidgets/wxWidgets/releases/download/v3.1.2/wxWidgets-3.1.2.tar.bz2
 
@@ -24,17 +24,28 @@
 
 export AROPTS="crD"
 
-VER=3.1.2
-export TYPE=msw
-cd wxWidgets-${VER} || exit 1
+for VER in 3.1.2; do
+#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3; do
+  export TYPE=msw
+  export VER
 
-mkdir build-${TYPE}
-cd    build-${TYPE}
+  if [[ ! -d wxWidgets-${VER} ]]; then
+     curl -L https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 \
+          -o wxWidgets-${VER}.tar.bz2|| \
+     wget https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 || exit 2
+     tar xjvf wxWidgets-${VER}.tar.bz2 || exit 3
+  fi
 
-export CFLAGS="-fPIC" CXXFLAGS="-fPIC"
-../configure --with-msw -enable-unicode --disable-debug --disable-shared --without-expat  --disable-richtext \
-             --with-libpng=builtin --with-libjpeg=builtin --with-libtiff=builtin --with-libxpm=builtin \
-             --prefix=/usr/local/wx${VER}-${TYPE} \
-	     && make && make install || exit 2
-export PATH=/usr/local/wx${VER}-${TYPE}/bin/:$PATH
-wx-config --list
+  cd wxWidgets-${VER} || exit 1
+
+  mkdir build-${TYPE}
+  cd    build-${TYPE}
+
+  export CFLAGS="-fPIC" CXXFLAGS="-fPIC"
+  ../configure --with-msw -enable-unicode --disable-debug --disable-shared --without-expat  --disable-richtext \
+               --with-libpng=builtin --with-libjpeg=builtin --with-libtiff=builtin --with-libxpm=builtin \
+               --prefix=/usr/local/wx${VER}-${TYPE} \
+  	     && make -j $( nproc ) && make -j $( nproc ) install || exit 2
+  echo export PATH=/usr/local/wx${VER}-${TYPE}/bin/:$PATH
+  wx-config --list
+done

@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 OSVER="macOS-$( sw_vers -productVersion | cut -f1,2 -d'.' )"
-VER=3.1.2
 MIN="$OSVER"
+for VER in 3.1.2; do
+#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3; do
 
 if [[ ! -d wxWidgets-${VER} ]]; then
    curl -L https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 \
@@ -29,7 +30,8 @@ cd     build-${TYPE}
 ../configure --enable-unicode --with-cocoa CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
              --disable-richtext  --disable-debug --disable-shared --without-expat  \
              --with-libtiff=builtin --with-libpng=builtin --with-libjpeg=builtin --with-libxpm=builtin --with-zlib=builtin \
-             --prefix=/usr/local/wx${VER}-${TYPE} && make && sudo make install || exit $?
+             --with-sdl \
+             --prefix=/usr/local/wx${VER}-${TYPE} && make -j $( sysctl -n hw.ncpu ) && sudo make -j $( sysctl -n hw.ncpu ) install || exit $?
 popd
 
     
@@ -43,5 +45,8 @@ cd     build-${TYPE}
 ../configure --enable-monolithic --enable-unicode --with-cocoa CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
              --disable-richtext  --disable-debug --disable-shared --without-expat  \
              --with-libtiff=builtin --with-libpng=builtin --with-libjpeg=builtin --with-libxpm=builtin --with-zlib=builtin \
-             --prefix=/usr/local/wx${VER}-${TYPE} && make && sudo make install || exit $?
+             --with-sdl \
+             --prefix=/usr/local/wx${VER}-${TYPE} && make -j $( sysctl -n hw.ncpu ) && sudo make -j $( sysctl -n hw.ncpu ) install || exit $?
 popd
+
+done

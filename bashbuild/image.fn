@@ -1,8 +1,10 @@
 function image() {
   local cmd=""
-  [[ -n "$KITTY_WINDOW_ID" ]]  && [[ -n "$( which kitty )" ]] && cmd="kitty +kitten icat"
-  [[ -n "$ITERM_SESSION_ID" ]] && [[ -n "$( which icat)" ]]   && cmd="imgcat"
-  [[ -z "$cmd" ]] && [[ "which fim" ]]                        && cmd=fim
+
+  [[ -n "$KITTY_WINDOW_ID"  ]] && cmd="$( (which kitty                              ) 2>/dev/null )" && cmd="$cmd +kitten icat"
+  [[ -n "$ITERM_SESSION_ID" ]] && cmd="$( (which imgcat; which $HOME/.iterm2/imgcat ) 2>/dev/null )"
+  [[ -n "$TERMINOLOGY"      ]] && cmd="$( (which tycat;  which terminology.tycat    ) 2>/dev/null )" && cmd="$cmd -c"
+
   [[ -n "$cmd" ]] && $cmd $@ 2>/dev/null  || return 1
   return $?
 }

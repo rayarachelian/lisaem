@@ -8,6 +8,89 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.02.22 - macos x mouse scale fixes
+
+2020.02.21 - windows mouse location and other fixes
+
+2020.02.18 - hqx now works on windows, though there's some flashing, and mouse
+             location is off, even in 4k mode
+           - fixed skinless mode centering
+
+2020.02.17 - fixed GTK mouse location for all supported scaling modes
+
+2020.02.16 - fixed skinless mouse coordinates for 50% 
+           - fixed menu shortcuts
+
+2020.02.12 - adding code to support libSDL2 because wxSound on all modern GTK
+             is broken even when using osspd-pulseaudio/, why the wxDevs don't
+             care to support pulseaudio natively is a great question! I might
+             switch to openal eventually as well even though it's deprecated
+             on future macos X.
+
+2020.02.09 - added kiosk mode + skinless centered origin vs top-left command
+             line options for raspberry pi Lisa case modes, this is equivalent
+             to: `-F -s- -p -q --o-`
+             CLI options are now:
+
+             Usage: lisaem [-h] [-p] [-q] [-f <str>] [-d] [-F[-]] [-z <double>] 
+                           [-s[-]] [-c <str>] [-k] [-o[-]]
+               -h, --help            show this help message
+               -p, --power           power on as soon as LisaEm is launched
+               -q, --quit            quit after Lisa shuts down
+               -f, --floppy=<str>    boot from which floppy image ROMless only
+               -d, --drive           boot from motherboard ProFile/Widget ROMless only
+               -F, --fullscreen      fullscreen mode (-F- to turn off fullscreen)
+               -z, --zoom=<double>   set zoom level (0.50, 0.75, 1.0, 1.25,... 3.0)
+               -s, --skin            turn on skin
+               -c, --config=<str>    Open which lisaem config file
+               -k, --kiosk           kiosk mode (suitable for RPi Lisa case)
+               -o, --originctr       skinless mode: center video(-o) vs topleft(-o-)
+
+
+           - ipct bug was in var.h INVALIDATE_IPC macro which didn't wipe mt->table
+             after free_ipct().
+
+2020.02.07 - found a bug where IPCT of the currently executing instruction is
+             being freed incorrectly.
+
+2020.02.06 - found an off by one in the init_initial_ipcts() which might be
+             causing memory instability. Found a memory leak in 
+             cpu68k_makeipclist.
+
+2020.01.31 - Tom Stepleton reported a bug where the mouse keeps reporting even
+             when not moving after the first move. Fixed.
+
+2020.01.26 - looks like I didn't need to build all that hidpi_scale code as
+             dc.SetUserScale() was available for the same, refactored to do
+             it the right way. Fixed some minor new and old bugs.
+
+2020.01.25 - found a workaround for the black screen, but it's slower.
+             rewrote hq3x to actually do 2x3y, the result is beautiful, and
+             it even converts the 50% gray patterns into actual gray.
+
+2020.01.20 - noticed some memory clobbering in either LisaEm or libdc42, but
+             have not found the section of code where it happens. Added 
+             valgrind to build script, addressing output of valgrind, looks
+             like I need to resize the wxBitmap I'm passing to hq3x.cpp
+
+2020.01.14 - redoing hq3x code, various fixes to build scripts, not able to
+             get proper hq3x display when using larger sizes, wx shows a black
+             screen On_Paint even though both the source and target DC's pass
+             IsOk.
+
+2019.12.25 - fixed macosx build/install for bashbuild, progress bar is still
+             way off
+
+2019.12.24 - various fixes, centralized upx/strip to a bash fn, removed mono-
+             lithic compiles, moved them QJOB/WAITQALL as per TODOs.
+             lowercased old 1.3.0 build uppercase function names, more cleanup
+
+2019.12.23 - Windows, fixed install, LisaEm can now find its skins and tries
+             to start, but dies on power on if HQ3X mode is used. AAG mode
+             works. There's also some flashes and some display artifacts,
+             shutdown causes the emulator to quit, or more likely crash.
+             Sound does not seem to work.
+
 2019.12.16 - Windows compiles are starting to work though skins aren't found
              Can't use pre-compiled wxmsw binaries, added a Cygwin compile
              script to the scripts directory and changed Windows.sys and some

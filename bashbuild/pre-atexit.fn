@@ -1,0 +1,12 @@
+#set -e
+
+function atexit {
+  waitqall
+  echo "* Exiting" 1>&2
+  rm -f /tmp/slot.$$.*.sh* ${TLD}/.env-ext* ${TLD}/.end-saved
+  if egrep -i error "$BUILDWARNINGS" >/dev/null 2>/dev/null; then
+     [[ -n "$DEBUG" ]] && [[ -n "$EDITOR" ]] && $EDITOR "$BUILDWARNINGS"
+  fi
+}
+
+trap atexit EXIT

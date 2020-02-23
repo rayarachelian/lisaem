@@ -3,7 +3,7 @@
 *              The Lisa Emulator Project  V1.2.7      DEV 2019.10.15                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2019 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, MMXX Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -169,7 +169,7 @@
 // If this is enabled, it will force the Instruction Parameter Cache to be invalidated on
 // for that address on each write to memory.  This is to correct problems with self-modifying code
 // turns out this is needed - at least for LPW to work, because it will load a new program in the
-// same space another one used to occupy, causing issues.
+// same space another one used to occupy, causing issues. *Want this on*
 #define FORCE_MEMWRITE_TO_INVALIDATE_IPC 1
 
 
@@ -769,11 +769,12 @@ GLOBAL(int,romless,0);
 GLOBAL(int,sound_effects_on,1);
 GLOBAL(int,profile_power,127);
 
-DECLARE(float,hidpi_scale); //,1.0);    // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
-
+GLOBAL(float,hidpi_scale,1.0); //,1.0);    // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
+DECLARE(float,mouse_scale);
 DECLARE(int,hide_host_mouse);
 DECLARE(int,skins_on);
 DECLARE(int,skins_on_next_run);
+DECLARE(int,skinless_center);
 DECLARE(int,lisa_ui_video_mode);
 DECLARE(uint32,refresh_rate);
 DECLARE(uint32,refresh_rate_used);
@@ -1004,7 +1005,7 @@ typedef struct _t_ipc {
                                                     // lots of mods of cpu68.k  To get it call iib->wordlen  but the illegal instruction in
                                                     // there needs checking.
 
-    unsigned int :0;                       //3      // what's this here for?  alignment I suspect?
+    unsigned int :0;                       //3      // what's this here for?  alignment for the next two
     uint32 src;                            //4
     uint32 dst;                            //4
 
@@ -1028,7 +1029,7 @@ typedef struct _t_ipc_table
     // the most you can have are 256 instructions per page.  We thus no longer need a hash table
     // nor any linked list of IPC's as this is a direct pointer to the IPC.  Ain't life grand?
 
-    t_ipc ipc[256];                            // only need this, the rest I think is junk
+    t_ipc ipc[256];
     struct _t_ipc_table *next;
 //    } t;
     int used;
@@ -1217,12 +1218,18 @@ GLOBAL(uint32,ipcts_allocated,0);
 GLOBAL(int64,ipcts_used,0);
 GLOBAL(int64,ipcts_free,0);
 GLOBAL(t_ipc_table,*ipct_free_head,NULL);
-GLOBAL(t_ipc_table, *ipct_free_tail,NULL);
+GLOBAL(t_ipc_table,*ipct_free_tail,NULL);
+#ifdef DEBUG
+GLOBAL(t_ipc_table,*ipct_used_head,NULL);
+GLOBAL(t_ipc_table, *ipct_used_tail,NULL);
+//^- if we do this will also need to add a previous link
+#endif
 
 /* (2MB RAM max+ 16KROM)=2113536 bytes of potentially executable code divided by 512(bytes/mmu page) = 4128
 *  ipc's page = maximum= 8256 ipct's is maximum - should not have to go above this ever.
 *  this value is only for testing, until we test the LisaEM under heavy load to find the actual used number of ipct's
 *  and lessen it to free things up.  remember, each ipct holds 256 ipcs plus extra info.  */
+
 GLOBAL(uint32,initial_ipcts,4128);
 
                                         // 212,179 ->missing 18 lines! 18 lines is the entire retrace cycle!
@@ -1508,8 +1515,8 @@ extern void on_lisa_exit(void);
 // parameter which is chopped to 9 bits for some oddball reason.
 #define EXIT(x,cmd,fmt,args...) \
                    {            \
-                      char msg[1024], msg2[1024];                                                                          \
-                      snprintf(msg2,1024, fmt, ## args);                                                                   \
+                      char msg[1024], msg2[1024-100];                                                                      \
+                      snprintf(msg2,1024-100, fmt, ## args);                                                               \
                       snprintf(msg,1024,"We've encountered a problem!\n%s\nStopped at %s:%s:%d with code :%d", msg2,       \
                             __FILE__,__FUNCTION__,__LINE__,x);                                                             \
                       if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                               \
@@ -1521,8 +1528,8 @@ extern void on_lisa_exit(void);
 
 #define EXITR(x,cmd,fmt,args...)                                                                                                                  \
                     {                                                                                                                             \
-                      char msg[1024], msg2[1024];                                                                                                 \
-                      snprintf(msg2, 1024, fmt, ## args);                                                                                         \
+                      char msg[1024], msg2[1024-100];                                                                                             \
+                      snprintf(msg2, 1024-100, fmt, ## args);                                                                                     \
                       snprintf(msg,1024,"I'm sorry, the emulation has aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2, \
                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
                       if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
@@ -1536,32 +1543,22 @@ extern void on_lisa_exit(void);
 //20191008 disable alert-log for production builds to save on code size + time as *printf is expensive and it will just go
 //to /dev/null anyway in most cases.
 #ifdef DEBUG
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#define ALERT_LOG( level, fmt, args... )                                                                                   \
-   { if ( (level <= DEBUGLEVEL) )                                                                                          \
-        {                                                                                                                  \
-         fprintf(stderr,"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__); fprintf(stderr,  fmt , ## args);                      \
-         fprintf(stderr,"| %x%x:%x%x:%x%x.%x %ld\n",                                                                       \
-                          lisa_clock.hours_h,lisa_clock.hours_l,                                                           \
-                          lisa_clock.mins_h,lisa_clock.mins_l,                                                             \
-                          lisa_clock.secs_h,lisa_clock.secs_l,                                                             \
-                          lisa_clock.tenths, cpu68k_clocks);                                                               \
-         fflush(stderr);                                                                                                   \
-         if (buglog && buglog!=NULL)  {                                                                                    \
-            fprintf(buglog,"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__); fprintf(buglog,  fmt , ## args);                   \
-            fprintf(buglog,"| %x%x:%x%x:%x%x.%x %ld\n",                                                                    \
-                            lisa_clock.hours_h,lisa_clock.hours_l,                                                         \
-                            lisa_clock.mins_h,lisa_clock.mins_l,                                                           \
-                            lisa_clock.secs_h,lisa_clock.secs_l,                                                           \
-                            lisa_clock.tenths, cpu68k_clocks);                                                             \
-            fflush(buglog);  }                                                                                             \
-         }                                                                                                                 \
-   }
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+#define ALERT_LOG( level, fmt, args... )                                                         \
+    { if ( (level <= DEBUGLEVEL) )                                                               \
+            fprintf((buglog ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);        \
+            fprintf((buglog ? buglog:stderr),  fmt , ## args);                                   \
+            fprintf((buglog ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                        \
+                          lisa_clock.hours_h,lisa_clock.hours_l,                                 \
+                          lisa_clock.mins_h,lisa_clock.mins_l,                                   \
+                          lisa_clock.secs_h,lisa_clock.secs_l,                                   \
+                          lisa_clock.tenths, cpu68k_clocks);                                     \
+    }
+//////////////////////////////////////////////////////////////////////////////////////////////////
 #else
   #define ALERT_LOG( level, fmt, args... )  {}
 #endif
-///////// Memory access macros//////////////////////////////////////////////////////////////////////////////////////////////////
+///////// Memory access macros////////////////////////////////////////////////////////////////////
 
 
 
@@ -2796,25 +2793,39 @@ GLOBAL(uint32,minlisaram,0);
 
 #endif
 
-// memory.c RAM macros.
+// memory.c RAM macros - good idea to enable this actually, perhaps should disable cross context free, not sure yet.
 #ifdef FORCE_MEMWRITE_TO_INVALIDATE_IPC
 
-#define INVALIDATE_IPC()                                    \
-        {                                                   \
-         uint32 iA9=(addr & 0x00ffffff)>>9;                 \
-         int32  iAD=mmu_trans[iA9].address;                 \
-         int iCTX;                                          \
-         for (iCTX=0; iCTX<5; iCTX++)                       \
-           if (mmu_trans_all[iCTX][iA9].address==iAD &&     \
-               mmu_trans_all[iCTX][iA9].table!=NULL )       \
-               free_ipct(mmu_trans_all[iCTX][iA9].table);   \
+#define INVALIDATE_IPC()                                                                                                       \
+        {                                                                                                                      \
+          uint32 iA9=(addr & 0x00ffffff)>>9;                                                                                   \
+          int32  iAD=mmu_trans[iA9].address;                                                                                   \
+          if (mmu_trans_all[context][iA9].address==iAD &&                                                                      \
+              mmu_trans_all[context][iA9].table!=NULL )  {                                                                     \
+              DEBUG_LOG(200,"calling free for address:%d/%08x pc:%08x mmu_trans_all[%d][%d]",context,addr,pc24,context,iA9);   \
+              free_ipct(mmu_trans_all[context][iA9].table);                                                                    \
+              mmu_trans_all[context][iA9].table=NULL;                                                                          \
+              }                                                                                                                \
         }
-// was:{if (mmu_trans[(addr)>>9].table != NULL ) free_ipct(mmu_trans[(addr)>>9].table );}
-// might need to walk all segments and see if iAD9<<9 + .address = iAD9<<9 + address
-// but that will be expensive.
 #else
 #define INVALIDATE_IPC() {}
 #endif
+
+
+#define XXXINVALIDATE_IPC()                                                                                                 \
+        {                                                                                                                   \
+          uint32 iA9=(addr & 0x00ffffff)>>9;                                                                                \
+          int32  iAD=mmu_trans[iA9].address;                                                                                \
+          int iCTX;                                                                                                         \
+          for (iCTX=0; iCTX<5; iCTX++) {                                                                                    \
+              if (mmu_trans_all[iCTX][iA9].address==iAD &&                                                                  \
+                  mmu_trans_all[iCTX][iA9].table!=NULL )  {                                                                 \
+                  ALERT_LOG(0,"calling free for address:%d/%08x pc:%08x mmu_trans_all[%d][%d]",context,addr,pc24,iCTX,iA9); \
+                  free_ipct(mmu_trans_all[iCTX][iA9].table);                                                                \
+                  }                                                                                                         \
+              }                                                                                                             \
+        }
+
 
 #ifdef DEBUG
   #define HIGH_BYTE_FILTER()  {if (addr>0xffffff) {DEBUG_LOG(0, "Access above 24 bits: %08x", addr);}     addr &=0x00ffffff; }

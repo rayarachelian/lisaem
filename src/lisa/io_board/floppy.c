@@ -972,7 +972,7 @@ void floppy_go6504(void)
 
         case  FLOP_CTRLR_SHAKE:  floppy_ram[STATUS]=0; /* floppy_FDIR=0; removing 2004.08.12 3:40am */ return;
 
-        case  FLOP_CTRLR_RWTS:
+        case  FLOP_CTRLR_RWTS: // FALLTHROUGH 
              floppy_ram[0x68]=0;                                // disable brute force flag
 
              #ifdef DEBUG
@@ -985,14 +985,13 @@ void floppy_go6504(void)
                     //fprintf(buglog,"RWTS access to invalid drive:%02x side:%d, track:%d,sector:%d\n",
                      //       floppy_ram[DRIVE],floppy_ram[SIDE], floppy_ram[TRACK], floppy_ram[SECTOR]);
                     return;}
-
-
-
-            switch(floppy_ram[FUNCTION])
+            /* FALLTHROUGH */ 
+            switch(floppy_ram[FUNCTION]) 
             {
-                case FLOP_CMD_READX : DEBUG_LOG(0,"brute force: "); floppy_ram[0x68]=0xff;    // enable brute force flag
-                                      /* FALLTHRU */
-                case FLOP_CMD_READ  :
+            
+                case FLOP_CMD_READX : DEBUG_LOG(0,"brute force: "); floppy_ram[0x68]=0xff;   /* FALLTHRU */ // enable brute force flag
+                                      
+                case FLOP_CMD_READ  : /* FALLTHRU */
 
                        if (F->fd<0 && F->fh==NULL)       { DEBUG_LOG(0,"SRC:null fhandle\n"); RWTS_IRQ_SIGNAL(FLOP_STAT_NODISK); floppy_FDIR=1;return;}
                        if (F->RAM==NULL)                 { DEBUG_LOG(0,"SRC:no RAM\n");       RWTS_IRQ_SIGNAL(FLOP_STAT_NODISK); floppy_FDIR=1;return;}
@@ -1050,7 +1049,7 @@ void floppy_go6504(void)
                        return;
 
                 case FLOP_CMD_WRITX : fprintf(buglog,"brute force: "); floppy_ram[0x68]=0xff; /* FALLTHRU */
-                case FLOP_CMD_WRITE :
+                case FLOP_CMD_WRITE : /* FALLTHRU */
                        DEBUG_LOG(0,"SRC:Write\n");
                        if (F->fd<0)                      { DEBUG_LOG(0,"SRC:null fhandle\n"); RWTS_IRQ_SIGNAL(FLOP_STAT_DRVNOT);return;  }
                        if (floppy_ram[TRACK]>F->maxtrk)  { DEBUG_LOG(0,"SRC:track>max %d>%d\n",floppy_ram[TRACK],F->maxtrk); RWTS_IRQ_SIGNAL(FLOP_STAT_INVTRK); return;}
@@ -1144,23 +1143,27 @@ void floppy_go6504(void)
 
                     return;
 
-                case FLOP_CMD_FMTTRK: ALERT_LOG(0,"Format track."); /* FALLTHRU */      // ignore the rest o'this
-                case FLOP_CMD_FORMAT: ALERT_LOG(0,"Format whole disk."); /* FALLTHRU */ // format a track (erase all it's sectors!)
+                case FLOP_CMD_FMTTRK: ALERT_LOG(0,"Format track."); 
+                     /* FALLTHRU */      // ignore the rest o'this
+                case FLOP_CMD_FORMAT: ALERT_LOG(0,"Format whole disk."); 
+                    /* FALLTHRU */ // format a track (erase all it's sectors!)
 
-                case FLOP_CMD_VERIFY:                                    /* FALLTHRU */
+                case FLOP_CMD_VERIFY:                                    
+                    /* FALLTHRU */
                 case FLOP_CMD_VFYTRK: floppy_FDIR=1;  // was missing from pre RC2!
                                       RWTS_IRQ_SIGNAL(0);
                                       ALERT_LOG(0,"...")
                                       return;
             }
-
-        case  FLOP_CTRLR_SEEK:
+            /* FALLTHRU */
+        case  FLOP_CTRLR_SEEK: 
             //fprintf(buglog,"SRC:seek\n");
             ///RWTS_IRQ_SIGNAL(0);  //2005.02.04 - maybe we don't need to wait on fdir?
                     floppy_ram[SPEED]=0;
                     floppy_ram[STATUS]=0;
 
             return;  // NO FDIR here charlie!
+            break; //this is fucking bullshit!
 
         case  FLOP_CTRLR_JSR :  // trap these and complain loudly of 6504 usage. //
             //fprintf(buglog,"SRC:The Lisa is trying to tell the 6504 floppy controller to execute code.  This is not supported by the emulator!\n");

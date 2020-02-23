@@ -1,7 +1,7 @@
-![libDC42 Logo](libdc42-banner.png)
+![libDC42 Logo](resources/libdc42-banner.png)
 
-###Copyright © 2019 by Ray Arachelian, All Rights Reserved. 
-###Released under the terms of the GNU Public License v3, or LGPL
+###Copyright © 2020 by Ray Arachelian, All Rights Reserved. 
+###Released under the terms of the GNU Public License v3
 
 ***
 # libDC42 tools

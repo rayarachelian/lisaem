@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #----------------------------------------------------------
 # add-interim-build-links-to-all-dirs.sh
@@ -42,3 +42,4 @@ find . -type d | while read i; do
      done
   fi
 done
+rm resources/skins/default/build.sh

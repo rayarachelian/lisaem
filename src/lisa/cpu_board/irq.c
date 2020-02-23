@@ -42,7 +42,7 @@ void init_IRQ(void)
 {
     int s;
     DEBUG_LOG(0,"initializing IRQ queue.  IRQq:%p  MAXIRQQUEUE:%d\n",&IRQq,MAXIRQQUEUE);
-    s=fliflo_buff_create(&IRQq,MAXIRQQUEUE);
+    s=fliflo_buff_create(&IRQq,MAXIRQQUEUE); // valgrind reports leak here 65 bytes, but not critical
     DEBUG_LOG(0,"IRQq:%p after init status:%d\n\n",&IRQq,s);
 }
 

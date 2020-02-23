@@ -6,7 +6,8 @@
 
 #if [[ "$OS" != "Windows" ]]; then
 
-   if [[ -z "$( which wx-config )" ]]; then
+   export WHICHWXCONFIG="$( which wx-config )"
+   if [[ -z "$WHICHWXCONFIG" ]]; then
       echo "Could not find wx-config command for wx-widgets" 1>&2
       exit 8
    fi
@@ -27,5 +28,5 @@
 
    export LIBS="$LIBS $(wx-config --libs) $LIBS "
    # includes are par of C*FLAGS
-   set >/tmp/set.wx-config
+   #set >/tmp/set.wx-config
 #fi

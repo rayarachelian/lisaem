@@ -1086,23 +1086,23 @@ typedef struct
 // SCC function hooks/(method overrides) to external device drivers
 typedef struct
 {
- void (*send_break)(uint8 port);
- void (*set_dtr)(uint8 port, uint8 value);
- void (*set_rts)(uint8 port, uint8 value);
- int  (*get_dcd)(uint8 port);
- int  (*get_cts)(uint8 port);
- int  (*get_break)(uint8 port);
- void (*signal_parity_error)(uint8 port);
- void (*signal_crc_error)(uint8 port);
- void (*set_even_parity)(uint8 port);
- void (*set_odd_parity)(uint8 port);
- void (*set_no_parity)(uint8 port);
- void (*set_bits_per_char)(uint8 port, uint8 bitsperchar);
- void (*set_stop_bits)(uint8 port,uint8 stopbits);
- char (*read_serial_port)(int8 port);
- void (*write_serial_port)(int8 port, char data);
- void (*scc_hardware_reset_port)(int8 port);
- void (*scc_channel_reset_port)(int8 port);
+ void (*send_break)(unsigned int port);
+ void (*set_dtr)(unsigned int port, uint8 value);
+ void (*set_rts)(unsigned int port, uint8 value);
+ int  (*get_dcd)(unsigned int port);
+ int  (*get_cts)(unsigned int port);
+ int  (*get_break)(unsigned int port);
+ void (*signal_parity_error)(unsigned int port);
+ void (*signal_crc_error)(unsigned int port);
+ void (*set_even_parity)(unsigned int port);
+ void (*set_odd_parity)(unsigned int port);
+ void (*set_no_parity)(unsigned int port);
+ void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
+ void (*set_stop_bits)(unsigned int port,uint8 stopbits);
+ char (*read_serial_port)(unsigned int port);
+ void (*write_serial_port)(unsigned int port, char data);
+ void (*scc_hardware_reset_port)(unsigned int port);
+ void (*scc_channel_reset_port)(unsigned int port);
  void (*set_baud_rate)(int port, uint32 baud);
 } sccfunc_t;
 
@@ -1128,23 +1128,23 @@ extern union {uint8 w[18];              // access will be scc_w[port].w[reg] or 
 
 
 // prototypes
-extern void send_break(uint8 port);
-extern void set_dtr(uint8 port, uint8 value);
-extern void set_rts(uint8 port, uint8 value);
-extern int get_dcd(uint8 port);
-extern int get_cts(uint8 port);
-extern int get_break(uint8 port);
-extern void signal_parity_error(uint8 port);
-extern void signal_crc_error(uint8 port);
-extern void set_even_parity(uint8 port);
-extern void set_odd_parity(uint8 port);
-extern void set_no_parity(uint8 port);
-extern void set_bits_per_char(uint8 port, uint8 bitsperchar);
-extern void set_stop_bits(uint8 port,uint8 stopbits);
-extern char read_serial_port(int8 port);
-extern void write_serial_port(int8 port, char data);
-extern void scc_hardware_reset_port(int8 port);
-extern void scc_channel_reset_port(int8 port);
+extern void send_break(unsigned int port);
+extern void set_dtr(unsigned int port, uint8 value);
+extern void set_rts(unsigned int port, uint8 value);
+extern int get_dcd(unsigned int port);
+extern int get_cts(unsigned int port);
+extern int get_break(unsigned int port);
+extern void signal_parity_error(unsigned int port);
+extern void signal_crc_error(unsigned int port);
+extern void set_even_parity(unsigned int port);
+extern void set_odd_parity(unsigned int port);
+extern void set_no_parity(unsigned int port);
+extern void set_bits_per_char(unsigned int port, uint8 bitsperchar);
+extern void set_stop_bits(unsigned int port,uint8 stopbits);
+extern char read_serial_port(unsigned int port);
+extern void write_serial_port(unsigned int port, char data);
+extern void scc_hardware_reset_port(unsigned int port);
+extern void scc_channel_reset_port(unsigned int port);
 extern void initialize_scc(void);
 extern void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);
 extern void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);

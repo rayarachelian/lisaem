@@ -697,13 +697,14 @@ void fill_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, i
 
     if (pagestart<0 || pageend<0 || pagestart>pageend || pagestart>255 || pageend>255) // invalidate the whole block, no need for checking pagestart/pageend
         {
-         for (i=0; i<256; i++)   // wipe all pages in a single segment -- the simpler version!
-         {
-           mt=&mmu_trans_all[cx][segment8+i];
-           mt->address=0;mt->readfn=bad_page; mt->writefn=bad_page;       // wipe it, wipe it good.
-           if (mt->table) free_ipct(mt->table);                           // invalidate ipct's
-           mt->table=NULL;                                                // and wipe pointer to be sure it won't be followed
-         }
+          for (i=0; i<256; i++)   // wipe all pages in a single segment -- the simpler version!
+          {
+            mt=&mmu_trans_all[cx][segment8+i];
+            mt->address=0;mt->readfn=bad_page; mt->writefn=bad_page;                                        // wipe it, wipe it good.
+            if (mt->table) {DEBUG_LOG(0,"calling free_ipct for mmu_trans_all[%d][%ld]",cx,(long)(segment8+i)); 
+                            free_ipct(mt->table); mt->table=NULL;}                                          // invalidate ipct's
+                                                                                                           // and wipe pointer to be sure it won't be followed
+          }
         }
     else if (wfn==ram)                 // wfn to ram is special because writes could be to video ram which I need to trap
           {
@@ -732,9 +733,9 @@ void fill_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, i
                 {DEBUG_LOG(10,"*** 1 MMU Additon is incorrect in+ea!=out %08x+%08x!=%08x in+ea=%08x  ea should be:%08x",
                 in,ea,out,in+ea,out-in); }
                 #endif
-
-                if (mt->table) free_ipct(mt->table);                             //   invalidate ipct's
-                mt->table=NULL;                                                  //   and wipe pointer to be sure it won't be followed
+                if (mt->table) {DEBUG_LOG(0,"calling free_ipct for mmu_trans_all[%d][%ld]",cx,(long)(epage)); 
+                                free_ipct(mt->table); mt->table=NULL;}            // invalidate ipct's
+                                                                                  //   and wipe pointer to be sure it won't be followed
             }
         }
     else
@@ -748,8 +749,9 @@ void fill_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, i
                 if (i>=pagestart && i<=pageend)  {mt->readfn=rfn     ; mt->writefn=wfn     ; mt->address=ea;}
                 else                             {mt->readfn=bad_page; mt->writefn=bad_page; mt->address=0 ;}
 
-                if (mt->table) free_ipct(mt->table);                             //   invalidate ipct's
-                mt->table=NULL;                                                  //   and wipe pointer to be sure it won't be followed
+                if (mt->table) {DEBUG_LOG(0,"calling free_ipct for mmu_trans_all[%d][%ld]",cx,(long)(segment8+i)); 
+                                free_ipct(mt->table); mt->table=NULL;}                                          // invalidate ipct's
+                                                                                 //   and wipe pointer to be sure it won't be followed
 
                 #ifdef DEBUG
                 in  = (segment<<17) + (i<<9);

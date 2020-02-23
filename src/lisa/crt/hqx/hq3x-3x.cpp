@@ -2,7 +2,7 @@
  * Copyright (C) 2003 Maxim Stepin ( maxst@hiend3d.com )
  *
  * Copyright (C) 2010 Cameron Zemek ( grom@zeminvaders.net)
- *
+*
  * Edits for LisaEm use, Copyright (C) 2018 Ray Arachelian 
  *                   <ray@arachelian.com>
  *
@@ -196,7 +196,7 @@ ChannelType &   Alpha ()    Data Access: Access to individual colour components.
 //-----------------------------------------------//
 
 //#define SETCOLOR(pi,val) {uint32 register v=(val>>24) 0xff; pi.Red()=v; pi.Blue()=MIN(v+EXTRABLUE,255); pi.Green()=v;}
-#define SETCOLOR(pi,val) {uint32 register v=(val>>24) & 0xff; pi.Red()=v; pi.Blue()=v+EXTRABLUE; pi.Green()=v;}
+#define SETCOLOR(pi,val) {uint32 register v=(val>>24) & 0xff; pi.Red()=v; pi.Blue()=v+EXTRABLUE; pi.Green()=v; pi.Alpha()=255;}
 
 #define PIXEL00_1M  SETCOLOR(p00, Interp1(w[5], w[1])       );
 #define PIXEL00_1U  SETCOLOR(p00, Interp1(w[5], w[2])       );
@@ -254,7 +254,6 @@ ChannelType &   Alpha ()    Data Access: Access to individual colour components.
 
 //typedef wxPixelData<wxBitmap,wxNativePixelFormat> PixelData;
 typedef wxPixelData<wxBitmap,wxImagePixelData> PixelData;
-
 
 //PixelData data(skins_on ? *my_skin:*my_lisabitmap);
 //if (!data) return;
@@ -327,8 +326,6 @@ static inline void getgraymap(uint16 up, uint16 val, uint16 dn,  uint8 *retval)
 
 //     PixelData data(skins_on ? *my_skin:*my_lisabitmap);  <- data comes from the image
 
-#define DEBUG 1
-
 // ::TODO:: add params for rectangle to update to save cycles 
 HQX_API void HQX_CALLCONV hq3x_32_rb( int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness ) // int xl,int yt,int xr,int yb
 {
@@ -350,9 +347,11 @@ HQX_API void HQX_CALLCONV hq3x_32_rb( int rowbytes,  wxBitmap *mybitmap, int Xre
 
     // might want to move these outside, not sure
 
-    typedef wxPixelData<wxBitmap,wxNativePixelFormat> PixelData;
-    PixelData data(*mybitmap);  // Valgrind:  Address 0xcec7c12 is 2 bytes after a block of size 786,240 alloc'd
+    //typedef wxPixelData<wxBitmap,wxNativePixelFormat> PixelData;
+    typedef wxPixelData<wxBitmap,wxAlphaPixelFormat> PixelData;
+    PixelData data(*mybitmap);
     if (!data) return;
+    //data.UseAlpha();
     // Reset pixel iterators - these are for the output wxBitmap
    //hq3x.cpp:301:33: error: no matching function for call to ‘wxPixelDataOut<wxBitmap>::wxPixelDataIn<wxPixelFormat<unsigned char, 24, 0, 1, 2> >::Iterator::Iterator(PixelData*&)’    
 
@@ -397,24 +396,20 @@ Later it does this per horizontal pixel
     extern uint8 *lisaram;                 // pointer to Lisa RAM
     extern uint32 videolatchaddress;
 
-#ifdef DEBUG
     int max_height=mybitmap->GetHeight();
     int max_width =mybitmap->GetWidth();
-#endif
 
     sp=&lisaram[videolatchaddress];
     up=&lisaram[videolatchaddress];
     dn=&lisaram[videolatchaddress+rowbytes];
     // x= x, dy=delta y, rowsize=76 or 90 - these are for the inputs from lisa video ram - 
     // might want to add gray detection/replacement code here too
-#ifdef USE_DOUBLE_WIDE
     #define GETPIXEL(x,ptr)       (  (double_video_bits[ptr[((x)>>4)         ]] & ( (1<<(15-((x) & 15))) )) ? black: bright  )
-    if (rowbytes==90) Xres=Xres * 2; // non-3A video
-#else
-    #define GETPIXEL(x,ptr)         (  (                  ptr[((x)>>3)          ] & ( (1<<(7 -((x) &  7))) )) ? black: bright  )
-#endif
+    //#define GETPIXEL(x,ptr)         (  (                  ptr[((x)>>3)          ] & ( (1<<(7 -((x) &  7))) )) ? black: bright  )
 
-    for (y=0; y<Yres; y++)
+    //if (rowbytes==90) Xres=Xres * 2; // non-3A video
+
+    for (y=0; y<Yres/3; y++)
     {
         register int xl=x-1; // one pixel left of  x
         register int xr=x+1; // one pixel right of x
@@ -434,20 +429,9 @@ Later it does this per horizontal pixel
         if (y>0)      {prevline = -rowbytes; up=sp-rowbytes;} else {prevline = 0; up=sp;}
         if (y<Yres-1) {nextline =  rowbytes; dn=sp+rowbytes;} else {nextline = 0; dn=sp;}
 
-#ifdef USE_TRIPPLE_TALL
-        for (int tripple=0; tripple<3; tripple++)
-#endif
-        {
+        for (int tripple=0; tripple<3; tripple++) {
         for (x=0; x<Xres; x++)
         {
-
-
-#ifdef DEBUG
-           if (x<0 || x>max_width || y<0 || y>max_height)
-           {
-               fprintf(stderr,"(%d,%d)write to hqx bitmap out of range(0,0)-(%d,%d)\n",x,y,max_width,max_height);
-           }
-#endif
            // :TODO: maybe convert this entire set of blocks to a macro so we can skip the y==0, y==Yres-1 checks
            // and the X==0 X<Xres-1 checks - possibly premature optimization, but might be doable.
             w[2] = GETPIXEL(x,up); //(*(sp + prevline) & (1<<(7-((x  )&7) ))) ? bright:0x00;      // w[2] = *(sp + prevline);
@@ -520,10 +504,10 @@ Later it does this per horizontal pixel
                     {
                         PIXEL00_2
                         PIXEL01_1
-                        PIXEL02_2 // Valgrind reports Invalid write of size 1 here
+                        PIXEL02_2
                         PIXEL10_1
                         PIXEL11
-                        PIXEL12_1 // Valgrind ==11150== Invalid write of size 1
+                        PIXEL12_1
                         PIXEL20_2
                         PIXEL21_1
                         PIXEL22_2
