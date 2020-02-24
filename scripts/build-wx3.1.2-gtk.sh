@@ -34,7 +34,7 @@ for VER in 3.1.2; do
                --prefix=/usr/local/wx${VER}-${TYPE} \
                --with-libxpm=builtin  --prefix=/usr/local/wx${VER}-${TYPE} \
 	       --with-sdl \
-	       && make -j $( nproc ) && $SUDO make -n $( nproc ) install || exit 2
+	       && make -j $( nproc ) && $SUDO make -j $( nproc ) install || exit 2
  # 2020.02.12: 
  # ^ added --with-sdl because wxWidgets wants oss which is extinct as modern distros have moved to pulseaudio
  # and so wxSound now does not work, even with osspd-pulseaudio, however it will be able to use SDL for sound.
