@@ -28,7 +28,7 @@ REASSIGN(int,cheat_ram_test,1);  // careful if we change the type of this: `exte
 REASSIGN(int,romless,0);
 REASSIGN(int,sound_effects_on,1);
 REASSIGN(int,profile_power,127);
-REASSIGN(float,hidpi_scale,1.0); //,1.0);    // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
+REASSIGN(float,hidpi_scale,1.0); // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
 REASSIGN(int32,video_scan,0);
 REASSIGN(int,lisa_vid_size_x,720);
 REASSIGN(int,lisa_vid_size_y,364);

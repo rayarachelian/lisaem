@@ -368,45 +368,7 @@ enum
 // fwd ref - this changes display settings.
 void set_hidpi_scale(void);
 
-// sets scaling lenses for hidpi, used to translate mouse and display coordinates from physical display to Lisa
-// gets called by set_hidpi_scale(), but only used for setting the lens
-void setup_hidpi(void)
-{
-  static float last_hidpi;
-  float scale;
-  scale=(hidpi_scale==0.0) ? 1.0 : hidpi_scale; // needed to prevent divide by zero at startup
 
-  if (last_hidpi != hidpi_scale) // || normal_to_hidpi==NULL || hidpi_to_normal==NULL )
-  {
-    int x,y,i; //,count;
-
-    DEBUG_LOG(0,"\n\n**** Changing scale from %f to %f ****\n\n",last_hidpi,hidpi_scale);
-
-//    if (!!normal_to_hidpi) free(normal_to_hidpi);
-//    if (!!hidpi_to_normal) free(hidpi_to_normal);
-
-   // wxDisplaySize(&x,&y);
-    //wxDisplay display(0);
-    ////const wxSize p=display.GetPPI();
-    //const wxRect r=display.GetClientArea();
-    //x=r.GetWidth();
-    //y=r.GetHeight();
-
-//    count=MAX(x,y)+1;
-//    max_h=count;
-//    hidpi_to_normal=(int*)calloc(count,sizeof(int));
-//    for (i=0; i<count; i++) {hidpi_to_normal[i]=(int) ( (double)(i)/(double)(scale) );}
-//
-//    if (skin.width_size && skin.height_size)
-//      count=MAX(skin.width_size,skin.height_size)+1;
-//    else
-//      count=MAX(ISKINSIZEX,ISKINSIZEY);
-//    normal_to_hidpi=(int*)calloc(count,sizeof(int));
-//    max_n=count;
-//    for (i=0; i<count; i++) {normal_to_hidpi[i]=(int) ( (double)(i)*(double)(scale) );}
-  }
-  last_hidpi=hidpi_scale;
-}
 
 // D'Oh looks like I wasted a lot of time working on scaling when wxWdigets already had it built in via DC.SetUSerScale()
 #define _H(x) (x)
@@ -418,7 +380,7 @@ void setup_hidpi(void)
 #ifdef __WXOSX__
 #define DCTYPE wxPaintDC
 #else
-#define DCTYPE wxBufferedPaintDC;
+#define DCTYPE wxBufferedPaintDC
 #endif
 
 class LisaWin : public wxScrolledWindow
@@ -430,6 +392,8 @@ public:
       int dirtyscreen;      // indicated dirty lisa vidram
       int doubley; 
       uint8 brightness;
+
+      int clear_skinless;
 
       int refresh_bytemap;  // flag indicating contrast change
       int floppystate;      // animation state of floppy
@@ -817,8 +781,6 @@ public:
 
     void OnFullScreen(wxCommandEvent& event);
     
-    void resize_lisaframe(int newscale);
-
     void insert_floppy_anim(wxString openfile);
 
     //class LisaWin *win;
@@ -1125,6 +1087,47 @@ static int     yoffset[502];              // lookup table for pointer into video
 //static int     screen_focus[364*3];       // how close to the ideal pixel we are - is this still used?
 
 
+// sets scaling lenses for hidpi, used to translate mouse and display coordinates from physical display to Lisa
+// gets called by set_hidpi_scale(), but only used for setting the lens
+// :TODO: delete this 
+void setup_hidpi(void)
+{
+  static float last_hidpi;
+  hidpi_scale=(hidpi_scale==0.0) ? 1.0 : hidpi_scale; // needed to prevent divide by zero at startup
+
+  if (last_hidpi != hidpi_scale) // || normal_to_hidpi==NULL || hidpi_to_normal==NULL )
+  {
+    // float scale=hidpi_scale;
+    //int x,y,i; //,count;
+
+    ALERT_LOG(0,"\n\n**** Changing scale from %f to %f ****\n\n",last_hidpi,hidpi_scale);
+    my_lisawin->clear_skinless=1;
+//    if (!!normal_to_hidpi) free(normal_to_hidpi);
+//    if (!!hidpi_to_normal) free(hidpi_to_normal);
+
+   // wxDisplaySize(&x,&y);
+    //wxDisplay display(0);
+    ////const wxSize p=display.GetPPI();
+    //const wxRect r=display.GetClientArea();
+    //x=r.GetWidth();
+    //y=r.GetHeight();
+
+//    count=MAX(x,y)+1;
+//    max_h=count;
+//    hidpi_to_normal=(int*)calloc(count,sizeof(int));
+//    for (i=0; i<count; i++) {hidpi_to_normal[i]=(int) ( (double)(i)/(double)(scale) );}
+//
+//    if (skin.width_size && skin.height_size)
+//      count=MAX(skin.width_size,skin.height_size)+1;
+//    else
+//      count=MAX(ISKINSIZEX,ISKINSIZEY);
+//    normal_to_hidpi=(int*)calloc(count,sizeof(int));
+//    max_n=count;
+//    for (i=0; i<count; i++) {normal_to_hidpi[i]=(int) ( (double)(i)*(double)(scale) );}
+  }
+  last_hidpi=hidpi_scale;
+}
+
 char *paste_to_keyboard=NULL;
 static int    idx_paste_to_kb=0;
 
@@ -1349,6 +1352,8 @@ void LisaWin::SetVideoMode(int mode)
 
   EXTERMINATE(my_lisabitmap);
   EXTERMINATE(display_image);
+
+  clear_skinless=1;
 
   switch (mode)
   {
@@ -1949,6 +1954,7 @@ LisaWin::LisaWin(wxWindow *parent)
 #endif
 )
 {
+    clear_skinless=1;
     mousemoved=0;
     lastcontrast=contrast;
     floppystate = FLOPPY_NEEDS_REDRAW | FLOPPY_EMPTY; // set floppy state and force refresh
@@ -2184,10 +2190,10 @@ void LisaEmFrame::OnVideoDoubleY(wxCommandEvent& WXUNUSED(event))
 
 void LisaEmFrame::OnVideo2X3Y(wxCommandEvent& WXUNUSED(event))
 {
-    if (screensizex<720*2+40 ||screensizey<364*3+100)
+    if (screensizex<(720*2+40)*hidpi_scale ||screensizey<(364*3+100)*hidpi_scale)
     {
         wxString msg;
-        msg.Printf(_T("Your display is only (%d,%d).  This mode needs at least (%d,%d)."),
+        msg.Printf(_T("Your display is only (%d,%d).  This mode needs at least (%d,%d), or you could try changing the scale first"),
                         screensizex,screensizey,  720*2+40,364*3+100 );
         wxMessageBox(msg,wxT("The display is too small"));
 
@@ -2245,6 +2251,7 @@ void LisaEmFrame::OnSkinSelect(wxCommandEvent& WXUNUSED(event))
           ALERT_LOG(0,"%s is *NOT* valid skin",CSTR(skinconfigpath) );  
         }
     cont = dir.GetNext(&filename);
+    my_lisawin->clear_skinless=1;
   }
 
   wxArrayString &choicesptr=choices;
@@ -2271,6 +2278,7 @@ void LisaEmFrame::OnSkinSelect(wxCommandEvent& WXUNUSED(event))
 void LisaEmFrame::OnSkinlessCenter(wxCommandEvent& event)
 {
     skinless_center=!skinless_center;
+    my_lisawin->clear_skinless=1;
     update_menu_checkmarks();
     save_global_prefs();
 }
@@ -2278,6 +2286,7 @@ void LisaEmFrame::OnSkinlessCenter(wxCommandEvent& event)
 void LisaEmFrame::OnSkins(wxCommandEvent& WXUNUSED(event))
 {
 
+    my_lisawin->clear_skinless=1;
     if (skins_on)
     {
         // Turn off skins
@@ -2362,38 +2371,15 @@ void prepare_skin(void)
     delete skinny;
 }
 
-void LisaEmFrame::resize_lisaframe(int newscale)
-{
-  int wx, wy, screensizex, screensizey;
-  float resize=newscale/hidpi_scale;
-  //wxSize maxsize;
-  wxDisplaySize(&screensizex,&screensizey);
-
-  //wx=GetMaxWidth()  * resize;  
-  //wy=GetMaxHeight() * resize;  
-  //
-  //if (wx>screensizex) wx=screensizex-32;
-  //if (wy>screensizey) wy=screensizey-32;
-  //
-  //maxsize.x=wx; maxsize.y=wy; if (my_lisawin) my_lisawin->SetMaxSize(&maxsize);
-  //
-  GetSize(&wx,&wy);
-  wx=wx*resize; wy=wy*resize;
-
-  if (wx>screensizex) wx=screensizex-32;
-  if (wy>screensizey) wy=screensizey-32;
-  SetSize(wx,wy);
-  // meh //CentreOnScreen(wxBOTH);
-}
 
 // :TODO: maybe convert these to C++ templates?
 #define SCALE_MENU(XscaleX)                                             \
   void LisaEmFrame::OnScale##XscaleX(  wxCommandEvent& WXUNUSED(event)) \
-       {resize_lisaframe(XscaleX/100);                                  \
-        hidpi_scale=(XscaleX/100.0);                                    \
+       {hidpi_scale=(XscaleX/100.0);                                    \
         save_global_prefs(); prepare_skin();                            \
         ALERT_LOG(0,"OnScaleMenu Zoom %f",hidpi_scale);                 \
         set_hidpi_scale(); update_menu_checkmarks(); }
+        
 SCALE_MENU(25);
 SCALE_MENU(50);
 SCALE_MENU(75);
@@ -4752,6 +4738,14 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
   ww_width  = ww_width > w_width  ? w_width  : ww_width;  // limit from going outside the viewport
   ww_height = ww_height> w_height ? w_height : ww_height;
 
+  // do this whenever we have a scale transition or switch from skin to skinless my_lisawin->clear_skinless=1;
+  if (clear_skinless) {
+      clear_skinless=0;
+
+      dc.SetBrush(*wxBLACK_BRUSH);  dc.SetPen(*wxBLACK_PEN);
+      dc.DrawRectangle(0 ,0,   65535,65535);  
+  }
+
   if  (lisa_ui_video_mode==vidmod_hq35x) {
       if (!my_lisahq3xbitmap) return;
       o_effective_lisa_vid_size_x=my_lisahq3xbitmap->GetWidth() * hidpi_scale;
@@ -5015,11 +5009,15 @@ void LisaWin::OnPaint_skins(wxRect &rect, DCTYPE &dc)
 
 void LisaWin::OnErase(wxEraseEvent &event)
 {
+  //DCTYPE dc(this); // 20190831 - let's see if this is needed
+  //DoPrepareDC(dc); // or this->PrepareDC(dc); this->OnDraw(dc);
+  //dc.SetUserScale(hidpi_scale,hidpi_scale);
+  //event.GetDC();  //https://wiki.wxwidgets.org/Flicker-Free_Drawing
   //ALERT_LOG(0,"entering");
   #ifdef __WXOSX__
     event.GetDC()->SetBackground(*wxTRANSPARENT_BRUSH);
     event.GetDC()->SetBackgroundMode(wxTRANSPARENT);
-    event.Skip();
+    //event.Skip();
     event.StopPropagation();
   #endif
   #ifdef __WXGTK__
@@ -5292,13 +5290,13 @@ extern "C" void lisa_rebooted(void)
 void LisaWin::OnMouseMove(wxMouseEvent &event)
 {
     DCTYPE dc(this); // 20190831 - let's see if this is needed
-    DoPrepareDC(dc); // or this->PrepareDC(dc); this->OnDraw(dc);
-    //dc.SetUserScale(hidpi_scale,hidpi_scale);
+    //DoPrepareDC(dc); // or this->PrepareDC(dc); this->OnDraw(dc);
+    dc.SetUserScale(hidpi_scale,hidpi_scale);
     wxString str;
     int vbX=0,vbY=0;                     // scrollbar location
     mousemoved++;
-    //wxPoint pos = event.GetLogicalPosition(  skins_on ? *my_skinDC : *my_memDC  );
-    wxPoint pos = event.GetLogicalPosition(dc);
+    wxPoint pos = event.GetLogicalPosition(  skins_on ? *my_skinDC : *my_memDC  );
+    //wxPoint pos = event->GetLogicalPosition(dc);
 
     // windows bug - crashes because it gets a mouse event before the window is ready.
     if (skins_on && my_skin==NULL) return;
@@ -7961,6 +7959,7 @@ void turn_skins_on(void)
 {
   skins_on_next_run=1;
   skins_on=1;
+  my_lisawin->clear_skinless=1;
   save_global_prefs();
   my_lisaframe->LoadImages();
   setvideomode(lisa_ui_video_mode);
@@ -7974,6 +7973,7 @@ void turn_skins_off(void)
 {
   skins_on_next_run=0;
   skins_on=0;
+  my_lisawin->clear_skinless=1;
   save_global_prefs();
   my_lisaframe->UnloadImages();
   setvideomode(lisa_ui_video_mode);
@@ -8323,6 +8323,7 @@ char *get_welcome_fortune(void)
   "Look ye upon my scrollbars and despair!",
   "If accidentally launched, induce kill -9",
   "Tesler's Choice!",
+  "Initiate Tesler Sequence (Apple-C, Apple-V, Apple-X)",
   "When you see a white pixel, drink!",
   "My Kajiger!",
   "Warning, ejecting floppies may cause eye damage",
@@ -8335,7 +8336,7 @@ char *get_welcome_fortune(void)
   "Too sexy for The App Store",
   "Beats getting dumped in a landfill in Logan, UT",
   "Voted 'adequate' on the Neutral Planet",
-  "Kif! What makes a man turn neutral!",
+  "Kif! What makes a man turn neutral! ... Tell my Mac 'Hello'",
   "See you on some other App store",
   "It just won't stay dead!",
   "Have you got an extra GOTO 10 line? I said I don't need a Bender!",
@@ -8656,12 +8657,13 @@ char *get_welcome_fortune(void)
   "Canon Cats. I'm being nibbled to death by Canon Cats.",
   "I can only conclude that I'm paying off code-karma at a vastly accelerated rate.",
   "Weep for the future, Ubuntu. Weep for us all.",
+  "No bug? No bug today, bug tomorrow, there's always a bug tomorrow. What? Someone's got to have some perspective around here!",
   "We are dreamers, shapers, singers, and makers. We study the mysteries of laser and circuit, code and emulator. These are the tools we employ and we know many things.", 
   "Oh, the usual. Good times, bad times, revelations, revolutions, outbreaks of emulation, the parade of compilation, linking, packaging, and the ocassional git push.",
   "Lisas. Such creatures are an attempt by the universe to make sure that we never take ourselves too seriously.", 
   "Mr. Garibaldi, you're sitting at my workstation, using my emulator. Is there a reason for this, or to save time should I just snap your hand off at the wrist?",
   "I cannot have an emulator who will not look up. It will be forever walking into things",
-  "The Lisa Emulator Project was our last, best hope. It failed. But in the year of the OS Wars, it became something greater: our last, best hope…for victory. The year is 2007. The place, LisaEm.",
+  "LisaEm 1.3 was our last, best hope. It failed. But in the year of the OS Wars, it became something greater: our last, best hope…for victory. The year is 2007. The place, LisaEm.",
   "LisaEm: decadents interested only in the pursuit of dubious pleasures. The dubious part is very important. It doesn't mean anything, but it scares people every time.",
   "Emulation... It's a small enough price to pay for immortality.",
   "\"What are you doing here?\" …\"Creating the future.\"",

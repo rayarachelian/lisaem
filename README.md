@@ -16,6 +16,15 @@ This document contains a few brief updates that are also found in the ChangeLog 
 
 ## 2020.02.22
 
+Fixed a bunch of windowing stuff for Windows. Still have some macos x issues
+when scale is other than 1.0 regarding refreshes, which leaves a white area
+near the Lisa's display. The disappearing window issue from 2020.02.22 is
+fixed (window resizing issue).
+
+2Y, 2X,3Y modes still have mouse issues and there are still other bugs.
+
+## 2020.02.22
+
 I've made many fixes, but there are still about a dozen bugs left. Most
 notably when the scale is changed the window size is wrong. On macos x
 it sometimes disappears entirely because it goes to size zero. A temporary
