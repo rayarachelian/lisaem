@@ -1051,7 +1051,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
     checkcontext(context,"pre-entry to cpu68k_makeipc");
     #endif
 
-    ipcs=(t_ipc **)calloc(sizeof(t_ipc *) , ipcs_to_get); if (!ipcs) EXITR(0,0,"Out of memory in makeipclist trying to get ipc pointers!");
+    ipcs=(t_ipc **)calloc(sizeof(t_ipc *) , ipcs_to_get); if (!ipcs) EXITN(0,0,"Out of memory in makeipclist trying to get ipc pointers!");
 
     mmu_trn=&mmu_trans[(pc>>9) & 32767];  if (mmu_trn->readfn==bad_page) {free(ipcs); return NULL;}
 

@@ -54,8 +54,26 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
+function LIBDC42ESTIMATE {
+  cd ${XTLD}/cpu68k
+  DEPS=0
+  [[ "$DEPS" -eq 0 ]] && if needed def68k-iibs.h          ../obj/cpu68k-f.o; then DEPS=1;fi
+  [[ "$DEPS" -eq 0 ]] && if needed def68k.def             ../obj/cpu68k-f.o; then DEPS=1;fi
+  [[ "$DEPS" -eq 0 ]] && if needed gen68k.c               ../obj/cpu68k-f.o; then DEPS=1;fi
+  [[ "$DEPS" -eq 0 ]] && if needed tab68k.c               ../obj/cpu68k-f.o; then DEPS=1;fi
+  [[ "$DEPS" -eq 0 ]] && if needed def68k.c               ../obj/cpu68k-f.o; then DEPS=1;fi
+  [[ "$DEPS" -eq 0 ]] && if needed ../include/generator.h ../obj/cpu68k-f.o; then DEPS=1;fi
 
-
+  if [[ $DEPS -gt 0 ]]; then
+     # 4 programs for generation
+     # 16 for opcodes
+     # reg68k cpu68k
+     # link library
+     echo $(( 4 + 16 + 2 + 2 ))
+  else
+     echo 0
+  fi
+}
 
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
@@ -99,6 +117,11 @@ create_machine_h
 for j in $@; do
  opt=`echo "$j" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
  case "$opt" in
+  estimate)   LIBDC42ESTIMATE
+              return 2>/dev/null >/dev/null #incase we're called directly 
+              exit 0
+              ;;
+
   clean)
             echo "* Removing libGenerator objects" 1>&2
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
@@ -108,6 +131,7 @@ for j in $@; do
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
+            [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
             [[ -z "$Z" ]] && exit 0
 
   ;;
@@ -249,15 +273,16 @@ echo Building libGenerator...
 echo
 echo "* Generator CPU Core OpCodes   (./cpu68k)"
 
-cd cpu68k
+
+cd ${XTLD}/cpu68k
 
 DEPS=0
-[[ "$DEPS" -eq 0 ]] && if needed def68k-iibs.h          ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if needed def68k.def             ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if needed gen68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if needed tab68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if needed def68k.c               ../obj/cpu68k-f.o; then  DEPS=1;fi
-[[ "$DEPS" -eq 0 ]] && if needed ../hdr/generator.h     ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k-iibs.h           ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k.def              ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed gen68k.c                ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed tab68k.c                ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed def68k.c                ../obj/cpu68k-f.o; then  DEPS=1;fi
+[[ "$DEPS" -eq 0 ]] && if needed ../include/generator.h  ../obj/cpu68k-f.o; then  DEPS=1;fi
 
 
 export CFLAGS="$ARCH $CFLAGS -Wno-format-truncation"

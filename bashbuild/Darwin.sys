@@ -17,8 +17,8 @@ export HASHOPTS="-b --tag"
 
 export PREFIX="/Applications"
 export PREFIXLIB="/Library"
-export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
-export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-unknown-warning-option"
+export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-unknown-warning-option -Wno-c++11-extensions"
 export SYSLIBS=""
 # Since we don't want to require the end user have wxWidgets as a dylib preinstalled
 # as well as other stuff like libdc42, generator, etc. build a statically linked app
@@ -44,6 +44,9 @@ if [[ "$MAJOR_MAC_VERSION" > "10.12" ]]; then
    export THIRTYTWOBITS=""
    export ARCH="-m64"
 fi
+
+export CFLAGS="${CFLAGS} -mmacosx-version-min=${MAJOR_MAC_VERSION}"
+export CXXFLAGS="${CXXFLAGS} -mmacosx-version-min=${MAJOR_MAC_VERSION}"
 
 export CLICMD=""
 export GUIAPP=""

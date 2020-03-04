@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
       exit(2);
     }
 
-    char *blusign=&block[512];  // BLU signature is in the tags of the spare table
+    char *blusign=(char *)&block[512];  // BLU signature is in the tags of the spare table
     uint8 x=blusign[15];
     blusign[15]=0; // force terminate string so we don't overrun
     int blublocks=( (block[0x12]<<16) | (block[0x13]<<8) | (block[0x14]    ) );
@@ -90,12 +90,12 @@ int main(int argc, char *argv[])
     if (strncmp(blusign,"Lisa HD Img BLU",15)!=0)
     {
       fprintf(stderr,"This doesn't appear to be a BLU image\n");
-      fclose(blu);
+      close(blu);
       exit(2);
     }
 
     blusign[15]=x;
-    if (strlen(block)<16)
+    if (strlen((char *)block)<16)
     {
       blusign[19]=0; // terminate version
       fprintf(stderr, "Created by %s\n",blusign);
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 
     numblocks--; // skip spare table/ BLU header block
 
-    if (abs(numblocks - blublocks)>2) // might have one extra block at the end due to xmodem buffering, but more than that is an error
+    if ((numblocks - blublocks)>2) // might have one extra block at the end due to xmodem buffering, but more than that is an error
     {
       fprintf(stderr,"Warning: number of blocks in BLU header (%d) doesn't match size of file (%d)\nUsing blublocks value.\n",blublocks,numblocks);
       numblocks=blublocks;

@@ -30,17 +30,17 @@ fi
 # if you're making your own package using the src.build system, you'll want to set
 # these variables.  These will help populate the appropriate fields in packages.
 ###########################################################################################
-   SOFTWARE="LisaEm"                    # name of the software (can contain upper case)
-     LCNAME="lisaem"                    # lower case name used for the directory
-DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
-        VER="1.2.7"                     # just the version number
-  STABILITY="BETA"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2020.02.22"                # release date.  must be YYYY.MM.DD
-     AUTHOR="Ray Arachelian"            # name of the author
-  AUTHEMAIL="ray@arachelian.com"        # email address for this software
-    COMPANY="Sunder.NET"                # company (vendor for sun pkg)
-      CONAM="SUNDERNET"                 # company short name for Solaris pkgs
-        URL="http://lisaem.sunder.net"  # url to website of package
+     SOFTWARE="LisaEm"                    # name of the software (can contain upper case)
+       LCNAME="lisaem"                    # lower case name used for the directory
+  DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
+          VER="1.2.7"                     # just the version number
+    STABILITY="BETA"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2020.02.29"                # release date.  must be YYYY.MM.DD
+       AUTHOR="Ray Arachelian"            # name of the author
+    AUTHEMAIL="ray@arachelian.com"        # email address for this software
+      COMPANY="Sunder.NET"                # company (vendor for sun pkg)
+        CONAM="SUNDERNET"                 # company short name for Solaris pkgs
+          URL="http://lisaem.sunder.net"  # url to website of package
 COPYRIGHTYEAR="2020"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR, All Rights Reserved"
 # ----------------------------------------------------------------------------------------
@@ -64,7 +64,10 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
-
+#VERSION="1.2.7-BETA_2019.03.03"
+#VERSION="1.2.7-BETA_2019.02.29"
+#VERSION="1.2.7-BETA_2019.02.25"
+#VERSION="1.2.7-BETA_2020.02.22"
 #VERSION="1.2.7-ALPHA_2019.11.11"
 #VERSION="1.2.7-ALPHA_2019.10.20"
 #VERSION="1.2.7-ALPHA_2019.10.15"
@@ -104,11 +107,14 @@ function CLEAN() {
             # note we expect to be inside src at this point, and we'll make our way out as needed.
             echo "* Cleaning..." 1>&2
             cd "${TLD}"
-            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
-            #rm -f src/tools/bin/*; echo "Built binaries go here " >src/tools/bin/README
+            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k 
+            subbuild src/lib/libGenerator --no-banner clean
+            subbuild src/lib/libdc42      --no-banner clean
+            subbuild src/tools            --no-banner clean
+            rm -rf bin/LisaEm.app ./bin/lisaem # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
             rm -f /tmp/slot.*.sh*
             rm -f ./pkg/build/*; echo "Built packages go here"    >pkg/build/README
-            rm -rf ./bin/lisaem
+            cd "${TLD}/bin"; ln -s ../bashbuild/interim-build.sh build.sh
             if [[ -n "`which ccache 2>/dev/null`" ]]; then echo -n "* "; ccache -c; fi
 }
 
@@ -507,8 +513,41 @@ export CPPFLAGS="$ARCH $CPPFLAGS -Wno-deprecated-copy -Wno-format-truncation"
 export CXXFLAGS="$ARCH $CXXFLAGS -Wno-deprecated-copy -Wno-format-truncation" 
 #2020.01.14 - ^ GCC 9.2.1 throws these on wxWidgets includes, which I'm not going to fix.
 
+
+#--------------------------------------------------------------------------------------------------------------------------
+# estimate how many compile passes we need. if upx is enabled, which takes a very long time, multiply it by some factor
+# since upx uses a single core
+
+ESTLIBGENCOUNT=$(  subestimate src/lib/libGenerator --no-banner $LIBGENOPTS    $SIXTYFOURBITS $THIRTYTWOBITS  )
+ESTLIBDC42COUNT=$( subestimate src/lib/libdc42      --no-banner                $SIXTYFOURBITS $THIRTYTWOBITS  ) 
+[[ -z "$NODC42TOOLS" ]] && ESTTOOLSCOUNT=$( subestimate src/tools  --no-banner $SIXTYFOURBITS $THIRTYTWOBITS  ) || ESTTOOLSCOUNT=0
+ESTPHASE1COUNT=$( INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COUNTNEEDED ${PHASE1LIST} )
+ESTPHASE2COUNT=$( INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COUNTNEEDED ${PHASE2LIST} )
+
+# multiply estimates when using UPX as UPX is very slow
+if [[ -z "$WITHOUTUPX" ]] && [[ -n "$UPXCMD" ]]; then
+   ESTTOOLSCOUNT=$((  $ESTTOOLSCOUNT  * 10 ));
+   ESTPHASE2COUNT=$(( $ESTPHASE2COUNT *  5 ));
+fi
+
+ESTIMATETOTALS=$(( $ESTLIBGENCOUNT + $ESTLIBDC42COUNT + $ESTTOOLSCOUNT + $ESTPHASE1COUNT + $ESTPHASE2COUNT + 5 ))
+
+ ESTLIBGENCOUNT=$(( $ESTLIBGENCOUNT  * 100 / $ESTIMATETOTALS ))
+ESTLIBDC42COUNT=$(( $ESTLIBDC42COUNT * 100 / $ESTIMATETOTALS ))
+  ESTTOOLSCOUNT=$(( $ESTTOOLSCOUNT   * 100 / $ESTIMATETOTALS ))
+ ESTPHASE1COUNT=$(( $ESTPHASE1COUNT  * 100 / $ESTIMATETOTALS ))
+ ESTPHASE2COUNT=$(( $ESTPHASE2COUNT  * 100 / $ESTIMATETOTALS ))
+
+#(echo "Estimates:"
+#echo "libgen:   $ESTLIBGENCOUNT"
+#echo "libdc42:  $ESTLIBDC42COUNT"
+#echo "tools:    $ESTTOOLSCOUNT"
+#echo "Phase1:   $ESTPHASE1COUNT"
+#echo "Phase2:   $ESTPHASE2COUNT"
+#) 1>&2
+#read x
 #---------------------------------------------------------------------------------------------------------------------------
-echo Building prerequisites...
+echo "* Building prerequisites..."
 echo
 
 create_builtby
@@ -524,33 +563,47 @@ else
     echo "machine.h failed to create $(pwd)" 1>&2
     exit 1
 fi
+
 cd ${TLD}
 # Build libraries and tools using subbuild
-export COMPILEPHASE="libGenerator"
-export PERCENTPROGRESS=0 PERCENTCEILING=25 REUSESAVE=""
-subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
-unset LIST
 
-export COMPILEPHASE="libdc42"
-export PERCENTPROGRESS=25 PERCENTCEILING=27 REUSESAVE="yes"
-subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
-unset LIST
+export PERCENTPROGRESS=0 PERCENTCEILING=${ESTLIBGENCOUNT}
+if [[ $ESTLIBGENCOUNT -gt 0 ]]; then
+    export COMPILEPHASE="libGenerator"
+    export PERCENTJOB=0 REUSESAVE=""
+    subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
+    unset LIST
+fi
 
-if  [[ -z "$NODC42TOOLS" ]]; then
+export PERCENTPROGRESS=${PERCENTCEILING}
+export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTLIBGENCOUNT )) 
+if [[ $ESTLIBDC42COUNT -gt 0 ]]; then
+  export COMPILEPHASE="libdc42"
+  export PERCENTJOB=0 REUSESAVE="yes"
+  subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
+  unset LIST
+fi
+
+export PERCENTPROGRESS=${PERCENTCEILING}
+export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTTOOLSCOUNT )) 
+if  [[ $ESTTOOLSCOUNT -gt 0 ]]; then
     export COMPILEPHASE="tools"
-    export PERCENTPROGRESS=27 PERCENTCEILING=35 REUSESAVE="yes"
+    export REUSESAVE="yes"
     subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS
     unset LIST
 fi
 
-echo "Building LisaEm..."
+echo "* Building LisaEm..."
 echo
-echo "* LisaEm C Code                (./lisa)"
+echo "* LisaEm C Code                  (./lisa)"
 
 
 # Compile C
 export COMPILEPHASE="C code"
-export PERCENTPROCESS=35 PERCENTCEILING=75 PERCENTJOB=0 NUMJOBSINPHASE=15
+
+export PERCENTPROGRESS=${PERCENTCEILING}
+export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTPHASE1COUNT ))
+export PERCENTJOB=0 NUMJOBSINPHASE=15
 export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $CFLAGS $INC -c :INFILE:.c -o :OUTFILE:.o"
 LIST1=$(WAIT="" INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COMPILELIST ${PHASE1LIST} )
 
@@ -599,7 +652,9 @@ fi
 # Compile C++
 cd "${TLD}"
 export COMPILEPHASE="C++ code"
-export PERCENTPROCESS=75 PERCENTCEILING=98 PERCENTJOB=0 NUMJOBSINPHASE=6
+export PERCENTPROGRESS=${PERCENTCEILING}
+export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTPHASE1COUNT ))
+export PERCENTJOB=0 NUMJOBSINPHASE=6
 CXXFLAGS="$CXXFLAGS -I src/include -I resources"
 export COMPILECOMMAND="$CXX -W -Wno-write-strings $WARNINGS $WITHDEBUG $WITHTRACE $WITHBLITS $INC $CXXFLAGS -c :INFILE:.cpp -o :OUTFILE:.o "
 LIST=$( WAIT="yes" INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COMPILELIST ${PHASE2LIST} )
@@ -632,34 +687,48 @@ cd "${TLD}/bin"
 if  [[ -f "$LISANAME" ]]; then
 
     strip_and_compress ${LISANAME}
-# .
-# └── LisaEm.app
-#     └── Contents
-#         ├── MacOS
-#         └── Resources
+#.
+#└── Contents                                ${TLD}/bin/LisaEm.app/Contents
+#    ├── Info.plist
+#    ├── MacOS                               ${TLD}/bin/LisaEm.app/Contents/MacOS
+#    │   └── LisaEm
+#    ├── PkgInfo
+#    └── Resources                           ${TLD}/bin/LisaEm.app/Contents/Resources
+#        └── skins                           
+#            └── default
+#                ├── default.conf
+#                ├── floppy0.png
+#                ├── floppy1.png
     
     if [[ -n "$DARWIN" ]]; then
         echo "* Creating macos X application" 1>&2
-        mkdir -pm775 "${TLD}/bin/LisaEm.app/Contents/MacOS"
-        mkdir -pm775 "${TLD}/bin/LisaEm.app/Contents/Resources"
-        sed "s/_VERSION_/$VERSION/g" <"${TLD}/resources/Info.plist" > "${TLD}/bin/LisaEm.app/Contents/Info.plist"
-        echo -n 'APPL????'          > "${TLD}/bin/LisaEm.app/Contents/PkgInfo"
-        mv "${TLD}/bin/${LISANAME}"   "${TLD}/bin/LisaEm.app/Contents/MacOS/" || exit $?
-        echo "* Copying Skins to app resources" 1>&2
-        (cd "${TLD}/resources"; tar cpf - skins ) | (cd "${TLD}/bin/LisaEm.app/Contents/Resources"; tar xpf - )
+
+        CONTENTS="${TLD}/bin/LisaEm.app/Contents/"
+        RESOURCES="${TLD}/bin/LisaEm.app/Contents/Resources"
+        BIN="${TLD}/bin/LisaEm.app/Contents/MacOS"
+
+        PLISTSRC="${TLD}/resources/Info.plist"
+        ICONSRC="${TLD}/resources/LisaEm.icns"
+
+        mkdir -pm775 "${BIN}" "${RESOURCES}"
+        mv "${TLD}/bin/${LISANAME}"                   "${BIN}"                  || exit $?
+        sed "s/_VERSION_/$VERSION/g" < "${PLISTSRC}"> "${CONTENTS}/Info.plist"  || exit $?
+        echo -n 'APPL????'                          > "${CONTENTS}/PkgInfo"     || exit $?
+        cp "${ICONSRC}"                               "${RESOURCES}"            || exit $?
+        (cd "${TLD}/resources";tar cpf - skins) | (cd "${RESOURCES}"; tar xpf - )
         x=$?
         if  [[ "$x" -ne 0 ]]; then
-            echo "Failed to copy ${TLD}/resources/skins to ${TLD}/bin/LisaEm.app/Contents/Resources" 1>&2
+            echo "Failed to copy ${TLD}/resources/skins to ${RESOURCES}" 1>&2
             exit $x
         fi
-    
-        [[ -n "$WITHDEBUG" ]] && echo "run -p" >gdb-run && $GDB ./LisaEm.app/Contents/MacOS/LisaEm
+
+        [[ -n "$WITHDEBUG" ]] && echo "run -p" >gdb-run && $GDB     ./LisaEm.app/Contents/MacOS/LisaEm
         #if we turned on profiling, process the results
         if [[ `echo "$WITHDEBUG" | grep 'p' >/dev/null 2>/dev/null` ]];then
           $GPROF LisaEm.app/Contents/MacOS/LisaEm/lisaem >lisaem-gprof-out
           echo lisaem-gprof-out created.
         fi
-    
+
         if [[ -n "$INSTALL" ]]; then
           echo "* Installing LisaEm.app" 1>&2
           (cd "${TLD}/bin"; tar cf - ./LisaEm.app ) | (cd "$PREFIX"; tar xf -)

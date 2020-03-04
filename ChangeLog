@@ -8,6 +8,13 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.03.03 - added estimates to build scripts so progress bars are better
+           - more os x cleanup
+
+2020.02.29 - macos x: skin path fixes, missing icon issue, cleanup fixes
+
+2020.02.25 - window resizing fixes
+
 2020.02.22 - macos x mouse scale fixes
 
 2020.02.21 - windows mouse location and other fixes

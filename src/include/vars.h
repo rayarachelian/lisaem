@@ -1539,6 +1539,19 @@ extern void on_lisa_exit(void);
                       return cmd-1;                                                                                                               \
                     }
 
+#define EXITN(x,cmd,fmt,args...)                                                                                                                  \
+                    {                                                                                                                             \
+                      char msg[1024], msg2[1024-100];                                                                                             \
+                      snprintf(msg2, 1024-100, fmt, ## args);                                                                                     \
+                      snprintf(msg,1024,"I'm sorry, the emulation has aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2, \
+                           __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
+                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
+                      fprintf(buglog,"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);                                 \
+                      messagebox(msg,"Emulation aborted!");                                                                                       \
+                      fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
+                      return NULL;                                                                                                               \
+                    }
+
 
 //20191008 disable alert-log for production builds to save on code size + time as *printf is expensive and it will just go
 //to /dev/null anyway in most cases.

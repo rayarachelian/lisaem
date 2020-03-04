@@ -59,7 +59,7 @@ function restore_environment() {
 
 function subbuild() {
    cd "${XTLD}"
-   [[ -z "${REUSESAVE}" ]] && save_environment #|| echo "Skipping save REUSESAVE=:$REUSEAVE:" 1>&2
+   [[ -z "${REUSESAVE}" ]] && save_environment
 
    unset XTLD REUSESAVE
    pushd ${1} >/dev/null     || exit $?
@@ -67,6 +67,21 @@ function subbuild() {
    popd >/dev/null           || exit $?
 
    restore_environment
-   #echo "finished restoring environment" 1>&2
-   #echo "SOFTWARE: $SOFTWARE version: $VERSION" 1>&2
+}
+
+# don't call this directly, this wrapper is needed to avoid return from sub build exiting subestimate and skipping restore_environment and popd
+function _sub__est_ {
+   source ./build.sh estimate --no-banner $@
+}
+
+function subestimate() {
+   cd "${XTLD}"
+   [[ -z "${REUSESAVE}" ]] && save_environment
+
+   unset XTLD REUSESAVE
+   pushd ${1} >/dev/null      || exit $?
+   _sub__est_ $@
+   popd >/dev/null            || exit $?
+
+   restore_environment
 }

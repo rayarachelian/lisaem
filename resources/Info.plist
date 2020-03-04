@@ -28,5 +28,7 @@
 	<string>Version _VERSION_</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>LisaEm version _VERSION_</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.10.0</string>
 </dict>
 </plist>

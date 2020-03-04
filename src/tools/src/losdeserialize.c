@@ -47,7 +47,7 @@ void deserialize(DC42ImageType *F)
          uint8 *ftag;
          uint8 *fsec;
          
-         for (int sec=32; sec<F->numblocks/3; sec++)
+         for (int sec=32; (unsigned)sec<F->numblocks/3; sec++)
          {
                char name[64];
                ftag=dc42_read_sector_tags(F,sec);

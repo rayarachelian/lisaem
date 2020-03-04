@@ -2275,7 +2275,7 @@ void LisaEmFrame::OnSkinSelect(wxCommandEvent& WXUNUSED(event))
 }
 
 
-void LisaEmFrame::OnSkinlessCenter(wxCommandEvent& event)
+void LisaEmFrame::OnSkinlessCenter(wxCommandEvent& WXUNUSED(event))
 {
     skinless_center=!skinless_center;
     my_lisawin->clear_skinless=1;
@@ -4662,7 +4662,7 @@ void LisaWin::RePaint_2X3Y(void)
 
 
 // void LisaWin::OnDraw(wxDC & dc) {} // should this be implemented?
-void LisaWin::OnPaint(wxPaintEvent &event )
+void LisaWin::OnPaint(wxPaintEvent& event )
 {
   DCTYPE dc(this); // 20190831 - let's see if this is needed
   DoPrepareDC(dc); // or this->PrepareDC(dc); this->OnDraw(dc);
@@ -4711,6 +4711,7 @@ void LisaWin::OnPaint(wxPaintEvent &event )
   videoramdirty=0;
  #ifdef __WXOSX__
 //  event.Skip(false);
+UNUSED(event);
  #else
   event.Skip(false); // not sure if I need this or not
  #endif
@@ -4728,12 +4729,12 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
 
   wxCoord w, h;
   dc.GetSize(&w, &h); // these are inside the window, and scaled * hidpi_scale via SetUserScale, and this is virtually much larger due to scrolling
-  wxRect r=my_lisaframe->GetRect(); // these are outside the viewport, and the true size of the window, unscaled - want this one!
-  w_width   = r.GetWidth();  //* hidpi_scale;              // inside frame size
-  w_height  = r.GetHeight(); //* hidpi_scale;
+  wxRect r=my_lisaframe->GetRect();             // these are outside the viewport, and the true size of the window, unscaled - want this one!
+  w_width   = r.GetWidth();      
+  w_height  = r.GetHeight();
   
-  ww_width  = w_width  * hidpi_scale;    // scale these to get the scaled version of the viewport size
-  ww_height = w_height * hidpi_scale;
+  ww_width  = w_width  / hidpi_scale;          
+  ww_height = w_height / hidpi_scale;
 
   ww_width  = ww_width > w_width  ? w_width  : ww_width;  // limit from going outside the viewport
   ww_height = ww_height> w_height ? w_height : ww_height;
@@ -4750,14 +4751,16 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
       if (!my_lisahq3xbitmap) return;
       o_effective_lisa_vid_size_x=my_lisahq3xbitmap->GetWidth() * hidpi_scale;
       o_effective_lisa_vid_size_y=my_lisahq3xbitmap->GetHeight()* hidpi_scale;
-      ox=(w_width  - _H(720))/2;
-      oy=(w_height - _H(548))/2;
+//      ox=(w_width  - _H(720)) / 2;
+//      oy=(w_height - _H(548)) / 2;
+      ox=( (ww_width)   - _H(effective_lisa_vid_size_x) ) / 2;
+      oy=( (ww_height)  - _H(effective_lisa_vid_size_x) ) / 2;
+
   }
   else
   {
-      ox=(w_width  - _H(effective_lisa_vid_size_x))/2;
-      oy=(w_height - _H(effective_lisa_vid_size_x))/2;
-
+      ox=(ww_width  - _H(effective_lisa_vid_size_x) ) / 2;
+      oy=(ww_height - _H(effective_lisa_vid_size_x) ) / 2;
   }
   if (!skinless_center)
   {   ox=0; oy=0;}
@@ -4770,9 +4773,11 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
   skin.screen_origin_x=ox;  
   skin.screen_origin_y=oy;
 
-#ifdef DEBUGOFXXX
+#ifdef DEBUG
   static unsigned short ctr;
   ctr++;
+  //src/host/wxui/lisaem_wx.cpp:OnPaint_skinless:4776:win:1920,1053/wwin:960,526/dc:1920,969 o_e_lisa_vid_sz 1440,1092 ox,oy:(600,166) oi:-240,-283 hidpi_scale:0.500000| 17:29:10.8 9693100831
+  //src/host/wxui/lisaem_wx.cpp:OnPaint_skinless:4782:my_lisabitmap:     1440x1092 32 bits| 17:29:10.8 9693100831
   if (!(ctr & 7)) {ALERT_LOG(0,"win:%d,%d/wwin:%d,%d/dc:%d,%d o_e_lisa_vid_sz %d,%d ox,oy:(%d,%d) oi:%d,%d hidpi_scale:%f",
             w_width, w_height, ww_width,ww_height,(long)w,(long)h,
             o_effective_lisa_vid_size_x,o_effective_lisa_vid_size_y,
@@ -4787,16 +4792,16 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
   {
       ex=ww_width-ox; ey=ww_height-oy;
       
-      #ifdef DEBUGXX
+      #ifdef DEBUG
       // debug draw color boxes around where we think the edges are so we see where we're wrong about size
       // but first wipe everything with a black rectangle to see the end of the window for the colored regions too.
-      dc.SetBrush(*wxBLACK_BRUSH);      dc.SetPen(*wxBLACK_PEN);
-      dc.DrawRectangle(0   , 0   , 1920,1080);
+      //dc.SetBrush(*wxBLACK_BRUSH);      dc.SetPen(*wxBLACK_PEN);
+      //dc.DrawRectangle(0   , 0   , 1920,1080);
       // center of window
       dc.SetBrush(*wxCYAN_BRUSH);      dc.SetPen(*wxCYAN_PEN);
       // x,y, width, height
-      dc.DrawRectangle(0,          w_height/2 -5 , w_width,     10);       // horizontal line
-      dc.DrawRectangle(w_width/2 -5,0,             10,    w_height);         // vertical line
+      dc.DrawRectangle(0,               (ww_height)/2 -5 , (ww_width),          10);       // horizontal line
+      dc.DrawRectangle((ww_width)/2 -5, 0,                 10,         (ww_height));       // vertical line
 
       #else
       // draw a black border around the lisa's display
@@ -4851,7 +4856,7 @@ void LisaWin::OnPaint_skinless(wxRect &rect, DCTYPE &dc)
   repaintall=0;
 }
 
-void LisaWin::Skins_Repaint_PowerPlane(wxRect &rect, DCTYPE &dc)
+void LisaWin::Skins_Repaint_PowerPlane(wxRect & WXUNUSED(rect), DCTYPE & WXUNUSED(dc) )
 {
     // The first time we're in here, draw the skins.  The skins are cut in horizontal quarters because
     // some versions of wxWidgets can't handle such a large wxBitmap.
@@ -4923,7 +4928,7 @@ void LisaWin::Skins_Repaint_PowerPlane(wxRect &rect, DCTYPE &dc)
 }
 
 
-void LisaWin::Skins_Repaint_Floppy(wxRect &rect, DCTYPE &dc)
+void LisaWin::Skins_Repaint_Floppy(wxRect& WXUNUSED(rect), DCTYPE & WXUNUSED(dc) )
 {
     if ((floppystate & FLOPPY_NEEDS_REDRAW) )
     {
@@ -8682,12 +8687,12 @@ char *get_welcome_fortune(void)
   "Who are you? What do you want? Why are you here? Where are you going? Did you think we've forgotten you? We have been waiting for you.",
   "Lisa 2/10 was the last of the Lisas. There would never be another. It changed the future and it changed us. It taught us that we have to create the future, or others will do it for us",
   "Now, I go to spread emulation to the rest of the world. It is a terrible responsibility, but I have learned to live with it.",
-  "Now, power buttons.. power buttons, hmm. Now if I were a power button, which one of these would I be?",
+  "Now, power buttons.. power buttons, hmm. Now if I were a power button, which one of these would I be? (Hint: Key menu!)",
   "We are the universe, trying to understand itself.",
   "it's counterproductive! I mean, why make history if you fail to learn by it?",
   "New LisaEm Release coming soon. How soon is soon? Longer than little while, faster than later.",
   "Have you ever tried LisaProject? I'm not sure, but according to the translator, it's either an aphrodisiac or a floor wax...",
-  "Savor the mystery, don't get nearly enough of them",
+  "Savor the mystery, we don't get nearly enough of them",
   "and I am both terrified and reassured to know that are still wonders in the universe that we have not yet emulated",
   "The universe is run by complex weaving of three elements: emulation, matter, and enlightened self-interest",
   "my shoes are too tight, and I have forgotten how to dance",
@@ -8697,6 +8702,7 @@ char *get_welcome_fortune(void)
   "I have always been here.",
   "I am who I have always been",
   "Compile! Compile now!",
+  "JMP.L! JMP.L now!",
   "It was beige. A shade of beige so deep your eye just kinda slides off it. And it didn't flicker when you looked at it. A case big as two Macs and twice as ugly. And when powered, it's like you hear a scream in your mind.",
   "It was the Dawn of the Third Age of Computing, 13 years after the Lisa was introduced... The Lisa Emulator Project was a dream given form.",
   "have you ever wondered what would happen if you opened an emulator while inside an emulator?",
@@ -8715,7 +8721,8 @@ char *get_welcome_fortune(void)
   "I will not compile the code for emulating again... I will not compile the code for emulating again... I will not compile the code for emulating again...",
   "I look upon the crumbling Lisas and despair",
   "When you do things right, people won’t be sure you’ve done anything at all.",
-  "We have such sights to show you..."
+  "We have such sights to show you...",
+  "Tearing the Mask Off LOS to See the Face of LisaEm"
 };
 
   int count=sizeof(fubar)/sizeof(fubar[0]);

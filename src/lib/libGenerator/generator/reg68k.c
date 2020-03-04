@@ -65,6 +65,7 @@ static int loopy_vector=0;                  // prevent fetch from calling this a
 
 /*** forward references ***/
 #ifdef DEBUG
+
 void dumpmmu(uint8 c, FILE *out);
 void validate_mmu_segments(char *from);
 void printregs(FILE *buglog,char *tag);
@@ -74,7 +75,8 @@ void extprintregs(FILE *buglog,char *tag);
 
 #endif
 
-//extern char *slrname(uint16 slr);       // from memory.c
+extern char *slrname(uint16 slr);       // from memory.c
+
 #include <diss68k.h>
 // Make sure that the bitfield unions work correctly - if they're in the wrong order, they won't.  This double checks
 // that ./configure got the right order.

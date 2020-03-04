@@ -93,6 +93,16 @@ for i in $@
 do
 
  case "$i" in
+  estimate)   cd ${XTLD}/src  # estimate compile count, we only have one file, but have to build library so return 2 units
+              COMPILED=""
+              if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
+                 echo 2
+              else
+                 echo 0
+              fi
+              return 2>/dev/null >/dev/null #incase we're called directly 
+              exit 0
+              ;;
   clean)
             echo "* Removing libdc42 objs"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types
@@ -100,6 +110,7 @@ do
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
+            [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
             [[ -z "$Z" ]] && exit 0
 
   ;;
@@ -249,11 +260,12 @@ CFLAGS="$CFLAGS   -Wno-empty-body  -Wno-duplicate-decl-specifier -Wno-incompatib
                   -Wno-implicit-function-declaration -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration  \
                   -Wno-unused-parameter  -Wno-unused"
 
+# moved to use qjob so can properly capture warning output
 cd src
 COMPILED=""
 if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
-   echo "  Compiling libdc42.c..."
-   $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
+   qjob "!!  Compiling libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
+   waitqall
    makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi
 

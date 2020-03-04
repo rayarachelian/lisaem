@@ -54,6 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dumper  lisadiskinfo  lisafsh-tool  losdeserialize rraw-to-dc42"
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 
@@ -68,33 +69,45 @@ if [[ -z "$NOBANNER" ]]; then
    image ${XTLD}/resources/libdc42-banner.png || (
 
       echo ' _____________ --------------------------------------------------------------'
-      echo "| |DC42    |.|   dc42 tools ${VERSION}  -   Unified Build Script"
-      echo '| |        | |                                                        '
+      echo "| |  dc42  |.|   dc42 tools ${VERSION}  -   Unified Build Script"
+      echo '| | tools  | |                                                        '
       echo '| |________| |              http://lisaem.sunder.net'
-      echo '|   ______   | Copyright (C) 2008 Ray Arachelian, All Rights Reserved'
+      echo '|   ______   | Copyright (C) MMXX Ray Arachelian, All Rights Reserved'
       echo '|  |    | |  |Released under the terms of the GNU General Public License 2.0'
       echo '\__|____|_|__| --------------------------------------------------------------'
    )
 fi
 
-CHECKFILES libdc42-gpl-license.txt src/lisadiskinfo.c src/lisafsh-tool.c src/patchxenix.c src/dumper.c src/dc42-to-raw.c src/raw-to-dc42.c
-create_machine_h
+CHECKFILES libdc42-gpl-license.txt $(for i in $SRCLIST; do echo src/$i.c; done)
 
 # Parse command line options if any, overriding defaults.
 
 for i in $@; do
 
  case "$i" in
+
+  estimate) cd ${XTLD}/src
+            count=0;
+            for s in $SRCLIST; do
+               needed ${s}.c ../bin/${s}${EXT} && count=$(( $count + 1 ))
+            done
+            echo $count
+            return 2>/dev/null >/dev/null #incase we're called directly 
+            exit 0
+            ;;
   clean)
+            cd ${XTLD}/obj
             echo "* Removing fsh tools objs and bins"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types*
-            cd ..
+            cd ../bin/
+            for b in $SRCLIST; do rm -f ${b}${EXT}; done
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
+            [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
             [[ -z "$Z" ]] && exit 0
 
-  ;;
+            ;;
  build*)    echo ;;    #default - nothing to do here, this is the default.
  install)
             if [[ -z "$CYGWIN" ]]; then
@@ -124,7 +137,7 @@ for i in $@; do
 
            echo Uninstalling from $PREFIX and $PREFIXLIB
            rm -rf $PREFIXLIB/lisaem/
-	   rm -rf $PREFIX/patchxenix${EXT} $PREFIX/blu-to-dc42${EXT}  $PREFIX/dc42-resize-to-400k${EXT}  $PREFIX/dumper${EXT}  $PREFIX/lisadiskinfo${EXT}  $PREFIX/lisafsh-tool${EXT}  $PREFIX/losdeserialize${EXT}  $PREFIX/rraw-to-dc42${EXT}
+	        rm -rf $PREFIX/patchxenix${EXT} $PREFIX/blu-to-dc42${EXT}  $PREFIX/dc42-resize-to-400k${EXT}  $PREFIX/dumper${EXT}  $PREFIX/lisadiskinfo${EXT}  $PREFIX/lisafsh-tool${EXT}  $PREFIX/losdeserialize${EXT}  $PREFIX/rraw-to-dc42${EXT}
            exit 0
 
     ;;
@@ -198,6 +211,7 @@ fi
 fi
 
 ###########################################################################
+create_machine_h
 
 # Has the configuration changed since last time? if so we may need to do a clean build.
 [[ -f .last-opts ]] && source .last-opts
@@ -258,7 +272,7 @@ cd src
 
 export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
 LIST1=$(WAIT="yes" OBJDIR="../bin/" INEXT=c OUTEXT="${EXTTYPE}" VERB=Compiling COMPILELIST \
-	patchxenix blu-to-dc42  dc42-resize-to-400k  dumper  lisadiskinfo  lisafsh-tool  losdeserialize rraw-to-dc42 )
+	$(for i in $SRCLIST; do echo $i; done) )
 
 if [[ -z "$XTLD" ]]; then
    echo "Error XTLD is empty" 1>&2
@@ -266,7 +280,7 @@ if [[ -z "$XTLD" ]]; then
 fi
 
 cd "${XTLD}/bin"
-strip_and_compress patchxenix${EXT} blu-to-dc42${EXT}  dc42-resize-to-400k${EXT}  dumper${EXT}  lisadiskinfo${EXT}  lisafsh-tool${EXT}  losdeserialize${EXT}  rraw-to-dc42${EXT}
+strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 
@@ -276,8 +290,8 @@ if [[ -n "$INSTALL" ]]; then
       echo "Installing tools to $PREFIX/bin"
       mkdir -pm755 "$PREFIX/bin" 2>/dev/null
       # * is for .exe on windows
-      for i in patchxenix${EXT} blu-to-dc42${EXT}  dc42-resize-to-400k${EXT}  dumper${EXT}  lisadiskinfo${EXT}  lisafsh-tool${EXT}  losdeserialize${EXT}  rraw-to-dc42${EXT}; do
-         cp ${i}* "$PREFIX/bin/" || exit 1
+      for i in $SRCLIST; do
+         cp ${i}${EXT} "$PREFIX/bin/" || exit 1
       done
       cd ..
 fi

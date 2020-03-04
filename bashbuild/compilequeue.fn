@@ -85,7 +85,13 @@ function qjob {
      else
         echo "echo -n \"$NAME\"     >>/tmp/${SLOTNAME}.out"  # output $1 to the out file.
      fi
+
      shift                                                   # remove $1 from the list of parameters
+
+     echo "$@"                >>/tmp/${SLOTNAME}.out         # save compile command
+     echo "in: $( /bin/pwd )" >>/tmp/${SLOTNAME}.out
+     echo ""                  >>/tmp/${SLOTNAME}.out
+
      echo "( $@ 2>&1 ) 2>&1       >>/tmp/${SLOTNAME}.out"    # execute $2 with params $3..$N and append to out file
      echo 'if [[ $? -ne 0 ]]; then'                          # check for errors.
      echo "   mv /tmp/$SLOTNAME.out /tmp/${SLOTNAME}.failed" # rename to .failed on failure
@@ -146,11 +152,24 @@ function waitq()
   # any successful jobs out there?
   if [[  `ls -l ${OUT}.*.sh.done 2>/dev/null | wc -l` -gt 0 ]]; then
      for z in  ${OUT}.*.sh.done; do
-        cat "$z" | head -5  1>&2
-        [[ "$( wc -l < ${z} 2>/dev/null )" -gt 2 ]] && echo "..." 1>&2  
+
+        # skip over the compile command and current directory, then output only 5 lines at most to highlight some warnings
+        # or errors if there are some, but preserve missing newline at the end.
+        local count=0; 
+        while IFS= read -r line; do
+              count=$(( count + 1))
+              [[ $count -gt 3 ]] && printf "%s\n" "$line" 1>&2; 
+              [[ $count -gt 9 ]] && break
+        done < "$z"
+        printf "%s" "$line" 1>&2
+        [[ "$count" -gt 8 ]] && echo "..." 1>&2  
+      
+        # save warnings from the slot output file to build warnings
         echo "---------------------- $z -----------------------" >>$BUILDWARNINGS
         cat "$z" >>$BUILDWARNINGS
         rm -f "$z"
+
+        # update progress bar
         [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
         export PERCENTJOB="$(( $PERCENTJOB +1 ))"
 
@@ -166,7 +185,7 @@ function waitq()
 
  # only check for failed jobs at the end when there are no other jobs running,
  # otherwise we'd leave behind still in flight successful jobs and junk files.
- if [ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -eq 0 ]
+ if [[ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -eq 0 ]]
  then
 
   #echo looking for failed: "`ls slot.$$.*.failed 2>/dev/null`"  >>/tmp/xxx.build.out
