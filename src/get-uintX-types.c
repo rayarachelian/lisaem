@@ -3,7 +3,7 @@
 *                       libGenerator - integer size detector                           *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2010 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2020 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 \**************************************************************************************/
@@ -33,7 +33,7 @@ h[6]=0;
 h[7]=0;
 h[8]=0;
 
-char *szs[5]={"char", "short", "int", "long", "long long"};
+char *szs[5]={"char", "short", "int", "long long", "long"};
 
 char buffer[256];
 FILE *uname;
@@ -51,8 +51,8 @@ if (!out) {perror("Could not create machine.h because "); return -1; }
 sz[0]=sizeof(char);
 sz[1]=sizeof(short);
 sz[2]=sizeof(int);
-sz[3]=sizeof(long);
-sz[4]=sizeof(long long);
+sz[3]=sizeof(long long);
+sz[4]=sizeof(long);
 
 
 fprintf(out,
@@ -61,7 +61,7 @@ fprintf(out,
 "*                machine.h -  detected integer types for this host                     *\n"
 "*                              http://lisaem.sunder.net                                *\n"
 "*                                                                                      *\n"
-"*                   Copyright (C) 1998, 2019 Ray A. Arachelian                         *\n"
+"*                   Copyright (C) 1998, 2020 Ray A. Arachelian                         *\n"
 "*                                All Rights Reserved                                   *\n"
 "*                                                                                      *\n"
 "\\**************************************************************************************/\n\n"
@@ -88,55 +88,17 @@ fprintf(out,"/*---------------------------------------------*/\n\n");
 for (i=0; i<5; i++) {
       if (! h[sz[i]] ) {
             h[sz[i]]=1;
-            fprintf(out,"typedef          %-9s %s  int%d;\n",szs[i],(sz[i]<2 ? " ":""),sz[i]*8); 
-            if (errno) {perror("couldn't write to machine.h because "); fclose(out); return -1;}
-            fprintf(out,"typedef unsigned %-9s %s uint%d;\n",szs[i],(sz[i]<2 ? " ":""),sz[i]*8); 
+
+            fprintf(out,"typedef          %-9s %s  int%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
+            fprintf(out,"typedef          %-9s %s sint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
+            fprintf(out,"typedef unsigned %-9s %s uint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
             if (errno) {perror("couldn't write to machine.h because "); fclose(out); return -1;}
       }
 }
-
-
-fprintf(out,"\n"
-"typedef          int8         sint8;\n"
-"typedef          int16       sint16;\n"
-"typedef          int32       sint32;\n"
-"typedef          int64       sint64;\n\n\n"
-"#ifndef int64_t \n"
-"   #define int64_t int64 \n"
-"#endif \n"
-"\n"
-"#ifndef int32_t \n"
-"   #define int32_t int32 \n"
-"#endif \n"
-"#ifndef int16_t \n"
-"   #define int16_t int16 \n"
-"#endif \n"
-"#ifndef int8_t \n"
-"   #define int8_t int8 \n"
-"#endif \n"
-"#ifndef uint64_t \n"
-"   #define uint64_t uint64 \n"
-"#endif \n"
-"\n"
-"#ifndef uint32_t \n"
-"   #define uint32_t uint32 \n"
-"#endif \n"
-"#ifndef uint16_t \n"
-"   #define uint16_t uint16 \n"
-"#endif \n"
-"#ifndef uint8_t \n"
-"   #define uint8_t uint8 \n"
-"#endif \n"
-"#ifndef uint_t \n"
-"   #define uint_t uint16 \n"
-"#endif \n"
-"#ifndef uint \n"
-"   #define uint uint16 \n"
-"#endif \n"
-"\n#endif\n");
+fprintf(out,"#endif\n");
 
 fclose(out);
-if (h[1] && h[2] && h[4] && h[8]) return 0;
 
+if (h[1] && h[2] && h[4] && h[8]) return 0;
 return -1;
 }

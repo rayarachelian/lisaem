@@ -9,7 +9,7 @@
 function create_machine_h {
 
   if needed ${TLD}/src/get-uintX-types.c  ${TLD}/obj/get-uintX-types; then
-     $CC -Wall ${TLD}/src/get-uintX-types.c -o ${TLD}/obj/get-uintX-types
+     $CC -Wall ${TLD}/src/get-uintX-types.c -o ${TLD}/obj/get-uintX-types 1>&2
   fi
 
   if [[ "$?" -ne 0 ]]; then

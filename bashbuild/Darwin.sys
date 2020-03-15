@@ -5,7 +5,7 @@
 [[ -z "$AROPTS" ]] && export AROPTS="cru"
 
 export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g' 2>/dev/null)"
-export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g' 2>/dev/null)"
+export CLANGVER="$($CC --version 2>/dev/null | egrep -i 'llvm|clang' | head -1 | sed 's/^.* //g' 2>/dev/null)"
 
 export GCCCOLORIZED=""
 [[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
@@ -17,8 +17,32 @@ export HASHOPTS="-b --tag"
 
 export PREFIX="/Applications"
 export PREFIXLIB="/Library"
-export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-unknown-warning-option"
-export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-unknown-warning-option -Wno-c++11-extensions"
+
+MAJOR_MAC_VERSION=$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')
+
+#macos 10.8 w/XCode 4.6.4 does not support many modern options such as
+# cc1: error: unrecognized command line option "-Wno-unknown-warning-option"
+# cc1: error: unrecognized command line option "-Wno-format-truncation"
+# cc1: error: unrecognized command line option "-Wno-duplicate-decl-specifier"
+# cc1: error: unrecognized command line option "-Wno-incompatible-pointer-types"
+# cc1plus: error: unrecognized command line option -Wno-c++11-extensions 
+# cc1plus: error: unrecognized command line option -Wno-deprecated-copy see: 
+
+
+if [[ "$MAJOR_MAC_VERSION" < "10.9" ]]; then
+  export NOWARNFORMATTRUNC=""
+  export NOUNKNOWNWARNING=""
+  export NODUPEDECL=""
+  export NOINCOMPATIBLEPTR=""
+  export NOCPP11EXT=""
+  export NODEPRECATEDCPY=""
+else
+  export NOUNKNOWNWARNING="-Wno-unknown-warning-option"
+fi
+
+export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -std=c99"
+export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer $NOUNKNOWNWARNING $NOCPP11EXT"
+
 export SYSLIBS=""
 # Since we don't want to require the end user have wxWidgets as a dylib preinstalled
 # as well as other stuff like libdc42, generator, etc. build a statically linked app
@@ -35,7 +59,6 @@ fi
 
 export AROPTS="cru"
 
-MAJOR_MAC_VERSION=$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')
 
 # Default 64 bit for MacOS 10.13+ as per Apple's deprecation efforts.
 # command line can override this of course.

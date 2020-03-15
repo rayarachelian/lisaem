@@ -1,0 +1,8 @@
+# set this here for all compilers, and then turn it off for those that don't
+
+export NOWARNFORMATTRUNC="-Wno-format-truncation"
+export NOUNKNOWNWARNING=""
+export NODUPEDECL="-Wno-duplicate-decl-specifier"
+export NOINCOMPATIBLEPTR="-Wno-incompatible-pointer-types"
+export NOCPP11EXT="-Wno-c++11-extensions"
+export NODEPRECATEDCPY="-Wno-deprecated-copy"

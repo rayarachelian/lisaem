@@ -256,7 +256,7 @@ echo Building libdc42...
 echo
 
 # :TODO: silence warnings via rewriting code that emits them
-CFLAGS="$CFLAGS   -Wno-empty-body  -Wno-duplicate-decl-specifier -Wno-incompatible-pointer-types \
+CFLAGS="$CFLAGS   -Wno-empty-body  $NODUPEDECL $NOINCOMPATIBLEPTR \
                   -Wno-implicit-function-declaration -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration  \
                   -Wno-unused-parameter  -Wno-unused"
 

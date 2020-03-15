@@ -8,6 +8,14 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.03.14 - more bashbuild fixes
+           - power off hidpi reset to 1.0 bug fix
+
+2020.03.12 - bashbuild fixes
+
+2020.03.09 - work on blu-to-dc42, doesn't quite work with widgets yet
+           - more macos x cleanup
+
 2020.03.03 - added estimates to build scripts so progress bars are better
            - more os x cleanup
 

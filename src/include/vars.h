@@ -720,10 +720,6 @@ ACGLOBAL(uint8,highest_bit_val_inv[],
 // runtime, and at every event as the timers are checked for overflow.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef int64
-  #define int64 int64_t
-  #define USE64BITTIMER 1
-#endif
 #define USE64BITTIMER 1
 
 
@@ -769,7 +765,7 @@ GLOBAL(int,romless,0);
 GLOBAL(int,sound_effects_on,1);
 GLOBAL(int,profile_power,127);
 
-GLOBAL(float,hidpi_scale,1.0); // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
+DECLARE(float,hidpi_scale); // time to support HiDPI displays and "Retina" displays, yeay!  Party like it's 2012!
 DECLARE(float,mouse_scale);
 DECLARE(int,hide_host_mouse);
 DECLARE(int,skins_on);

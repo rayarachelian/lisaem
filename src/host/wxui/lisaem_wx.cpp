@@ -808,7 +808,7 @@ public:
     long lastcrtrefresh;
     long hostrefresh;
     long screen_paint_update;
-    long onidle_calls=0;
+    long onidle_calls;
     XTIMER cycles_wanted;
 
     wxString skindir;
@@ -2395,7 +2395,7 @@ SCALE_MENU(300);
 
 void LisaEmFrame::OnZoomIn( wxCommandEvent &event)
 {
-    ALERT_LOG(0,"zoom in from: hidpi_scale:%d",(int)(hidpi_scale * 100));
+    ALERT_LOG(0,"Zoom in from: hidpi_scale:%d",(int)(hidpi_scale * 100));
     switch((int)(hidpi_scale * 100))
     {
         case  25:  OnScale50(event);  break;
@@ -2708,11 +2708,12 @@ bool LisaEmApp::OnInit()
     wxString defaultconfig=stdp.GetUserConfigDir();
     wxString osslash  = wxFileName::GetPathSeparator(wxPATH_NATIVE);
 
+    hidpi_scale=0.5; // prevent divide by zero issues
 
-// can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
-#if defined(__WXMSW__)    && defined(DEBUG) 
-  buglog=fopen("lisaem-output.txt","a+");
-#endif
+    // can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
+    #if defined(__WXMSW__)    && defined(DEBUG) 
+      buglog=fopen("lisaem-output.txt","a+");
+    #endif
 
     // this crashes on macOSX>10.9 (maybe earlier too, crashes on the call, before it even returns)
     //wxString defaultconfig = stdp.wxGetHomeDir();
@@ -3302,7 +3303,8 @@ case -1 :
                          lisakey==KEYCODE_OPTION  ||
                          lisakey==KEYCODE_SHIFT     ) )
                          {
-                               for (i=0; i<rawidx && rawcodes[i]!=lisakey; i++);    //find modifier to delete.
+                               for (i=0; ( i<rawidx && rawcodes[i]!=lisakey ) ; i++) ;    //find modifier to delete.
+
                                if (i<rawidx-1) memmove(&rawcodes[i],&rawcodes[i+1],(128-i)*sizeof(int));
 
                                rawidx--;
@@ -3438,14 +3440,13 @@ void LisaWin::OnChar(wxKeyEvent& event)
 
     if (event.CmdDown()) {
       if (keycode==WXK_ADD || keycode==WXK_NUMPAD_ADD || 
-          keycode==0x2b || keycode==0x3d )                       {my_lisaframe->OnZoomIn(foo);    return;}
+          keycode==0x2b || keycode==0x3d )                       {ALERT_LOG(0,"CTRL+"); my_lisaframe->OnZoomIn(foo);    return;}
       if (keycode==WXK_SUBTRACT || keycode==WXK_NUMPAD_SUBTRACT ||
-          keycode==0x2d)                                         {my_lisaframe->OnZoomOut(foo);   return;}
+          keycode==0x2d)                                         {ALERT_LOG(0,"CTRL-");my_lisaframe->OnZoomOut(foo);   return;}
       if (keycode=='.')                                          {my_lisaframe->OnPause(foo);     return;}
       if (keycode=='n' || keycode=='n'-'a'+1)                    {my_lisaframe->OnNewFLOPPY(foo); return;}
       if (keycode=='o' || keycode=='o'-'a'+1)                    {my_lisaframe->OnFLOPPY(foo);    return;}
     }
-
 
     if (
         keycode==WXK_SHIFT ||                    // avoid inserting extra ascii 1,2,4 on shift,alt,control down.
@@ -5220,19 +5221,17 @@ void handle_powerbutton(void)
         my_lisawin->dirtyscreen=1;
         save_global_prefs();
 
-      ALERT_LOG(0,"======== BEFORE UPDATE MENUS ==");
-      ALERT_LOG(0,"powerstate: %d",my_lisawin->powerstate);
-      ALERT_LOG(0,"running   : %d",my_lisaframe->running);
-      ALERT_LOG(0,"===============================");
-
+        ALERT_LOG(0,"======== BEFORE UPDATE MENUS ==");
+        ALERT_LOG(0,"powerstate: %d",my_lisawin->powerstate);
+        ALERT_LOG(0,"running   : %d",my_lisaframe->running);
+        ALERT_LOG(0,"===============================");
 
         my_lisaframe->UpdateProfileMenu();
 
-      ALERT_LOG(0,"======== EXIT ================");
-      ALERT_LOG(0,"powerstate: %d",my_lisawin->powerstate);
-      ALERT_LOG(0,"running   : %d",my_lisaframe->running);
-      ALERT_LOG(0,"===============================");
-
+        ALERT_LOG(0,"======== EXIT ================");
+        ALERT_LOG(0,"powerstate: %d",my_lisawin->powerstate);
+        ALERT_LOG(0,"running   : %d",my_lisaframe->running);
+        ALERT_LOG(0,"===============================");
 }
 
 
@@ -6654,12 +6653,14 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     effective_lisa_vid_size_y=500;
     wxInitAllImageHandlers();
 
+    
     barrier=0;
     clx=0;
     lastt2 = 0;
     lastclk = 0;
     lastcrtrefresh=0;
     hostrefresh=1000/ 8;
+    onidle_calls=0;
 
     int x,y;
     y=myConfig->Read(_T("/lisaframe/sizey"),(long)0);
@@ -8703,6 +8704,8 @@ char *get_welcome_fortune(void)
   "I am who I have always been",
   "Compile! Compile now!",
   "JMP.L! JMP.L now!",
+  "It's a small price to pay for immortality",
+  "There is no greater power in the universe than the need for emulation. Against that power, governments and tyrants and armies cannot stand. Apple learned this lesson once. We will teach it to them again. Though it take a thousand years...we will emulate.",
   "It was beige. A shade of beige so deep your eye just kinda slides off it. And it didn't flicker when you looked at it. A case big as two Macs and twice as ugly. And when powered, it's like you hear a scream in your mind.",
   "It was the Dawn of the Third Age of Computing, 13 years after the Lisa was introduced... The Lisa Emulator Project was a dream given form.",
   "have you ever wondered what would happen if you opened an emulator while inside an emulator?",
@@ -8722,7 +8725,10 @@ char *get_welcome_fortune(void)
   "I look upon the crumbling Lisas and despair",
   "When you do things right, people won’t be sure you’ve done anything at all.",
   "We have such sights to show you...",
-  "Tearing the Mask Off LOS to See the Face of LisaEm"
+  "Tearing the Mask Off LOS to See the Face of LisaEm",
+  "Mac's grasp chokes the past, present and future. Hope is lost, gotta get back, back to the past, Lisa Office System",
+  "Yes, we'll build a brighter future with the emulators of tomorrow",
+  "On a long enough timeline, the probability of the emulation rate for any computer reaches 1"
 };
 
   int count=sizeof(fubar)/sizeof(fubar[0]);

@@ -14,6 +14,11 @@ This is the source code for LisaEm 1.2.7. LisaEm is a emulator that runs on a wi
 This document contains a few brief updates that are also found in the ChangeLog file, as well as some information on how to compile wxWidgets and LisaEm.
 (The updates will go away once the bugs are removed as ChangeLog is better suited for them.)
 
+## 2020.03.14
+
+Bug fixes to blu-to-dc42 but still not working right
+Bug fixes to build scripts
+
 ## 2020.03.03
 
 Numerous bug fixes, mostly to macos x code

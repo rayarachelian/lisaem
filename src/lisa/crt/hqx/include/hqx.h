@@ -44,19 +44,19 @@
     #define HQX_API
 //#endif
 
-#ifndef uint32
-
-    #define uint8   uint8_t
-    #define uint16  uint16_t
-    #define uint32  uint32_t
-    #define uint64  uint64_t
-
-    #define int8    int8_t
-    #define int16   int16_t
-    #define int32   int32_t
-    #define int64   int64_t
-
-#endif
+// #ifndef uint32
+// 
+//     #define uint8   uint8_t
+//     #define uint16  uint16_t
+//     #define uint32  uint32_t
+//     #define uint64  uint64_t
+// 
+//     #define int8    int8_t
+//     #define int16   int16_t
+//     #define int32   int32_t
+//     #define int64   int64_t
+// 
+// #endif
 
 
 HQX_API void HQX_CALLCONV hqxInit(void);

@@ -239,7 +239,7 @@ echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
 
 # :TODO: un-silence warnings for demos and fix code
 
-CFLAGS="$CFLAGS   -Wno-empty-body  -Wno-duplicate-decl-specifier  -Wno-incompatible-pointer-types  -Wno-implicit-function-declaration \
+CFLAGS="$CFLAGS   -Wno-empty-body  $NODUPEDECL $NOINCOMPATIBLEPTR -Wno-implicit-function-declaration \
                   -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration \
                   -Wno-unused-parameter  -Wno-unused "
 

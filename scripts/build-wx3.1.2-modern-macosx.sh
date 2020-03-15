@@ -2,7 +2,7 @@
 
 OSVER="macOS-$( sw_vers -productVersion | cut -f1,2 -d'.' )"
 MIN="$OSVER"
-for VER in 3.1.2; do
+for VER in 3.0.4; do
 #for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3; do
 
 if [[ ! -d wxWidgets-${VER} ]]; then
@@ -13,10 +13,12 @@ if [[ ! -d wxWidgets-${VER} ]]; then
 fi
 
 # use clang here
-export CC=gcc CXX=gcc
+#export CC=gcc 
+#export CXX=gcc
 
-CC --version
-sleep 2
+#$CC --version
+
+#sleep 2
 
 pushd wxWidgets-${VER}
 TYPE=cocoa-x64-${OSVER}-cpp
@@ -25,9 +27,11 @@ rm -rf build-${TYPE}
 mkdir  build-${TYPE}
 cd     build-${TYPE}
 
+
+#export CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++"
 # thanks to https://forums.wxwidgets.org/viewtopic.php?t=43760
 # --with-macosx-version-min=${MIN}
-../configure --enable-unicode --with-cocoa CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
+../configure --enable-unicode --with-cocoa  LIBS=-lc++ \
              --disable-richtext  --disable-debug --disable-shared --without-expat  \
              --with-libtiff=builtin --with-libpng=builtin --with-libjpeg=builtin --with-libxpm=builtin --with-zlib=builtin \
              --with-sdl \
@@ -42,7 +46,8 @@ rm -rf build-${TYPE}
 mkdir  build-${TYPE}
 cd     build-${TYPE}
 
-../configure --enable-monolithic --enable-unicode --with-cocoa CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
+#export CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++"
+../configure --enable-monolithic --enable-unicode --with-cocoa  LIBS=-lc++ \
              --disable-richtext  --disable-debug --disable-shared --without-expat  \
              --with-libtiff=builtin --with-libpng=builtin --with-libjpeg=builtin --with-libxpm=builtin --with-zlib=builtin \
              --with-sdl \

@@ -285,7 +285,7 @@ DEPS=0
 [[ "$DEPS" -eq 0 ]] && if needed ../include/generator.h  ../obj/cpu68k-f.o; then  DEPS=1;fi
 
 
-export CFLAGS="$ARCH $CFLAGS -Wno-format-truncation"
+export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
 
 if [[ "$DEPS" -gt 0 ]] ######################################################################
 then

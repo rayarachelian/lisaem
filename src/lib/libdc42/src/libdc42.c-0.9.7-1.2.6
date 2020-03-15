@@ -297,11 +297,14 @@ uint32 dc42_get_datachecksum(DC42ImageType *F)
 
   if (!F->mmappedio) {
                        if ( F->fd>2)  {
+			                int i;
                                         lseek(F->fd,72,SEEK_SET);
-                                         read(F->fd,&F->RAM[72],(79-72) );
+                                        i=read(F->fd,&F->RAM[72],(79-72) );
                                       }
-                       if ( F->fh  )  { fseek(F->fh,72,SEEK_SET);
-                                             fread(&F->RAM[72],(79-72),1,F->fh);
+                       if ( F->fh  )  {
+			                int i;
+			                fseek(F->fh,72,SEEK_SET);
+                                        i=fread(&F->RAM[72],(79-72),1,F->fh);
                                       }
                      }
 
@@ -319,11 +322,14 @@ uint32 dc42_get_tagchecksum(DC42ImageType *F)
 
   if (!F->mmappedio) {
                        if ( F->fd>2)  {
+			                int i;
                                         lseek(F->fd,72,SEEK_SET);
-                                         read(F->fd,&F->RAM[72],(79-72) );
+                                        i=read(F->fd,&F->RAM[72],(79-72) );
                                       }
-                       if ( F->fh  )  { fseek(F->fh,72,SEEK_SET);
-                                             fread(&F->RAM[72],(79-72),1,F->fh);
+                       if ( F->fh  )  {
+			                int i;
+				        fseek(F->fh,72,SEEK_SET);
+                                        i=fread(&F->RAM[72],(79-72),1,F->fh);
                                       }
                      }
 
@@ -359,14 +365,16 @@ int dc42_recalc_checksums(DC42ImageType *F)
 
   if (!F->mmappedio) {
                        if ( F->fd>2)  {
+                                        int i;
                                         lseek(F->fd,72,SEEK_SET);
-                                        write(F->fd,&F->RAM[72],(79-72) );
+                                        i=write(F->fd,&F->RAM[72],(79-72) );
                                       }
-                       if ( F->fh  )  { fseek(F->fh,72,SEEK_SET);
-                                             fwrite(&F->RAM[72],(79-72),1,F->fh);
+                       if ( F->fh  )  {
+                                        int i;
+                                        fseek(F->fh,72,SEEK_SET);
+                                        i=fwrite(&F->RAM[72],(79-72),1,F->fh);
                                       }
                      }
-
   return 0;
 }
 
@@ -412,16 +420,16 @@ int dc42_sync_to_disk(DC42ImageType *F)                                    // re
   #endif
 
   if (F->mmappedio==2 && F->readonly==0)
-                       {
+                       { int i;
 
                         if (F->fd>2)
                            {  lseek(F->fd,F->dc42seekstart,SEEK_SET);   // locate the dc42 image inside the FD
-                              write(F->fd,F->RAM,F->size);              // save the whole file
+                              i=write(F->fd,F->RAM,F->size);              // save the whole file
                            }
 
                         if (F->fh)
                            {  fseek(F->fh,F->dc42seekstart,SEEK_SET);   // locate the dc42 image inside the FD
-                              fwrite(     F->RAM,F->size,1,F->fh);      // save the whole file
+                              i=fwrite(     F->RAM,F->size,1,F->fh);      // save the whole file
                            }
 
                        }                                                // should do this with a dirty map instead as this is too slow.
@@ -505,11 +513,11 @@ uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber)
    if (sectornumber   > F->numblocks ) { DC42_RET_CODE(F,999,"invalid sector #",return NULL);}
 
    if (F->mmappedio==0)
-      {
+      {  int i;
          if (F->fd>2)
             {
              lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
-              read(F->fd,&F->RAM[F->datasize],F->tagsize);         // put tags at the end of the buffer so we can overlap reads of tags
+             i= read(F->fd,&F->RAM[F->datasize],F->tagsize);         // put tags at the end of the buffer so we can overlap reads of tags
 
               //fprintf(stderr,"fd-read tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
 
@@ -517,7 +525,7 @@ uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber)
          if (F->fh)
             {
              fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
-             fread(      &F->RAM[F->datasize],F->tagsize,1,F->fh); // put tags at the end of the buffer so we can overlap reads of tags
+             i=fread(      &F->RAM[F->datasize],F->tagsize,1,F->fh); // put tags at the end of the buffer so we can overlap reads of tags
 
               //fprintf(stderr,"fh-read tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
 
@@ -546,11 +554,11 @@ uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber)
 
 
    if (!F->mmappedio)
-      {
+      { int i;
         if (F->fd>2)
          {
           lseek(F->fd,GET_DATA_POS(sectornumber),SEEK_SET);
-           read(F->fd,F->RAM,F->sectorsize);
+          i= read(F->fd,F->RAM,F->sectorsize);
 
            //fprintf(stderr,"fd-read data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
 
@@ -559,7 +567,7 @@ uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber)
         if (F->fh)
          {
           fseek(F->fh,GET_DATA_POS(sectornumber),SEEK_SET);
-          fread(      F->RAM,F->sectorsize,1,F->fh);
+          i=fread(      F->RAM,F->sectorsize,1,F->fh);
 
           //fprintf(stderr,"fh-read data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
          }
@@ -585,19 +593,19 @@ int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data)
    if (sectornumber   > F->numblocks ) { DC42_RET_CODE(F,999,"invalid sector #",return 999);}
 
    if (!F->mmappedio)
-      {
+      {  int i;
          //{fprintf(stderr,"libdc42.c::wrote DIRECT! to block#%ld, returning:%ld\n",sectornumber, F->retval); fflush(stderr);}
          if (F->fd)
          {
             lseek(F->fd,GET_DATA_POS(sectornumber),SEEK_SET);
-            write(F->fd,data,F->sectorsize);
+            i=write(F->fd,data,F->sectorsize);
 
             //fprintf(stderr,"fd-write data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
          }
          if (F->fh)
          {
             fseek(F->fh,GET_DATA_POS(sectornumber),SEEK_SET);
-            fwrite(    data,F->sectorsize,1,F->fh);
+            i=fwrite(    data,F->sectorsize,1,F->fh);
             //fprintf(stderr,"fh-write data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
          }
 
@@ -629,16 +637,16 @@ int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata
   if (!F->mmappedio)
      {
          if (F->fd>2)
-            {
+            {int i;
              lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
-             write(F->fd,tagdata,F->tagsize);
+             i=write(F->fd,tagdata,F->tagsize);
              //fprintf(stderr,"fd-write tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
             }
 
          if (F->fh)
-            {
+            {int i;
              fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
-             fwrite(     tagdata,F->tagsize,1,F->fh);
+             i=fwrite(     tagdata,F->tagsize,1,F->fh);
              //fprintf(stderr,"fh-write tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
             }
 
@@ -764,10 +772,10 @@ int dc42_is_valid_image(char *filename)
 	    uint16 extras=0;
 
 		 if (is_macbin) 
-		    {
+		    {int i;
 			  uint8 buf[2];
 			  lseek(F->fd,120,SEEK_SET);
-			  read(F->fd,buf,2);
+			  i=read(F->fd,buf,2);
 			  //  Length of a secondary header. If this is non-zero, skip this many bytes (rounded up to the next multiple of 128). 
 			  extras=(buf[0]<<8) | (buf[1]);
 			  if (extras & 127) extras=(extras|127)+1;
@@ -810,13 +818,13 @@ int dc42_is_valid_image(char *filename)
 
     if (F->fd>2)
        {
-
-        read(F->fd,tempbuf,2048);  // read 1st 2k of image
+        int i;
+        i=read(F->fd,tempbuf,2048);  // read 1st 2k of image
         close(F->fd);  F->fd=0;
        }
     if (F->fh)
-       {
-        fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
+       {int i;
+        i=fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
         fclose(F->fh); F->fh=NULL;
        }
 
@@ -895,14 +903,14 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
     if (filesizetotal>(1024*1024*64)) DC42_RET_CODE(F,88,"File too large to be a valid disk image",return F->retval);
 
     if (F->fd>2)
-       {
-        read(F->fd,tempbuf,2048);  // read 1st 2k of image
-        close(F->fd);  F->fd=0;
+       { int i;
+         i=read(F->fd,tempbuf,2048);  // read 1st 2k of image
+         close(F->fd);  F->fd=0;
        }
     if (F->fh)
-       {
-        fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
-        fclose(F->fh); F->fh=NULL;
+       { int i;
+         i=fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
+         fclose(F->fh); F->fh=NULL;
        }
 
     // make sure that this is a DC42 image
@@ -1057,16 +1065,16 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
                            F->RAM=malloc(F->size);
                            if (F->RAM)
-                              {
+                              {  int i;
                                  if (F->fd>2)
                                  {
                                    lseek(F->fd,F->dc42seekstart,SEEK_SET);
-                                   read(F->fd,F->RAM,F->size);
+                                   i=read(F->fd,F->RAM,F->size);
                                  }
                                  if (F->fh)
                                  {
                                    fseek(F->fh,F->dc42seekstart,SEEK_SET);
-                                   fread(     F->RAM,F->size,1,F->fh);
+                                   i=fread(     F->RAM,F->size,1,F->fh);
                                  }
                               }
 
@@ -1092,7 +1100,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
 int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options)
 {
-
+    int i;
     int32 filesizetotal=0;
     uint8 tempbuf[2048];
     F->dc42seekstart=0;
@@ -1111,8 +1119,8 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
     F->dc42seekstart= (seekstart!=0) ? seekstart :   lseek(F->fd, 0, 0);
 
 
-    if (F->fd>2)        read(F->fd,tempbuf,2048);  // read 1st 2k of image
-    if (F->fh)         fread(      tempbuf,2048,1,F->fh);  // read 1st 2k of image
+    if (F->fd>2)       i= read(F->fd,tempbuf,2048);  // read 1st 2k of image
+    if (F->fh)         i=fread(      tempbuf,2048,1,F->fh);  // read 1st 2k of image
 
 
     // make sure that this is a DC42 image
@@ -1297,16 +1305,16 @@ int dc42_set_volname(DC42ImageType *F,char *name)
   for (i=0; i<slen; i++) F->RAM[1+i]=newname[i];
 
   if (!F->mmappedio)
-     {
+     { int i;
        if (F->fd)
        {
-        lseek(F->fd,F->dc42seekstart,SEEK_SET);
-        write(F->fd,F->RAM,64);
+        lseek(  F->fd,F->dc42seekstart,SEEK_SET);
+        i=write(F->fd,F->RAM,64);
        }
        if (F->fh)
        {
-        fseek(F->fh,F->dc42seekstart,SEEK_SET);
-        fwrite(     F->RAM,64,1,F->fh);
+        fseek(  F->fh,F->dc42seekstart,SEEK_SET);
+        i=fwrite(     F->RAM,64,1,F->fh);
        }
      }
 
@@ -1326,13 +1334,13 @@ char *dc42_get_volname(DC42ImageType *F)
      {
        if (F->fd>2)
        {
-         lseek(F->fd,F->dc42seekstart,SEEK_SET);
-          read(F->fd,F->RAM,64);
+          lseek( F->fd,F->dc42seekstart,SEEK_SET);
+          i=read(F->fd,F->RAM,64);
        }
        if (F->fh  )
        {
-         fseek(F->fh,F->dc42seekstart,SEEK_SET);
-         fread(      F->RAM,64,1,F->fh);
+          fseek(  F->fh,F->dc42seekstart,SEEK_SET);
+          i=fread(      F->RAM,64,1,F->fh);
        }
 
      }
@@ -1607,23 +1615,20 @@ int dart_to_dc42(char *dartfilename, char *dc42filename)
    if (feof(dart)) return -99; //DC42_RET_CODE(F,-99,"Unexpected EOF while reading DART file",return F->retval);
 
    memset(dart_block_out,0x00,DART_CHUNK);  // empty the block
-
-
-
    if (dart_blocksizes[i]<0 || dart_compression_type==2)
-      {
+      {     int ignore;
             // read the uncompressed block directly to the out buffer
             //printf("Blocksize <0:(%d %04x) so reading %d bytes direct\n",dart_blocksizes[i],dart_blocksizes[i],DART_CHUNK);
-            fread(dart_block_out,DART_CHUNK,1,dart);
+            ignore=fread(dart_block_out,DART_CHUNK,1,dart);
             //printf("Uncompressed block:%d sec:%d\n",i,sectornum);
       }
    else
       {     // read the compressed block and decompress it to the out buffer
-
+            int ignore;
             memset(dart_block_in,0x33,DART_CHUNK);
 
-            if (dart_compression_type==0)    fread(dart_block_in,dart_blocksizes[i]*2,1,dart);
-            else                             fread(dart_block_in,dart_blocksizes[i]  ,1,dart);
+            if (dart_compression_type==0)    ignore=fread(dart_block_in,dart_blocksizes[i]*2,1,dart);
+            else                             ignore=fread(dart_block_in,dart_blocksizes[i]  ,1,dart);
 
             //printf("expanding blocks (#%d-%d) of type %d(0=RLE,2=uncompressed) size:%d \n",
             //        sectornum,
@@ -1667,11 +1672,12 @@ int dart_to_dc42(char *dartfilename, char *dc42filename)
 // 1 if it is, 0 if it's not
 int dc42_is_valid_macbinii(char *infilename, char *creatortype)
 {
+int ignore;
 FILE *infile;
 unsigned char buffer[128];
 char *filename=infilename;
 infile=fopen(filename,"rb"); if (!infile) return 0;
-fread(buffer,128,1,infile);
+ignore=fread(buffer,128,1,infile);
 fclose(infile);
 
 if (!buffer[0] && buffer[1] && buffer[1]<64 && !buffer[74] && !buffer[82])
@@ -1712,12 +1718,12 @@ return 0;
 // -3 if unable to create new file - filename clobbered
 int dc42_extract_macbinii(char *infilename)
 {
+int i;
 FILE *infile;
 char buffer[65536];
 char *filename=infilename;
 infile=fopen(filename,"rb");                       if (!infile) return 0;
-fread(buffer,128,1,infile);
-
+i=fread(buffer,128,1,infile);
 
 if (!buffer[0] && buffer[1] && buffer[1]<64 && !buffer[74] && !buffer[82])
 {
@@ -1749,8 +1755,9 @@ if (!buffer[0] && buffer[1] && buffer[1]<64 && !buffer[74] && !buffer[82])
 
    while(datasz>=0)
    {
-     fread( buffer,datasz>=65536 ? 65536:datasize,1,infile);
-     fwrite(buffer,datasz>=65536 ? 65536:datasize,1,datafork);
+     int i;
+     i=fread( buffer,datasz>=65536 ? 65536:datasize,1,infile);
+     i=fwrite(buffer,datasz>=65536 ? 65536:datasize,1,datafork);
      datasz-=65536;
    }
    fclose(infile);

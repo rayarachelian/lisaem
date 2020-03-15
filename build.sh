@@ -35,7 +35,7 @@ fi
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
     STABILITY="BETA"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.02.29"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2020.03.14"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -64,6 +64,8 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
+#VERSION="1.2.7-BETA_2019.03.14"
+#VERSION="1.2.7-BETA_2019.03.09"
 #VERSION="1.2.7-BETA_2019.03.03"
 #VERSION="1.2.7-BETA_2019.02.29"
 #VERSION="1.2.7-BETA_2019.02.25"
@@ -111,10 +113,10 @@ function CLEAN() {
             subbuild src/lib/libGenerator --no-banner clean
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
-            rm -rf bin/LisaEm.app ./bin/lisaem # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
+            rm -rf bin/LisaEm.app bin/lisaem # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
             rm -f /tmp/slot.*.sh*
             rm -f ./pkg/build/*; echo "Built packages go here"    >pkg/build/README
-            cd "${TLD}/bin"; ln -s ../bashbuild/interim-build.sh build.sh
+            cd "${TLD}/bin"; ln -sf ../bashbuild/interim-build.sh build.sh
             if [[ -n "`which ccache 2>/dev/null`" ]]; then echo -n "* "; ccache -c; fi
 }
 
@@ -508,9 +510,9 @@ ENDLAST
 
 [[ "$needclean" -gt 0 ]] && CLEAN
 
-export CFLAGS="$ARCH $CFLAGS -Wno-format-truncation"
-export CPPFLAGS="$ARCH $CPPFLAGS -Wno-deprecated-copy -Wno-format-truncation"
-export CXXFLAGS="$ARCH $CXXFLAGS -Wno-deprecated-copy -Wno-format-truncation" 
+export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
+export CPPFLAGS="$ARCH $CPPFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
+export CXXFLAGS="$ARCH $CXXFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING" 
 #2020.01.14 - ^ GCC 9.2.1 throws these on wxWidgets includes, which I'm not going to fix.
 
 
@@ -671,6 +673,13 @@ echo '---------------------------------------------------------------' >> $BUILD
 cd "${TLD}"
 
 [[ -n "$DARWIN" ]] && LISANAME="LisaEm" || LISANAME="lisaem${EXT}"
+
+
+(
+  echo "LIST: $LIST"
+  echo "LIST1: $LIST1"
+  echo "WXLIST: $WXLIST"
+) >/tmp/slot.lists.txt
 
 export COMPILEPHASE="linking"
 export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1

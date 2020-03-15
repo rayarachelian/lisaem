@@ -65,13 +65,13 @@ static uint16 const double_video_bits[]={
 #define trV   0x00000006
 
 /* RGB to YUV lookup table */
-//extern uint32_t RGBtoYUV[16777216];  //RA20180410 no longer used
+//extern uint32 RGBtoYUV[16777216];  //RA20180410 no longer used
 
 
 // 0xXXRRGGBB in, 0xYYUUVV out
 // should always return brightness back in all 4. 
 // #define MASK_RGB   0x00FFFFFF
-static inline uint32_t rgb_to_yuv(uint32_t c)
+static inline uint32 rgb_to_yuv(uint32  c)
 {
     // Mask against MASK_RGB to discard the alpha channel
     //return RGBtoYUV[MASK_RGB & c];
@@ -79,19 +79,19 @@ static inline uint32_t rgb_to_yuv(uint32_t c)
 }
 
 /* Test if there is difference in color */
-static inline int yuv_diff(uint32_t yuv1, uint32_t yuv2) {
+static inline int yuv_diff(uint32  yuv1, uint32 yuv2) {
     return (( labs((long) ((yuv1 & Ymask) - (yuv2 & Ymask)) ) > trY ) );/* ||  // RA20180410 - Lisa is B&W so no color testing needed.
             ( labs((long) ((yuv1 & Umask) - (yuv2 & Umask)) ) > trU ) ||
             ( labs((long) ((yuv1 & Vmask) - (yuv2 & Vmask)) ) > trV ) ); */
 }
 
-static inline int Diff(uint32_t c1, uint32_t c2)
+static inline int Diff(uint32 c1, uint32 c2)
 {
     return yuv_diff(rgb_to_yuv(c1), rgb_to_yuv(c2));
 }
 
 /* Interpolate functions */
-static inline uint32_t Interpolate_2(uint32_t c1, int w1, uint32_t c2, int w2, int s)
+static inline uint32 Interpolate_2(uint32 c1, int w1, uint32 c2, int w2, int s)
 {
     if (c1 == c2) {
         return c1;
@@ -102,7 +102,7 @@ static inline uint32_t Interpolate_2(uint32_t c1, int w1, uint32_t c2, int w2, i
         ((((c1 & MASK_13) * w1 + (c2 & MASK_13) * w2) >> s) & MASK_13);
 }
 
-static inline uint32_t Interpolate_3(uint32_t c1, int w1, uint32_t c2, int w2, uint32_t c3, int w3, int s)
+static inline uint32 Interpolate_3(uint32 c1, int w1, uint32 c2, int w2, uint32 c3, int w3, int s)
 {
     return
         (((((c1 & MASK_ALPHA) >> 24) * w1 + ((c2 & MASK_ALPHA) >> 24) * w2 + ((c3 & MASK_ALPHA) >> 24) * w3) << (24-s)) & MASK_ALPHA) +
@@ -110,61 +110,61 @@ static inline uint32_t Interpolate_3(uint32_t c1, int w1, uint32_t c2, int w2, u
         ((((c1 & MASK_13) * w1 + (c2 & MASK_13) * w2 + (c3 & MASK_13) * w3) >> s) & MASK_13);
 }
 
-static inline uint32_t Interp1(uint32_t c1, uint32_t c2)
+static inline uint32 Interp1(uint32 c1, uint32 c2)
 {
     //(c1*3+c2) >> 2;
     return Interpolate_2(c1, 3, c2, 1, 2);
 }
 
-static inline uint32_t Interp2(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp2(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*2+c2+c3) >> 2;
     return Interpolate_3(c1, 2, c2, 1, c3, 1, 2);
 }
 
-static inline uint32_t Interp3(uint32_t c1, uint32_t c2)
+static inline uint32 Interp3(uint32 c1, uint32 c2)
 {
     //(c1*7+c2)/8;
     return Interpolate_2(c1, 7, c2, 1, 3);
 }
 
-static inline uint32_t Interp4(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp4(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*2+(c2+c3)*7)/16;
     return Interpolate_3(c1, 2, c2, 7, c3, 7, 4);
 }
 
-static inline uint32_t Interp5(uint32_t c1, uint32_t c2)
+static inline uint32 Interp5(uint32 c1, uint32 c2)
 {
     //(c1+c2) >> 1;
     return Interpolate_2(c1, 1, c2, 1, 1);
 }
 
-static inline uint32_t Interp6(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp6(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*5+c2*2+c3)/8;
     return Interpolate_3(c1, 5, c2, 2, c3, 1, 3);
 }
 
-static inline uint32_t Interp7(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp7(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*6+c2+c3)/8;
     return Interpolate_3(c1, 6, c2, 1, c3, 1, 3);
 }
 
-static inline uint32_t Interp8(uint32_t c1, uint32_t c2)
+static inline uint32 Interp8(uint32 c1, uint32 c2)
 {
     //(c1*5+c2*3)/8;
     return Interpolate_2(c1, 5, c2, 3, 3);
 }
 
-static inline uint32_t Interp9(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp9(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*2+(c2+c3)*3)/8;
     return Interpolate_3(c1, 2, c2, 3, c3, 3, 3);
 }
 
-static inline uint32_t Interp10(uint32_t c1, uint32_t c2, uint32_t c3)
+static inline uint32 Interp10(uint32 c1, uint32 c2, uint32 c3)
 {
     //(c1*14+c2+c3)/16;
     return Interpolate_3(c1, 14, c2, 1, c3, 1, 4);
