@@ -1,0 +1,34 @@
+--- /tmp/strvararg.h	2020-04-06 09:47:26.000000000 -0400
++++ /usr/local/wx3.1.2-cocoa-x86-macOS-10.9-clang-sdl/include/wx-3.1/wx/strvararg.h	2020-04-06 09:47:59.000000000 -0400
+@@ -18,6 +18,31 @@
+ #include "wx/buffer.h"
+ #include "wx/unichar.h"
+ 
++
++//----------------- patch to fix error from stackoverflow ---------------------
++// from: https://stackoverflow.com/questions/13219007/xcode-4-5-tr1-type-traits-file-not-found
++// to fix:
++// In file included from /usr/local/wx3.1.2-cocoa-i386-macOS-10.9-cpp/include/wx-3.1/wx/string.h:37:
++///usr/local/wx3.1.2-cocoa-i386-macOS-10.9-cpp/include/wx-3.1/wx/strvararg.h:27:18: fatal error: 'tr1/type_traits' file not found
++//        #include <tr1/type_traits>
++//                 ^
++//
++
++#include <ciso646>  // detect std::lib
++#ifdef _LIBCPP_VERSION
++// using libc++
++#ifndef HAVE_TYPE_TRAITS
++#define HAVE_TYPE_TRAITS 1
++#endif
++#else
++// using libstdc++
++#ifndef HAVE_TR1_TYPE_TRAITS
++#define HAVE_TR1_TYPE_TRAITS 1
++#endif
++#endif
++//-----------------------------------------------------------------------------
++
++
+ #if defined(HAVE_TYPE_TRAITS)
+     #include <type_traits>
+ #elif defined(HAVE_TR1_TYPE_TRAITS)

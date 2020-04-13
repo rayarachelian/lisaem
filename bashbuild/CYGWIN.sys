@@ -100,7 +100,7 @@ if [[ "$mode" == "shared" ]]
 then
 
              echo "  Creating  $libname.dll" 1>&2
-             gcc -shared -o      ${dllname} ${objs}                  || exit 1
+             gcc -shared -o      ${dllname} ${objs}  $ARCH                || exit 1
              /bin/rm -f          ${ldllname}
              ln -sf ${dllname}   ${ldllname}                                    ;;
              #see: http://www.cygwin.com/cygwin-ug-net/dll.html

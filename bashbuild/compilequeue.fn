@@ -42,25 +42,27 @@ function qjob {
      exit 9
   fi
 
+  NAME="$1"
+
   # if we only have one CPU, execute immediately, no need to waste effort queueing
   getcpus
-  if [[ $NUMCPUS -eq 1 ]]
-  then
-    [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
-    export PERCENTJOB="$(( $PERCENTJOB +1 ))"
-
-    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD qjob: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
-    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD qjob: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
-    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD qjob: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
-    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD qjob: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
-    update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
-
-    if [[ "${1:0:2}" == "!!" ]]; then echo "${1:2}" 1>&2; else echo -n  "$1" 1>&2; fi
-    shift
-    $@ 1>&2
-    if [[ $? -ne 0 ]]; then exit $?; fi
-    return;
-  else
+#  if [[ $NUMCPUS -eq 1 ]]
+#  then
+#    [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
+#    export PERCENTJOB="$(( $PERCENTJOB +1 ))"
+#
+#    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD qjob: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
+#    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD qjob: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
+#    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD qjob: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
+#    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD qjob: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
+#    update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
+#
+#    if [[ "${1:0:2}" == "!!" ]]; then echo -n "${1:2}" 1>&2; else echo "$1" 1>&2; fi
+#    shift
+#    $@ 1>&2
+#    if [[ $? -ne 0 ]]; then exit $?; fi
+#    return;
+#  else
 
     # make sure we have at least one free slot (and process any completed ones before adding more)
     waitq
@@ -87,17 +89,12 @@ function qjob {
      # if $1 starts with !! then append a newline after it, otherwise, don't.
      NAME="$1"
 
-     if [[ "${NAME:0:2}" == "!!" ]]; then
-        echo "echo    \"${NAME:2}\" >>/tmp/${SLOTNAME}.out"    # output $1 to the out file with newline
-     else
-        echo "echo -n \"$NAME\"     >>/tmp/${SLOTNAME}.out"    # output $1 to the out file.
-     fi
-
      shift                                                     # remove $1 from the list of parameters
 
      echo "$@"                >>/tmp/${SLOTNAME}.out           # save compile command
      echo "in: $( /bin/pwd )" >>/tmp/${SLOTNAME}.out
      echo ""                  >>/tmp/${SLOTNAME}.out
+     echo "echo   \"${NAME}\" >>/tmp/${SLOTNAME}.out"          # output Name to the out file with newline
 
      echo "( $@ 2>&1 ) 2>&1   >>/tmp/${SLOTNAME}.out"          # execute $2 with params $3..$N and append to out file
 
@@ -119,8 +116,8 @@ function qjob {
     chmod 755 ./${SLOTNAME}                                    # make it executable by our user
     touch  /tmp/${SLOTNAME}.out                                # avoid race conditions where qjob is done, but output file
                                                                # has been created, but we fall through waitqall
-    ./${SLOTNAME} 1>&2 &                                       # launch it in the background.
-  fi
+    (./${SLOTNAME}) 1>&2 &                                     # launch it in the background.
+#  fi
 }
 
 
@@ -136,6 +133,7 @@ function qjob {
 waitqc=0
 function waitq()
 {
+  local l=""
   getcpus
   twirl='/-\\|' # twirly cursor
   if [[ $NUMCPUS -eq 1 ]]; then return; fi
@@ -166,23 +164,28 @@ function waitq()
   if [[  `ls -l ${OUT}.*.sh.done 2>/dev/null | wc -l` -gt 0 ]]; then
      for z in  ${OUT}.*.sh.done; do
 
-        # skip over the compile command and current directory, then output only 5 lines at most to highlight some warnings
-        # or errors if there are some, but preserve missing newline at the end (for !! jobs) this will output the job name
+        # skip over the compile command and current dir lines then output only 5 lines at most to highlight some warnings
+        # or errors if there are some, but output a newline at the end (for !! jobs) this will output the job name
         # if there are no errors
 
-        (
+        cat "$z" | (
            local count=0; 
-           while IFS= read -r line; do
+           echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
+           while IFS= read -r l; do
                  count=$(( count + 1))
-                 [[ $count -gt 3 ]] && [[ $count -lt 9 ]] && printf "%s\n" "$line"  1>&2
-                 [[ $count -eq 9 ]] &&                    printf "%s"      "$line"  1>&2
-           done < "$z"
-           [[ "$count" -gt 8 ]] && echo "..." 1>&2 
+                 if [[ $count -gt 3 ]] && [[ $count -lt 9 ]]; then 
+                    [[ "${l:0:2}" != '!!' ]] && printf "%s" "${l}" || printf "%s\n" "${l:2}"
+                 else
+                    [[ $count -eq 9       ]] && printf "%s" "$l"
+                 fi
+                 echo "$l" >>${BUILDWARNINGS}
+           done
+           [[ "$count" -gt 8 ]] && echo "..."
         ) 1>&2
 
         # save warnings from the slot output file to build warnings
-        echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
-        cat "$z" >>${BUILDWARNINGS}
+        #echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
+        cp "$z" "$z.final"
         rm -f "$z"
 
         # update progress bar

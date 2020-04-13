@@ -6,9 +6,11 @@
 
 #include "machine.h"
 
-#define LISA_CONFIG_DEFAULTSERIAL "ff028308104050ff0010163504700000"
-                                 //012345678901234567890123 5678901
-                                 //          11111111112222 222
+// v- switched to magic serial number
+#define LISA_CONFIG_DEFAULTSERIAL "ff000000000000ff0000000000000000"
+//                                "ff028308104050ff0010163504700000" - original S/N for LisaEm from one of my original two Lisas
+//                                 012345678901234567890123 5678901
+//                                           11111111112222 222
 
 #define ROMVER        (0x18)     // ROM Version
 

@@ -28,7 +28,7 @@ t_sr reg68k_sr;
 #endif
 #endif
 
-#define LISA_REBOOTED(x)   { ALERT_LOG(0,"rebooting? reg68k_pc:%08x,pc24:%08x %16lx",reg68k_pc,pc24,cpu68k_clocks); return x;}
+#define LISA_REBOOTED(x)   { ALERT_LOG(0,"rebooting? reg68k_pc:%08lx,pc24:%08lx %16lx",(long)reg68k_pc,(long)pc24,(long)cpu68k_clocks); return x;}
 #define LISA_POWEREDOFF(x) { save_pram(); profile_unmount(); lisa_powered_off();  return x;}
 
 //static const int insetjmpland=1; //RA20190601
@@ -597,7 +597,7 @@ unsigned int reg68k_external_step(void)
         regs.pc = reg68k_pc; regs.sr = reg68k_sr;
     }
     cpu68k_clocks += ipc.clks;
-    DEBUG_LOG(0,"cpu68k_clocks:%016lx this opcode:%d",cpu68k_clocks,ipc.clks);
+    DEBUG_LOG(0,"this opcode:%d clks",ipc.clks);
     return clks;                  /* number of clocks done */
 }
 

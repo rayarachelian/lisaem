@@ -823,7 +823,7 @@ void free_all_ipcts(void)
           free(ipct_mallocs[i]); ipct_mallocs[i]=NULL; sum+=sipct_mallocs[i]; sipct_mallocs[i]=0;
         }
   DEBUG_LOG(20,"--------------------------------------------------------------------------------------------")
-  DEBUG_LOG(20,"Freed all IPCTs: %d mallocs were done, max is %ld segments: %ld, %uld count, %uld bytes",iipct_mallocs,sum,(sum*sizeof(t_ipc_table)));
+  DEBUG_LOG(20,"Freed all IPCTs: %ld mallocs were done, %ld count, %ld bytes",(long)iipct_mallocs,(long)sum,(long)(sum*sizeof(t_ipc_table)));
 
   iipct_mallocs=0;
   ipcts_allocated=0;
@@ -910,7 +910,7 @@ t_ipc_table *get_ipct(uint32 address)
             //check_ipct_counts(__FUNCTION__,__LINE__);
             EXITR(86,NULL,"Out of memory while allocating more ipct's");
         }
-        DEBUG_LOG(20,"ipct[%d]=%p count:%ld",iipct_mallocs,ipct_mallocs[iipct_mallocs],size_to_get);
+        DEBUG_LOG(20,"ipct[%d]=%p count:%lld",iipct_mallocs,ipct_mallocs[iipct_mallocs],size_to_get);
 
 
         // Zap the new IPC's and link them to the free linked list ---  since we're fresh out
@@ -1232,7 +1232,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
 
         //check_ipct_counts(__FUNCTION__,__LINE__);
     }
-    DEBUG_LOG(20,"out of ix-- loop, ix=%ld ipc is now %p at pc %06lx max %06lx **** corrected ipc's: %ld instructions **** \n\n",ix,
+    DEBUG_LOG(20,"out of ix-- loop, ix=%ld ipc is now %p at pc %06lx max %06lx **** corrected ipc's: %ld instructions **** \n\n",(long)ix,
               ipc,(long)pc,(long)xpc,(long)instrs);
 
     #ifdef DEBUG

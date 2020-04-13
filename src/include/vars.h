@@ -1300,8 +1300,8 @@ GLOBAL(XTIMER,cops_mouse,(COPS_IRQ_TIMER_FACTOR*4));
 #define SET_COPS_NEXT_EVENT(x) { cops_event=(cops_mouse ? (cpu68k_clocks+cops_mouse):-1);                             \
                                  if (copsqueuelen>0 && ((cops_event>(cpu68k_clocks+KBCOPSCYCLES)) || cops_event<0))   \
                                         cops_event=cpu68k_clocks+KBCOPSCYCLES;                                        \
-                                 DEBUG_LOG(0,"SET_COPS_NEXT:copsqueuelen:%d cops_mouse:%ld cops_event:%016llx cpu68k_clk:%016llx \n", \
-                                             copsqueuelen,cops_mouse, cops_event, cpu68k_clocks);                     \
+                                 DEBUG_LOG(0,"SET_COPS_NEXT:copsqueuelen:%d cops_mouse:%ld cops_event:%016llx    \n", \
+                                             copsqueuelen,cops_mouse, cops_event);                                    \
                                 }
 
 
@@ -1465,7 +1465,7 @@ DECLARE(char,_msg_alert2[1024]);
                           lisa_clock.hours_h,lisa_clock.hours_l,                                                     \
                           lisa_clock.mins_h,lisa_clock.mins_l,                                                       \
                           lisa_clock.secs_h,lisa_clock.secs_l,                                                       \
-                          lisa_clock.tenths, cpu68k_clocks);                                                         \
+                          lisa_clock.tenths, (long)cpu68k_clocks);                                                   \
             fflush(buglog);                                                                                          \
             fflush(stdout);                                                                                          \
          }                                                                                                           \
@@ -1479,7 +1479,7 @@ DECLARE(char,_msg_alert2[1024]);
                         lisa_clock.hours_h,lisa_clock.hours_l,                                                       \
                         lisa_clock.mins_h,lisa_clock.mins_l,                                                         \
                         lisa_clock.secs_h,lisa_clock.secs_l,                                                         \
-                        lisa_clock.tenths, cpu68k_clocks);                                                           \
+                        lisa_clock.tenths, (long)cpu68k_clocks);                                                     \
           fflush(buglog);                                                                                            \
           fflush(stdout);                                                                                            \
         }                                                                                                            \
@@ -1561,7 +1561,7 @@ extern void on_lisa_exit(void);
                           lisa_clock.hours_h,lisa_clock.hours_l,                                 \
                           lisa_clock.mins_h,lisa_clock.mins_l,                                   \
                           lisa_clock.secs_h,lisa_clock.secs_l,                                   \
-                          lisa_clock.tenths, cpu68k_clocks);                                     \
+                          lisa_clock.tenths, (long)cpu68k_clocks);                               \
     }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #else

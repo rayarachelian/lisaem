@@ -111,11 +111,11 @@ BEGIN_EVENT_TABLE(LisaConfigFrame, wxFrame)
 END_EVENT_TABLE()
 
 const int idth[4]={0, ID_PICK_PROFILES1H,  ID_PICK_PROFILES2H,  ID_PICK_PROFILES3H};
-const int idtl[4]={0, ID_PICK_PROFILES1L,  ID_PICK_PROFILES2L,  ID_PICK_PROFILES3L};
+const int idtl[4]={0, ID_PICK_PROFILES1L,  ID_PICK_PROFILES2L,  ID_PICK_PROFILES3L}; // why is this not used? bug?
 const int idbh[4]={0, ID_PICK_PROFILESB1H, ID_PICK_PROFILESB2H, ID_PICK_PROFILESB3H};
 const int idbl[4]={0, ID_PICK_PROFILESB1L, ID_PICK_PROFILESB2L, ID_PICK_PROFILESB3L};
-
-
+// idth - upper text field idbh - button upper
+// using wxID_ANY for lower for some reason(why?), idbl - button lower line ~493
 
 LisaConfigFrame::LisaConfigFrame(const wxString& title, LisaConfig *lisaconfig)
        : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(550*HIDPISCALE,650*HIDPISCALE), 
@@ -473,7 +473,6 @@ wxPanel *LisaConfigFrame::CreateSlotConfigPage(wxNotebook *parent, int slot)
     else if (cu.IsSameAs(_T("ADMP"),false))             pportboxh[slot]->SetSelection(1);
     else                                                pportboxh[slot]->SetSelection(2);
 
-
     m_text_propathh[slot] = new wxTextCtrl(panel, idth[slot], u, wxPoint( 10,  y), wxSize( 400 * HIDPISCALE, 30 * HIDPISCALE), 0 );
     (void) new wxButton( panel, idbh[slot], wxT("browse"),  wxPoint( 420* HIDPISCALE,  y), wxDefaultSize);
 
@@ -490,9 +489,12 @@ wxPanel *LisaConfigFrame::CreateSlotConfigPage(wxNotebook *parent, int slot)
     if      (cl.IsSameAs(_T("PROFILE"),false))          pportboxl[slot]->SetSelection(0);
     else if (cl.IsSameAs(_T("ADMP"),false))             pportboxl[slot]->SetSelection(1);
     else                                                pportboxl[slot]->SetSelection(2);
-
-    m_text_propathl[slot] = new wxTextCtrl(panel, wxID_ANY, l, wxPoint( 10 * HIDPISCALE,  y), wxSize( 400 * HIDPISCALE, 30 * HIDPISCALE ), 0 );
+    // 20200320 bug?                         was  wxID_ANY v
+    m_text_propathl[slot] = new wxTextCtrl(panel, idtl[slot], l, wxPoint( 10 * HIDPISCALE,  y), wxSize( 400 * HIDPISCALE, 30 * HIDPISCALE ), 0 );
     (void) new wxButton( panel, idbl[slot], wxT("browse"),     wxPoint(420 * HIDPISCALE , y), wxDefaultSize);
+
+    // idth - upper text field idbh - button upper
+    // using wxID_ANY for lower for some reason(why?), idbl - button lower line ~493
 
 
     (void) new wxButton( panel, ID_APPLY, wxT("Apply"), wxPoint(420* HIDPISCALE,  400* HIDPISCALE), wxDefaultSize );

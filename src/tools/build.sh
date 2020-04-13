@@ -35,7 +35,7 @@ fi
 DESCRIPTION="dc42 tools for Apple Lisa"    # description of the package
         VER="0.9.6"                        # just the version number
   STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
+RELEASEDATE="2020.03.31"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
   AUTHEMAIL="ray@arachelian.com"           # email address for this software
     COMPANY="sunder.net"                   # company (vendor for sun pkg)
@@ -82,6 +82,8 @@ CHECKFILES libdc42-gpl-license.txt $(for i in $SRCLIST; do echo src/$i.c; done)
 
 # Parse command line options if any, overriding defaults.
 
+[[ -n "$MACOSX_MAJOR_VER" ]] && mkdir -pm 755 "${XTLD}/bin/$MACOSX_MAJOR_VER/"
+
 for i in $@; do
 
  case "$i" in
@@ -89,7 +91,7 @@ for i in $@; do
   estimate) cd ${XTLD}/src
             count=0;
             for s in $SRCLIST; do
-               needed ${s}.c ../bin/${s}${EXT} && count=$(( $count + 1 ))
+               needed ${s}.c "../bin/$MACOSX_MAJOR_VER/${s}${EXT}" && count=$(( $count + 1 ))
             done
             echo $count
             return 2>/dev/null >/dev/null #incase we're called directly 
@@ -99,8 +101,7 @@ for i in $@; do
             cd ${XTLD}/obj
             echo "* Removing fsh tools objs and bins"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types*
-            cd ../bin/
-            for b in $SRCLIST; do rm -f ${b}${EXT}; done
+            cd "${XTLD}/bin/${MACOSX_MAJOR_VER}/" && for b in $SRCLIST; do rm -f ${b}${EXT}; done
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
@@ -151,6 +152,7 @@ for i in $@; do
   -32|--32)
                                export SIXTYFOURBITS=""; 
                                export THIRTYTWOBITS="--32"; 
+                               [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                export ARCH="-m32"                        ;;
 
  --without-debug)              WITHDEBUG=""
@@ -159,6 +161,7 @@ for i in $@; do
  --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
                                WARNINGS="-Wall"                          ;;
 
+-D*)                           EXTRADEFINES="${EXTRADEFINES} ${i}";;
 
  --with-profile)               WITHDEBUG="$WITHDEBUG -p"                 ;;
 
@@ -227,7 +230,7 @@ MACHINE="`uname -mrsv`"
 
 if [[ "$needclean" -gt 0 ]]; then
    rm -f .last-opts last-opts
-   cd bin         && /bin/rm -f *
+   cd "bin/$MACOSX_MAJOR_VER"         && /bin/rm -f *
    cd ../obj      && /bin/rm -f *.a *.o
    cd ..
 fi
@@ -271,7 +274,7 @@ create_machine_h
 cd src
 
 export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
-LIST1=$(WAIT="yes" OBJDIR="../bin/" INEXT=c OUTEXT="${EXTTYPE}" VERB=Compiling COMPILELIST \
+LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=Compiled COMPILELIST \
 	$(for i in $SRCLIST; do echo $i; done) )
 
 if [[ -z "$XTLD" ]]; then
@@ -279,13 +282,13 @@ if [[ -z "$XTLD" ]]; then
    exit 99
 fi
 
-cd "${XTLD}/bin"
+cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
 strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd ${XTLD}/bin/
+      cd "${XTLD}/bin/x/$MACOSX_MAJOR_VER"
       [[ -n "$DARWIN" ]] && PREFIX=/usr/local/bin  # these shouldn't go into /Applications
       echo "Installing tools to $PREFIX/bin"
       mkdir -pm755 "$PREFIX/bin" 2>/dev/null

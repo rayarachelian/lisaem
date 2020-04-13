@@ -17,6 +17,17 @@ Some sample scripts as to how to build wxWidgets 3.x for LisaEm as well as
 3. A script to remove the lisaem preferences hidden inside ~/Library on macosx
    (this might fail under Mojave/Catalina due to gatecreeper)
 
+When building on macos x, it's possible to build wxWidgets and LisaEm using
+just the command line tools, but it doesn't always work properly and you can
+get all sorts of weird issues. It's best to make sure you install the right
+version of XCode for your OS as well as the matching command line tools package.
+Generally I go with the lowest major version that an OS will handle, and then
+the highest middle/minor version. This allows that OS to have the older SDK
+for the previous os. See: https://en.wikipedia.org/wiki/Xcode#Version_comparison_table
+for versions of XCode that map to what OS.
+
+For example for macos 10.9 I'd use XCode 5.1.1 which supports 10.9 and 10.8.
+
 NOTE: there are issues building LisaEm on older OS X using clang/llvm/Xcode.
 To fix this, you should install the GNU C Compiler Suite using homebrew from
 brew.sh using the command brew install gcc@7.

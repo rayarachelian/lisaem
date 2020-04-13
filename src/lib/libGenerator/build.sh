@@ -159,6 +159,7 @@ for j in $@; do
 
   -32|--32)                     export SIXTYFOURBITS=""; 
                                 export THIRTYTWOBITS="--32"; 
+                                [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                 export ARCH="-m32"                        ;;
 
   --no-debug)                   WITHDEBUG=""
@@ -173,6 +174,8 @@ for j in $@; do
 
   --debug-on-start)             WITHDEBUG="$WITHDEBUG -g -DDEBUGLOG_ON_START"
                                                                           ;;
+  -D*)                          EXTRADEFINES="${EXTRADEFINES} ${opt}";;
+
 
   --*mem)                       WITHDEBUG="$WITHDEBUG -g -DDEBUGMEMCALLS"
                                 WARNINGS="-Wall"                          ;;
@@ -285,28 +288,28 @@ DEPS=0
 [[ "$DEPS" -eq 0 ]] && if needed ../include/generator.h  ../obj/cpu68k-f.o; then  DEPS=1;fi
 
 
-export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
+export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES"
 
 if [[ "$DEPS" -gt 0 ]] ######################################################################
 then
-  export COMPILEPHASE="gen" VERB="compiling"
+  export COMPILEPHASE="gen"
   export PERCENTJOB=0 NUMJOBSINPHASE=24
   export OUTEXT=""
-  export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
-  LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiling COMPILELIST tab68k def68k )
+  export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $ARCH -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
+  LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiled COMPILELIST tab68k def68k )
 
   cd ../obj
 
-  $CC $CLICMD $ARC  -o def68k tab68k.o def68k.o
+  $CC $CLICMD $ARCH  -o def68k tab68k.o def68k.o
 
   cd ../cpu68k
   echo -n "  "
   ../obj/def68k || exit 1
 
-  echo "  Compiling gen68k.c..."
-  $CC $CLICMD $ARC $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
+  echo "  Compiled gen68k.c..."
+  $CC $CLICMD $ARCH $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
 
-  $CC $CLICMD $ARC $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o $LIB
+  $CC $CLICMD $ARCH $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o $LIB
   echo -n "  "
   ../obj/gen68k || exit 1
 
@@ -316,10 +319,10 @@ then
 
   export COMPILEPHASE="generating"
   export PERCENTJOB=2 NUMJOBSINPHASE=24
-  echo -n "  Compiling cpu68k-: "
+  echo -n "  Compiled  cpu68k-: "
   for src in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
       #echo -n "${src}. "
-      qjob    "${src}. " $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS  -c cpu68k-${src}.c -o ../obj/cpu68k-${src}.o
+      qjob    "${src}. " $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS $ARCH -c cpu68k-${src}.c -o ../obj/cpu68k-${src}.o
       COMPILED="yes"
   done
   waitqall
@@ -347,7 +350,7 @@ for src in cpu68k reg68k diss68k ui_log; do
     #only compile what we need, unlike ./cpu68k this is less sensitive
     if needed ${src}.c ../obj/${src}.o
     then
-      qjob "!!  Compiling ${src}.c..." $CC $WITHDEBUG $WITHTRACE $INC $CFLAGS -c ${src}.c -o ../obj/${src}.o|| exit 1
+      qjob "!!  Compiled ${src}.c..." $CC $WITHDEBUG $WITHTRACE $INC $ARCH $CFLAGS -c ${src}.c -o ../obj/${src}.o|| exit 1
       COMPILED="yes"
     fi
 done

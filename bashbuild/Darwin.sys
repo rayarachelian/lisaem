@@ -3,6 +3,8 @@
 [[ -z "$AR"     ]] && export AR="ar"
 [[ -z "$LD"     ]] && export LD="ld"
 [[ -z "$AROPTS" ]] && export AROPTS="cru"
+[[ -z "$GDB"    ]] && export GDB="$(which lldb)"
+[[ -z "$GDB"    ]] && export GDB="$(which gdb)"
 
 export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g' 2>/dev/null)"
 export CLANGVER="$($CC --version 2>/dev/null | egrep -i 'llvm|clang' | head -1 | sed 's/^.* //g' 2>/dev/null)"
@@ -12,13 +14,26 @@ export GCCCOLORIZED=""
 [[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
 
 export DARWIN="Darwin"
+export MACHINE="$( uname -m )"
+# ::TODO:: check 32 bit vs 64 bit for PowerMac G5
+
+export OSVER=$( sw_vers -productVersion        )
+export OSMAJOR=$( echo $OSVER | cut -d'.' -f1  )
+
+export MACOSX_MAJOR_VER=$( echo $OSVER | cut -d'.' -f1-2  )
+
+export OSMIDDLE=$( printf "%02d" $( echo $OSVER | cut -d'.' -f2 ))
+export BINARYEXTENSION="-${MACHINE}-${OSMAJOR}.$OSMIDDLE"
+export MACOSX_VERSION=$( printf "%02d.%02d.%02d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
+
+export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
+[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
+[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION=$( printf "%02d.%d.%d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
 
 export HASHOPTS="-b --tag"
 
 export PREFIX="/Applications"
 export PREFIXLIB="/Library"
-
-MAJOR_MAC_VERSION=$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')
 
 #macos 10.8 w/XCode 4.6.4 does not support many modern options such as
 # cc1: error: unrecognized command line option "-Wno-unknown-warning-option"
@@ -29,7 +44,7 @@ MAJOR_MAC_VERSION=$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')
 # cc1plus: error: unrecognized command line option -Wno-deprecated-copy see: 
 
 
-if [[ "$MAJOR_MAC_VERSION" < "10.9" ]]; then
+if [[ "$MACOSX_VERSION" < "10.09" ]]; then
   export NOWARNFORMATTRUNC=""
   export NOUNKNOWNWARNING=""
   export NODUPEDECL=""
@@ -39,6 +54,11 @@ if [[ "$MAJOR_MAC_VERSION" < "10.9" ]]; then
 else
   export NOUNKNOWNWARNING="-Wno-unknown-warning-option"
 fi
+
+# UPX is broken on 10.8 and 10.9.
+[[ "$MACOSX_VERSION" > "10.07" ]] && [[ "$MACOSX_VERSION" < "10.10" ]] && UPXCMD=""
+
+# see: https://stackoverflow.com/questions/13219007/xcode-4-5-tr1-type-traits-file-not-found  for 'tr1/type_traits' file not found errors.
 
 export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -std=c99"
 export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer $NOUNKNOWNWARNING $NOCPP11EXT"
@@ -59,17 +79,34 @@ fi
 
 export AROPTS="cru"
 
+# for some reason if we leave -lstdc++ on some versions, it fails to link and throws loads of errors, but adding .6 works
+# even though we see it in the links and it should work, it does not. why? At least on 10.12, I recall seeing this on 10.9
+#
+# -rwxr-xr-x  1 root  wheel   1.4M Jul 15  2017 /usr/lib/libstdc++.6.0.9.dylib*
+# lrwxr-xr-x  1 root  wheel    21B Nov  8  2017 /usr/lib/libstdc++.6.dylib@ -> libstdc++.6.0.9.dylib
+# lrwxr-xr-x  1 root  wheel    17B Nov  8  2017 /usr/lib/libstdc++.dylib@ -> libstdc++.6.dylib
+#
+
+# if you get "Undefined symbols for architecture x86_64" while linking - Mavericks or another OS, you may need to change this case block to match your Xcode, etc.
+
+
+case "$MACOSX_VERSION" in
+  #10.08.*) CXXFLAGS="$CXXFLAGS -stdlib=libc++"; export SYSLIBS="-lstdc++.6" ;;
+  10.09.*)  CXXFLAGS="$CXXFLAGS -stdlib=libc++"; export SYSLIBS="-lstdc++.6" ;;
+  10.10.*)  CXXFLAGS="$CXXFLAGS -stdlib=libc++"; export SYSLIBS="-lstdc++.6" ;;
+  10.11.*)  CXXFLAGS="$CXXFLAGS -stdlib=libc++"; export SYSLIBS="-lstdc++.6" ;;
+esac
 
 # Default 64 bit for MacOS 10.13+ as per Apple's deprecation efforts.
 # command line can override this of course.
-if [[ "$MAJOR_MAC_VERSION" > "10.12" ]]; then
+if [[ "$MACOSX_VERSION" > "10.12" ]]; then
    export SIXTYFOURBITS="--64" 
    export THIRTYTWOBITS=""
    export ARCH="-m64"
 fi
 
-export CFLAGS="${CFLAGS} -mmacosx-version-min=${MAJOR_MAC_VERSION}"
-export CXXFLAGS="${CXXFLAGS} -mmacosx-version-min=${MAJOR_MAC_VERSION}"
+export CFLAGS="${CFLAGS} -mmacosx-version-min=${MIN_MACOSX_VERSION}"
+export CXXFLAGS="${CXXFLAGS} -mmacosx-version-min=${MIN_MACOSX_VERSION}"
 
 export CLICMD=""
 export GUIAPP=""
@@ -154,8 +191,8 @@ then
              echo "  Creating  $libname.dylib" 1>&2
              ##nope!##libtool -dynamic -o ${dylibname} $L64 ${objs}           || exit 1
              $CC $ARCH -dynamiclib -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup  \
-                 -install_name /usr/local/lib/${dylibname}                               \
-                 -compatibility_version ${ver} -current_version ${ver}                   \
+                 -install_name /usr/local/lib/${dylibname}                                     \
+                 -compatibility_version ${ver} -current_version ${ver}                         \
                  -o ${dylibname} ${objs}                                      || exit 1
 
              /bin/rm -f          ${ldylibname}

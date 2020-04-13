@@ -227,7 +227,7 @@ tags:       00 00 00 21 bb bb 82 00 ff ff . ff 6c 00 01 ff ff ff ff ff ff
           exit(1);
       }
 
-      i=dc42_write_sector_data(&profile,b5, &block);
+      i=dc42_write_sector_data(&profile,b5, (uint8 *) (&block));
       if (i) {fprintf(stderr,"\n\nError writing block data %d to dc42 ProFile:%s because %s\n",b,dc42filename,profile.errormsg); dc42_close_image(&profile); exit(1); }
 
                //          xxxx tags: 00   01   02   03   04   05   06   07   08   09   0a   0b   0c   0d   0e   0f   10   11   12   13   

@@ -118,7 +118,7 @@ fi
 
 if [[ "$mode" == "shared" ]]; then
              echo "  Creating  $libname.so" 1>&2
-             gcc -shared -Wl,-soname,${soname} -o ${dsoname} ${objs} || exit 1
+             gcc -shared $ARCH -Wl,-soname,${soname} -o ${dsoname} ${objs} || exit 1
              /bin/rm -f          ${ldsoname}
              ln -sf ${dsoname}   ${ldsoname}
              ln -sf ${dsoname}   ${ldsoname}

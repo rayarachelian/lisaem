@@ -1,6 +1,6 @@
 ![LisaEm Logo](resources/lisaem-banner.png)
 
-### Copyright © 2020 by Ray Arachelian, All Rights Reserved. 
+### Copyright © 2020 by Ray Arachelian, All Rights Reserved.
 ### Released under the terms of the GNU Public License v3.
 
 ------------------------------------------------------------------------------
@@ -13,6 +13,18 @@ This is the source code for LisaEm 1.2.7. LisaEm is a emulator that runs on a wi
 
 This document contains a few brief updates that are also found in the ChangeLog file, as well as some information on how to compile wxWidgets and LisaEm.
 (The updates will go away once the bugs are removed as ChangeLog is better suited for them.)
+
+## 2020.03.31
+
+Display works better on macos x, though it breaks up a bit by one pixel. But have to use wxDoubleBufferedPaintDC instead of wxPaintDC. Strangely enough wxAutoBufferedPaintDC does not work. Unfortunately this makes the display very slow. Grrrrrr.
+
+Reapplying fixes for AA/AAG flashing menu bar on updates that were somehow lost.
+
+Added -D define passthrough option for build script
+
+Fixed debugging warnings/errors on macos x 10.12, added fix for -lstdc++.6 vs -lstdc++
+
+Added a macos binary launcher - instead of making a fat universal binary using lipo, a script replaces the lisaem binary which then detects the OS and CPU architecture, and tries to locate the newest compatible binary for the current machine. This way we can have x86_64 bit binaries for macos 10.7, 10.10, 10.12, etc. and the most suited one for the current os will be launched.
 
 ## 2020.03.14
 

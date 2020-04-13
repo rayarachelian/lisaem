@@ -108,7 +108,7 @@ then
              ld -G -z text -o    ${dsoname} ${objs}   || exit 1
              /bin/rm -f          ${ldsoname}
              ln -sf ${dsoname}   ${ldsoname} 
-echo -n "" >/dev/null
+             echo -n "" >/dev/null
 }
 
 export CLICMD=""

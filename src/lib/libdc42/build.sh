@@ -126,6 +126,7 @@ do
 
  skipinstall)  INSTALL="" ;;    # skip install (used to disable $INSTALL passed from TLD builds)
 
+-D*)        EXTRADEFINES="${EXTRADEFINES} ${i}";;
 
  uninstall)
            if [[ -n "$DARWIN" ]]; then
@@ -163,6 +164,7 @@ do
   -32|--32)
                                export SIXTYFOURBITS=""; 
                                export THIRTYTWOBITS="--32"; 
+                               [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                export ARCH="-m32"                        ;;
 
 
@@ -258,13 +260,13 @@ echo
 # :TODO: silence warnings via rewriting code that emits them
 CFLAGS="$CFLAGS   -Wno-empty-body  $NODUPEDECL $NOINCOMPATIBLEPTR \
                   -Wno-implicit-function-declaration -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration  \
-                  -Wno-unused-parameter  -Wno-unused"
+                  -Wno-unused-parameter  -Wno-unused $EXTRADEFINES"
 
 # moved to use qjob so can properly capture warning output
 cd src
 COMPILED=""
 if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
-   qjob "!!  Compiling libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
+   qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
    makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi

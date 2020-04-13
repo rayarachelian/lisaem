@@ -30,6 +30,7 @@ go-*
 *.bak
 *.exe
 *.dll
+*.dSYM
 *.o
 *.a
 *.dyld

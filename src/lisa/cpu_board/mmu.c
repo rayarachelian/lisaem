@@ -89,7 +89,7 @@ int is_valid_slr(uint16 q)
 #ifdef DEBUG
 char *printslr(char *x, long size, uint16 slr);
 void check_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, int pagestart, int pageend, char *from);
-void checkcontext(uint8 c, char *text) {;}  // disabled
+void checkcontext(uint8 c, char *text) { UNUSED(c); UNUSED(text);}  // disabled
 
 void xxxcheckcontext(uint8 c, char *text)
 {

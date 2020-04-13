@@ -396,8 +396,8 @@ Later it does this per horizontal pixel
     extern uint8 *lisaram;                 // pointer to Lisa RAM
     extern uint32 videolatchaddress;
 
-    int max_height=mybitmap->GetHeight();
-    int max_width =mybitmap->GetWidth();
+    //unused//int max_height=mybitmap->GetHeight();
+    //unused//int max_width =mybitmap->GetWidth();
 
     sp=&lisaram[videolatchaddress];
     up=&lisaram[videolatchaddress];
@@ -411,10 +411,6 @@ Later it does this per horizontal pixel
 
     for (y=0; y<Yres/3; y++)
     {
-        register int xl=x-1; // one pixel left of  x
-        register int xr=x+1; // one pixel right of x
-
-
         // -----------------------------------------------------------------------------------------------------
         // to do don't update sp on every cursor right scan
         // maybe remove yy, not sure.

@@ -680,7 +680,6 @@ void ImageWriter::iw_lf(void)
 
 void ImageWriter::iw_set_vline_pos(uint16 line)
 {
-    line=line;
     linepixel=iw_get_ypix(line);
 }
 

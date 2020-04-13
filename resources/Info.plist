@@ -13,7 +13,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>LisaEm</string>
+	<string>lisaem.sh</string>
 	<key>CFBundleIconFile</key>
 	<string>LisaEm.icns</string>
 	<key>CFBundleName</key>

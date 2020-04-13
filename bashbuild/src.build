@@ -104,6 +104,8 @@ if ! is_bashbuild_loaded 2>/dev/null; then
    # [[ "${OS:0:6}" == "CYGWIN" ]] && OS="CYGWIN"
 
    export OS
+   # put this here to disable UPX later in Darwin.sys
+   [[ -z "$UPXCMD"  ]] && export  UPXCMD="$( which upx       2>/dev/null )"
 
    # load system specific settings/scripts and all the functions needed
    fn=""
@@ -136,7 +138,6 @@ if ! is_bashbuild_loaded 2>/dev/null; then
    #------------------------------------------------------------
    
    [[ -z "$STRIP"   ]] && export   STRIP="$( which strip     2>/dev/null )"
-   [[ -z "$UPXCMD"  ]] && export  UPXCMD="$( which upx       2>/dev/null )"
    [[ -z "$GDB"     ]] && export     GDB="$( which gdb       2>/dev/null )"
    [[ -z "$GDB"     ]] && export     GDB="$( which lldb      2>/dev/null )"
    [[ -z "$AR"      ]] && export      AR="$( which ar        2>/dev/null )"

@@ -50,9 +50,9 @@ local deps=""
 local list=""
 local s
 
-if [[ -z "$INEXT" ]];           then echo "$(/bin/pwd) $0 $@ missing INEXT variable" 1>&2; exit 1; fi
-if [[ -z "$OBJDIR" ]];          then echo "$(/bin/pwd) $0 $@ missing OBJDIR variable" 1>&2; exit 1; fi
-if [[ -z "$VERB" ]];            then echo "$(/bin/pwd) $0 $@ missing VERB variable" 1>&2; exit 1; fi
+if [[ -z "$INEXT" ]];           then echo "$(/bin/pwd) $0 $@ missing INEXT variable"          1>&2; exit 1; fi
+if [[ -z "$OBJDIR" ]];          then echo "$(/bin/pwd) $0 $@ missing OBJDIR variable"         1>&2; exit 1; fi
+if [[ -z "$VERB" ]];            then echo "$(/bin/pwd) $0 $@ missing VERB variable"           1>&2; exit 1; fi
 if [[ -z "$COMPILECOMMAND" ]];  then echo "$(/bin/pwd) $0 $@ missing COMPILECOMMAND variable" 1>&2; exit 1; fi
 
 for i in $@; do
@@ -68,7 +68,7 @@ for i in $@; do
 
   [[ -n "$OUTEXT" ]] && out="${o}.${OUTEXT}" || ou="${o}"
   # needs to become ../obj for linking
-  LIST="$LIST ${out}"
+  list="$list ${out}"
 
   # have any of the dependencies changed, or is force on?
   deps="${FORCE}"
@@ -102,8 +102,8 @@ done
 [[ "$WAIT" ]] && waitqall
 
 # output the object list collected for the linker
-echo "$LIST"
-
+echo "$list"
+#echo "$list" >/tmp/slot.compilequeu.list
 }
 
 # similar to COMPILELIST only it just returns how many jobs there are - useful for calculating progressbar limits

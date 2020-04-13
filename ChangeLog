@@ -8,6 +8,33 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.04.01 - Infrastructure work: setting up macos VMs and retooling the
+2020.04.11   build-wx3.1.2-modern-macosx.sh build script to be more flexible,
+             compiling LisaEm for various macos versions.
+
+2020.03.31 - display works better on macos x, though it breaks up a bit by one
+             pixel. But have to use wxDoubleBufferedPaintDC instead of 
+             wxPaintDC. Strangely enough wxAutoBufferedPaintDC does not work.
+             Unfortunately this makes the display very slow. Grrrrrr.
+
+2020.03.30 - more macos x debugging
+
+2020.03.29 - fixes for AA/AAG flashing menu bar on updates again
+
+2020.03.28 - added -D define passthrough option for build script
+
+2020.03.27 - fixing debugging warnings/errors on macos x 10.12,
+             adding fix for -lstdc++.6 vs -lstdc++
+
+2020.03.25 - more bashbuild fixes, updates, enhancements
+           - automating scripts for macos dmg
+           - adding a macos binary launcher - instead of making a fat universal
+             binary using lipo, a script replaces the lisaem binary which then
+             detects the OS and CPU architecture, and tries to locate the 
+             newest compatible binary for the current machine. This way we can
+             have x86_64 bit binaries for macos 10.7, 10.10, 10.12, etc. and
+             the most suited one for the current os will be launched.
+
 2020.03.14 - more bashbuild fixes
            - power off hidpi reset to 1.0 bug fix
 

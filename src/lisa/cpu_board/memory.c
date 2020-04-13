@@ -1161,12 +1161,12 @@ uint8  lisa_rb_2x_parallel_h(uint32 addr)
 
 
 uint16 lisa_rw_2x_parallel_h(uint32 addr)
-{   return (uint16)(lisa_rw_2x_parallel_h(addr)<<8) + (uint16)(lisa_rw_2x_parallel_h(addr+1)); }
+{   return (uint16)(lisa_rb_2x_parallel_h(addr)<<8) + (uint16)(lisa_rb_2x_parallel_h(addr+1)); }
 
 
 uint32 lisa_rl_2x_parallel_h(uint32 addr)
-{   return (uint32)(  (uint32)(lisa_rw_2x_parallel_h(addr+0)<<24) + (uint32)(lisa_rw_2x_parallel_h(addr+1)<<16) +
-                      (uint32)(lisa_rw_2x_parallel_h(addr+2)<<8 ) + (uint32)(lisa_rw_2x_parallel_h(addr+3)    )    );
+{   return (uint32)(  (uint32)(lisa_rb_2x_parallel_h(addr+0)<<24) + (uint32)(lisa_rb_2x_parallel_h(addr+1)<<16) +
+                      (uint32)(lisa_rb_2x_parallel_h(addr+2)<<8 ) + (uint32)(lisa_rb_2x_parallel_h(addr+3)    )    );
 }
 
 
@@ -2623,9 +2623,9 @@ void   lisa_wl_ram(uint32 addr, uint32 data)
 
 // These are unnecessary as they're never called - only here for completion.
 uint8  *lisa_mptr_vidram(uint32 addr)  {return lisa_mptr_ram(addr);}
-uint8  lisa_rb_vidram(uint32 addr)     {return lisa_rb_vidram(addr);}
-uint16 lisa_rw_vidram(uint32 addr)     {return lisa_rw_vidram(addr);}
-uint32 lisa_rl_vidram(uint32 addr)     {return lisa_rl_vidram(addr);}
+uint8  lisa_rb_vidram(uint32 addr)     {return lisa_rb_ram(addr);}
+uint16 lisa_rw_vidram(uint32 addr)     {return lisa_rw_ram(addr);}
+uint32 lisa_rl_vidram(uint32 addr)     {return lisa_rl_ram(addr);}
 
 
 void   lisa_wb_vidram(uint32 addr, uint8 data)

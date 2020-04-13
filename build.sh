@@ -35,7 +35,7 @@ fi
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
     STABILITY="BETA"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.03.14"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2020.03.31"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -64,6 +64,7 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
+#VERSION="1.2.7-BETA_2019.03.24"
 #VERSION="1.2.7-BETA_2019.03.14"
 #VERSION="1.2.7-BETA_2019.03.09"
 #VERSION="1.2.7-BETA_2019.03.03"
@@ -86,8 +87,6 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #VERSION="1.0.0-RC2_2007.06.27"
 #--------------------------------------------------------------------------------------------------------
 
-
-
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 LIBGENOPTS=""            # passthrough to libGenerator
 #STATIC=--static
@@ -109,11 +108,11 @@ function CLEAN() {
             # note we expect to be inside src at this point, and we'll make our way out as needed.
             echo "* Cleaning..." 1>&2
             cd "${TLD}"
-            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k 
+            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
             subbuild src/lib/libGenerator --no-banner clean
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
-            rm -rf bin/LisaEm.app bin/lisaem # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
+            rm -rf bin/LisaEm.app bin/lisaem bin/*.dSYM # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
             rm -f /tmp/slot.*.sh*
             rm -f ./pkg/build/*; echo "Built packages go here"    >pkg/build/README
             cd "${TLD}/bin"; ln -sf ../bashbuild/interim-build.sh build.sh
@@ -250,6 +249,7 @@ for j in $@; do
 
   -32|--32)                     export SIXTYFOURBITS=""; 
                                 export THIRTYTWOBITS="--32"; 
+                                [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                 export ARCH="-m32"                        ;;
 
 
@@ -260,7 +260,7 @@ for j in $@; do
             LIBGENOPTS=""                                     ;;
 
  --valgrind)
-            GDB="$(which valgrind)"
+            export GDB="$(which valgrind)"
             if [[ -z "$GDB" ]]; then
                echo "Could not find valgrind" 1>&2
                exit 5
@@ -275,8 +275,10 @@ for j in $@; do
             #WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
             LIBGENOPTS="$LIBGENOPTS --with-debug"             ;;
 
+-D*)        EXTRADEFINES="${EXTRADEFINES} ${opt}";;
+
  --drmemory)
-            GDB="$(which drmemory)"
+            export GDB="$(which drmemory)"
             if [[ -z "$(which drmemory)" ]]; then
                echo "Could not find drmemory" 1>&2
                exit 5
@@ -293,8 +295,8 @@ for j in $@; do
             LIBGENOPTS="$LIBGENOPTS --with-debug"             ;;
 
  --debug|debuggery|bugger*)
-            WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG"
-            WITHDEBUG="$WITHDEBUG -g -DDEBUG"
+            export WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG"
+            export WITHDEBUG="$WITHDEBUG -g -DDEBUG"
             WITHOUTSTRIP="nostrip"
             WITHOUTUPX="noupx"
             # disabled 1.3.0 core options
@@ -315,8 +317,8 @@ for j in $@; do
 
  --debug*-on-start)
             LIBGENOPTS="$LIBGENOPTS --with-debug-on-start"
-            WARNINGS="-Wall -Wextra -Wno-write-strings -g"
-            WITHDEBUG="$WITHDEBUG -DDEBUGLOG_ON_START -DDEBUG"
+            export WARNINGS="-Wall -Wextra -Wno-write-strings -g"
+            export WITHDEBUG="$WITHDEBUG -DDEBUGLOG_ON_START -DDEBUG"
             WITHOUTSTRIP="nostrip"
             WITHOUTUPX="noupx"
             WARNINGS="-Wall -Wno-write-strings"
@@ -340,14 +342,15 @@ for j in $@; do
             LIBGENOPTS="$LIBGENOPTS --with-tracelog"
             #LIBGENOPTS="$LIBGENOPTS --with-ipc-comments"
             #LIBGENOPTS="$LIBGENOPTS --with-reg-ipc-comments"
+            WITHDEBUG="$WITHDEBUG -g -DDEBUG"
             WARNINGS="-Wall -Wno-write-strings"               ;;
 
  --showcmd) DEBUGCOMPILE="yes"                                ;;
  --debug-mem*|--mem*)
-            WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
-            WITHTRACE="-DDEBUG -DTRACE -DDEBUGMEMCALLS"
-            LIBGENOPTS="$LIBGENOPTS --with-tracelog"
-            LIBGENOPTS="$LIBGENOPTS --with-debug-mem"
+            export WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
+            export WITHTRACE="-DDEBUG -DTRACE -DDEBUGMEMCALLS"
+            export LIBGENOPTS="$LIBGENOPTS --with-tracelog"
+            export LIBGENOPTS="$LIBGENOPTS --with-debug-mem"
            #LIBGENOPTS="$LIBGENOPTS --with-ipc-comments"
            #LIBGENOPTS="$LIBGENOPTS --with-reg-ipc-comments"
             WARNINGS="-Wall -Wno-write-strings"               ;;
@@ -400,13 +403,15 @@ Options:
 --no-color-warn         don't record color ESC codes in compiler warnings
 --no-tools              don't compile dc42 tool commands
 
---with-showcmd          Show invoked compiler/linker commandlines
 --with-static           Enables a static compile
 --without-static        Enables shared library compile (not recommended)
 --without-optimize      Disables optimizations
 --without-upx           Disables UPX compression (no upx on OS X)
 
 --without-strip         Disable strip when compiling without debug
+
+-DFOO                   Pass extra defines to C/C++ compilers
+-DFOO=BAR
 
 Environment Variables you can pass:
 
@@ -487,11 +492,11 @@ fi
 
 needclean=0
 #debug and tracelog changes affect the whole project, so need to clean it all
-[[ "$WITHTRACE" != "$LASTTRACE" ]]             && needclean=1 && echo "Clean Needed: LASTRACE Changed" 1>&2
-[[ "$WITHDEBUG" != "$LASTDEBUG" ]]             && needclean=1 && echo "Clean Needed: WITHDEBUG Changed" 1>&2
-[[ "$SIXTYFOURBITS" != "$LASTSIXTYFOURBITS" ]] && needclean=1 && echo "Clean Needed: SIXTYFOURBITS Changed" 1>&2
-[[ "$THIRTYTWOITS" != "$LASTTHIRTYTWOBITS" ]]  && needclean=1 && echo "Clean Needed: THIRTYTWOBITS Changed" 1>&2
-[[ "$LASTWHICHWXCONFIG" != "$WHICHWXCONFIG" ]] && needclean=1 && echo "Clean Needed: WHICHWXCONFIG Changed" 1>&2
+[[ "$WITHTRACE" != "$LASTTRACE" ]]             && needclean=1 # && echo "Clean Needed: LASTRACE Changed" 1>&2
+[[ "$WITHDEBUG" != "$LASTDEBUG" ]]             && needclean=1 # && echo "Clean Needed: WITHDEBUG Changed" 1>&2
+[[ "$SIXTYFOURBITS" != "$LASTSIXTYFOURBITS" ]] && needclean=1 # && echo "Clean Needed: SIXTYFOURBITS Changed" 1>&2
+[[ "$THIRTYTWOITS" != "$LASTTHIRTYTWOBITS" ]]  && needclean=1 # && echo "Clean Needed: THIRTYTWOBITS Changed" 1>&2
+[[ "$LASTWHICHWXCONFIG" != "$WHICHWXCONFIG" ]] && needclean=1 # && echo "Clean Needed: WHICHWXCONFIG Changed" 1>&2
 
 # display mode changes affect only the main executable, mark it for recomoilation
 if [[ "$WITHBLITS" != "$LASTBLITS" ]]; then
@@ -510,9 +515,9 @@ ENDLAST
 
 [[ "$needclean" -gt 0 ]] && CLEAN
 
-export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
-export CPPFLAGS="$ARCH $CPPFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING"
-export CXXFLAGS="$ARCH $CXXFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING" 
+export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES"
+export CPPFLAGS="$ARCH $CPPFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES"
+export CXXFLAGS="$ARCH $CXXFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES" 
 #2020.01.14 - ^ GCC 9.2.1 throws these on wxWidgets includes, which I'm not going to fix.
 
 
@@ -573,7 +578,7 @@ export PERCENTPROGRESS=0 PERCENTCEILING=${ESTLIBGENCOUNT}
 if [[ $ESTLIBGENCOUNT -gt 0 ]]; then
     export COMPILEPHASE="libGenerator"
     export PERCENTJOB=0 REUSESAVE=""
-    subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
+    subbuild src/lib/libGenerator --no-banner $LIBGENOPTS $SIXTYFOURBITS $THIRTYTWOBITS $EXTRADEFINES skipinstall
     unset LIST
 fi
 
@@ -582,7 +587,7 @@ export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTLIBGENCOUNT ))
 if [[ $ESTLIBDC42COUNT -gt 0 ]]; then
   export COMPILEPHASE="libdc42"
   export PERCENTJOB=0 REUSESAVE="yes"
-  subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS skipinstall
+  subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS $EXTRADEFINES skipinstall
   unset LIST
 fi
 
@@ -591,13 +596,13 @@ export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTTOOLSCOUNT ))
 if  [[ $ESTTOOLSCOUNT -gt 0 ]]; then
     export COMPILEPHASE="tools"
     export REUSESAVE="yes"
-    subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS
+    subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS $EXTRADEFINES
     unset LIST
 fi
 
 echo "* Building LisaEm..."
 echo
-echo "* LisaEm C Code                  (./lisa)"
+echo "* LisaEm C Code                (./lisa)"
 
 
 # Compile C
@@ -607,7 +612,7 @@ export PERCENTPROGRESS=${PERCENTCEILING}
 export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTPHASE1COUNT ))
 export PERCENTJOB=0 NUMJOBSINPHASE=15
 export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $CFLAGS $INC -c :INFILE:.c -o :OUTFILE:.o"
-LIST1=$(WAIT="" INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COMPILELIST ${PHASE1LIST} )
+LIST1=$(WAIT="" INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiled COMPILELIST ${PHASE1LIST} )
 
 
 cd ${TLD}/src/host || (echo "Couldn't cd into host from $(/bin/pwd)" 1>&2; exit 1)
@@ -630,12 +635,18 @@ export WINDOWS_RES_ICONS=$( printf 'lisa2icon   ICON   "lisa2icon.ico"\r\n')
 printf ' \r'  # eat twirly cursor, since we're not waitqing
 
 if needed lisaem_static_resources.cpp ${TLD}/obj/lisaem_static_resources.o; then
-  qjob "!!  Compiling lisaem_static_resources.cpp " $CXX $ARCH $CXXFLAGS -c lisaem_static_resources.cpp -o ${TLD}/obj/lisaem_static_resources.o
+  qjob "!!  Compiled lisaem_static_resources.cpp " $CXX $ARCH $CXXFLAGS -c lisaem_static_resources.cpp -o ${TLD}/obj/lisaem_static_resources.o 1>&2
+  waitqall
 fi
 
 printf ' \r'
 
+#echo "LIST:$LIST" >/tmp/slot.list.0
+
 LIST="$LIST ${TLD}/obj/lisaem_static_resources.o $(windres)"
+
+#echo "LIST:$LIST" >/tmp/slot.list.1
+
 # ^^ this also creates the windows resource via the windres function for Windows only. windres fn must be empty elsewhere
 # note the $(windres) is executing that function call
 rm -f lisaem lisaem.exe
@@ -659,7 +670,10 @@ export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTPHASE1COUNT ))
 export PERCENTJOB=0 NUMJOBSINPHASE=6
 CXXFLAGS="$CXXFLAGS -I src/include -I resources"
 export COMPILECOMMAND="$CXX -W -Wno-write-strings $WARNINGS $WITHDEBUG $WITHTRACE $WITHBLITS $INC $CXXFLAGS -c :INFILE:.cpp -o :OUTFILE:.o "
-LIST=$( WAIT="yes" INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COMPILELIST ${PHASE2LIST} )
+LIST=$( WAIT="yes" INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiled COMPILELIST ${PHASE2LIST} )
+waitqall
+
+#echo "LIST:$LIST" >/tmp/slot.list.2
 
 # restore warnings
 [ -n "$OWARNINGS" ] && WARNINGS="$OWARNINGS"
@@ -675,21 +689,22 @@ cd "${TLD}"
 [[ -n "$DARWIN" ]] && LISANAME="LisaEm" || LISANAME="lisaem${EXT}"
 
 
-(
-  echo "LIST: $LIST"
-  echo "LIST1: $LIST1"
-  echo "WXLIST: $WXLIST"
-) >/tmp/slot.lists.txt
+#(
+#  echo "LIST: $LIST"
+#  echo "LIST1: $LIST1"
+#  echo "WXLIST: $WXLIST"
+#) >/tmp/slot.lists.txt
 
 export COMPILEPHASE="linking"
 export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 waitqall
-qjob  "!!* Linking ./bin/${LISANAME}" $CXX $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
+qjob  "!!* Linked ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
       src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS
 waitqall
+
 export COMPILEPHASE="pack/install"
-export PERCENTPROCESS=99 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1
+export PERCENTPROCESS=98 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 
 cd "${TLD}/bin"
@@ -710,7 +725,7 @@ if  [[ -f "$LISANAME" ]]; then
 #                ├── floppy1.png
     
     if [[ -n "$DARWIN" ]]; then
-        echo "* Creating macos X application" 1>&2
+        echo "* Creating macos application" 1>&2
 
         CONTENTS="${TLD}/bin/LisaEm.app/Contents/"
         RESOURCES="${TLD}/bin/LisaEm.app/Contents/Resources"
@@ -720,21 +735,31 @@ if  [[ -f "$LISANAME" ]]; then
         ICONSRC="${TLD}/resources/LisaEm.icns"
 
         mkdir -pm775 "${BIN}" "${RESOURCES}"
-        mv "${TLD}/bin/${LISANAME}"                   "${BIN}"                  || exit $?
-        sed "s/_VERSION_/$VERSION/g" < "${PLISTSRC}"> "${CONTENTS}/Info.plist"  || exit $?
-        echo -n 'APPL????'                          > "${CONTENTS}/PkgInfo"     || exit $?
-        cp "${ICONSRC}"                               "${RESOURCES}"            || exit $?
+        cp "${TLD}/resources/lisaem.sh"               "${BIN}/lisaem.sh"                               || exit $?
+        chmod 755                                     "${BIN}/lisaem.sh"                               || exit $?
+        mv "${TLD}/bin/${LISANAME}"                   "${BIN}/lisaem${BINARYEXTENSION}-wx${WXVERSION}" || exit $?
+        sed "s/_VERSION_/$VERSION/g" < "${PLISTSRC}"> "${CONTENTS}/Info.plist"                         || exit $?
+        echo -n 'APPL????'                          > "${CONTENTS}/PkgInfo"                            || exit $?
+        cp "${ICONSRC}"                               "${RESOURCES}"                                   || exit $?
         (cd "${TLD}/resources";tar cpf - skins) | (cd "${RESOURCES}"; tar xpf - )
         x=$?
         if  [[ "$x" -ne 0 ]]; then
             echo "Failed to copy ${TLD}/resources/skins to ${RESOURCES}" 1>&2
             exit $x
         fi
+        
+        LISANAME="${BIN}/lisaem${BINARYEXTENSION}-wx${WXVERSION}"
 
-        [[ -n "$WITHDEBUG" ]] && echo "run -p" >gdb-run && $GDB     ./LisaEm.app/Contents/MacOS/LisaEm
+        if [[ -n "$WITHDEBUG" ]]; then
+            echo "run -p" >gdb-run
+            echo "Launching debugger:"
+            [[ -n "$( echo $GDB | grep gdb )"  ]] && $GDB -x gdb-run     "$LISANAME"
+            [[ -n "$( echo $GDB | grep lldb )" ]] && $GDB -o "run -p" -f "$LISANAME"
+            fi
+        fi
         #if we turned on profiling, process the results
         if [[ `echo "$WITHDEBUG" | grep 'p' >/dev/null 2>/dev/null` ]];then
-          $GPROF LisaEm.app/Contents/MacOS/LisaEm/lisaem >lisaem-gprof-out
+          $GPROF "${LISANAME}" >lisaem-gprof-out
           echo lisaem-gprof-out created.
         fi
 

@@ -1,0 +1,42 @@
+Here's a list of some of the current known issues, there are likely many others.
+
+
+* Major Display issues:
+
+The display system is horribly broken, especially on macos x. Works failry well
+on Linux, but even there, certain Scale values and video modes cause issues. 
+Was able to mostly remediate this on macos x by using double buffering, but 
+this makes refreshes very slow and also some of the refreshes are slightly 
+horizontally and vertically off, making the display break a bit - but it's 
+no longer flashing a white rectangle.
+
+Some combinations of skins/video mode/scale work better than others. 
+Debugging this is not easy. In others the mouse movement or detection of
+clicking on the image of the floppy drive or power button or display in 
+skinned mode is somewhat off.
+
+* Various sound generation issues across several platforms, but works on 
+GTK if SDL is enabled, so turning on SDL for build wx scripts. 
+
+* Install both Xcode and command line tools on macos x.
+to properly build wxWidgets on macos x, it's highly recommended to install the
+right version of Xcode for your os as well as the right version of the Command
+line tools that match that Xcode. Builds with just command line tools don't
+install the macos SDKs which then fail when you try to compile LisaEm
+against wxWidgets.
+
+* If you get a  fatal error: 'tr1/type_traits' file not found  error, run this (Change the filename as needed)
+sudo patch /usr/local/wx3.1.2-cocoa-x86-macOS-10.9-clang-sdl/include/wx-3.1/wx/strvararg.h  scripts/wx-strvararg.patch
+
+Only has to be done once.
+
+* UPX on macos 10.8, 10.9 generates executables that segfault, do not use.
+Added code to the bashbuild scripts to disable it on those, possibly affects
+other macos x versions, based on old memories, I remember it working on PPC32/64
+on macos 10.4, not sure about 10.5-10.7. This also affects command line tools
+such as lisafsh-tool.
+
+* blu-to-dc42
+This code does not work well enough to convert Widget or Profile dumped via BLU
+to be bootable, nor mountable in LisaEm, although lisafsh-tool can get a 
+directory of the resulting image, not yet sure what's wrong.
