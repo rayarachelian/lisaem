@@ -327,7 +327,7 @@ static inline void getgraymap(uint16 up, uint16 val, uint16 dn,  uint8 *retval)
 //     PixelData data(skins_on ? *my_skin:*my_lisabitmap);  <- data comes from the image
 
 // ::TODO:: add params for rectangle to update to save cycles 
-HQX_API void HQX_CALLCONV hq3x_32_rb( int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness ) // int xl,int yt,int xr,int yb
+HQX_API void HQX_CALLCONV hq3x_32_rb(int startx, int starty, int width, int height, int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness ) // int xl,int yt,int xr,int yb
 {
     int  x, y, k;                          // x,y iterators, k is circumcentral pixel iterator, xx=pixel x coord
 
@@ -352,34 +352,22 @@ HQX_API void HQX_CALLCONV hq3x_32_rb( int rowbytes,  wxBitmap *mybitmap, int Xre
     PixelData data(*mybitmap);
     if (!data) return;
     //data.UseAlpha();
-    // Reset pixel iterators - these are for the output wxBitmap
-   //hq3x.cpp:301:33: error: no matching function for call to ‘wxPixelDataOut<wxBitmap>::wxPixelDataIn<wxPixelFormat<unsigned char, 24, 0, 1, 2> >::Iterator::Iterator(PixelData*&)’    
+    // Reset pixel iterators - these are for the output wxBitmap so don't divide their sizes at all
+    PixelData::Iterator p00(data);  p00.Reset(data);  p00.MoveTo(data,startx+0,starty+0);
+    PixelData::Iterator p01(data);  p01.Reset(data);  p01.MoveTo(data,startx+1,starty+0);
+    PixelData::Iterator p02(data);  p02.Reset(data);  p02.MoveTo(data,startx+2,starty+0);
 
-    // :TODO: double check if I need to worry about edge cases y=0, y=Yres-1 here
-    PixelData::Iterator p00(data);  p00.Reset(data);  p00.MoveTo(data,0,0);
-    PixelData::Iterator p01(data);  p01.Reset(data);  p01.MoveTo(data,1,0);
-    PixelData::Iterator p02(data);  p02.Reset(data);  p02.MoveTo(data,2,0);
+    PixelData::Iterator p10(data);  p10.Reset(data);  p10.MoveTo(data,startx+0,starty+1);
+    PixelData::Iterator p11(data);  p11.Reset(data);  p11.MoveTo(data,startx+1,starty+1);
+    PixelData::Iterator p12(data);  p12.Reset(data);  p12.MoveTo(data,startx+2,starty+1);
 
-    PixelData::Iterator p10(data);  p10.Reset(data);  p10.MoveTo(data,0,1);
-    PixelData::Iterator p11(data);  p11.Reset(data);  p11.MoveTo(data,1,1);
-    PixelData::Iterator p12(data);  p12.Reset(data);  p12.MoveTo(data,2,1);
-
-    PixelData::Iterator p20(data);  p20.Reset(data);  p20.MoveTo(data,0,2);
-    PixelData::Iterator p21(data);  p21.Reset(data);  p21.MoveTo(data,1,2);
-    PixelData::Iterator p22(data);  p22.Reset(data);  p22.MoveTo(data,2,2);
+    PixelData::Iterator p20(data);  p20.Reset(data);  p20.MoveTo(data,startx+0,starty+2);
+    PixelData::Iterator p21(data);  p21.Reset(data);  p21.MoveTo(data,startx+1,starty+2);
+    PixelData::Iterator p22(data);  p22.Reset(data);  p22.MoveTo(data,startx+2,starty+2);
 
     PixelData::Iterator p00rowStart(data);
     p00rowStart=p00;
 
-/*
-Later it does this per horizontal pixel
-            sp++;                          // X++
-            dp += 3;                       // X++ on destination.
-        // per line---------------------------------------vvvv---------
-        sRowP += srb;                      // Next line source.
-        sp = (uint32 *) sRowP;                                
-        dRowP += drb * 3;                  // Next destination line 
-        dp = (uint32 *) dRowP;                                       */
 // j=y coordinate, i=x coordinate.
     //   +----+----+----+
     //   |    |    |    |
@@ -399,21 +387,29 @@ Later it does this per horizontal pixel
     //unused//int max_height=mybitmap->GetHeight();
     //unused//int max_width =mybitmap->GetWidth();
 
-    sp=&lisaram[videolatchaddress];
-    up=&lisaram[videolatchaddress];
-    dn=&lisaram[videolatchaddress+rowbytes];
+    sp=&lisaram[videolatchaddress+(starty/3)*rowbytes]; // initially center and up are the same
+    up=&lisaram[videolatchaddress+(starty/3)*rowbytes];
+    dn=&lisaram[videolatchaddress+(starty/3)*rowbytes+rowbytes]; // down is one rowbytes line down
+
     // x= x, dy=delta y, rowsize=76 or 90 - these are for the inputs from lisa video ram - 
-    // might want to add gray detection/replacement code here too
-    #define GETPIXEL(x,ptr)       (  (double_video_bits[ptr[((x)>>4)         ]] & ( (1<<(15-((x) & 15))) )) ? black: bright  )
-    //#define GETPIXEL(x,ptr)         (  (                  ptr[((x)>>3)          ] & ( (1<<(7 -((x) &  7))) )) ? black: bright  )
+    // might want to eventually add gray detection/replacement code here too
+    //#define GETPIXEL(x,ptr)   (  (double_video_bits[ptr[(((x)/2)>>4)        ]] & ( (1<<(15-(((x)/2) & 15))) )) ? black: bright  )
+    #define GETPIXEL(x,ptr)     (  (                  ptr[(((x)/2)>>3)        ]  & ( (1<<( 7-(((x)/2) &  7))) )) ? black: bright  )
 
     //if (rowbytes==90) Xres=Xres * 2; // non-3A video
 
-    for (y=0; y<Yres/3; y++)
+//    fprintf(stderr,"start: %d,%d size:%d,%d\n",startx,starty,width,height);
+
+    if ((starty+height)>(364*3) || (startx+width)>(720*2)) {
+//      fprintf(stderr,"!!! got oversized update, reset to proper coordinates !!!");
+        startx=0; starty=0; width=720*2; height=364*3;
+    }
+
+    // x and y are in wxBitmap scaled so 2x,3y
+    for (y=starty; y<starty+height; y+=3) // y<Yres/3
     {
         // -----------------------------------------------------------------------------------------------------
         // to do don't update sp on every cursor right scan
-        // maybe remove yy, not sure.
         // might be able to optimize a bit more by adding a 3rd inner loop for X
         // where sp gets ++ on every 16 increments of x, not sure if it will make it worse
         // might be able to turn the whole block into a macro and eliminate these two Y if
@@ -422,17 +418,17 @@ Later it does this per horizontal pixel
 
         // note that prevline is negative and it's added hence the meth below might look a bit weird if you
         // don't notice these two lines here.
-        if (y>0)      {prevline = -rowbytes; up=sp-rowbytes;} else {prevline = 0; up=sp;}
-        if (y<Yres-1) {nextline =  rowbytes; dn=sp+rowbytes;} else {nextline = 0; dn=sp;}
+        if (y/3>0)      {prevline = -rowbytes; up=sp-rowbytes;} else {prevline = 0; up=sp;}
+        if (y/3<Yres-1) {nextline =  rowbytes; dn=sp+rowbytes;} else {nextline = 0; dn=sp;}
 
-        for (int tripple=0; tripple<3; tripple++) {
-        for (x=0; x<Xres; x++)
+        for (int tripple=0; tripple<3; tripple++) { // this loop is used to tripple each horizontal line since we do y*3
+                                                    // without it there would be gaps
+        for (x=startx; x<startx+width; x++)
         {
            // :TODO: maybe convert this entire set of blocks to a macro so we can skip the y==0, y==Yres-1 checks
            // and the X==0 X<Xres-1 checks - possibly premature optimization, but might be doable.
             w[2] = GETPIXEL(x,up); //(*(sp + prevline) & (1<<(7-((x  )&7) ))) ? bright:0x00;      // w[2] = *(sp + prevline);
             w[5] = GETPIXEL(x,sp); //(*(sp           ) & (1<<(7-((x  )&7) ))) ? bright:0x00;      // w[5] = *sp;
-
             w[8] = GETPIXEL(x,dn); // (*(sp + nextline) & (1<<(7-((x  )&7) ))) ? bright:0x00;      // w[8] = *(sp + nextline);
 
             if (x>0) // 1,4,7 are the left column
@@ -4141,18 +4137,18 @@ Later it does this per horizontal pixel
 // sp=source pointer, dp=dest pointer, expects 4 byte pixels.
 
 
-HQX_API void HQX_CALLCONV hq3x_32(wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness )
-{
-    //uint32 rowBytesL = Xres * 4;                            // *** here here here //
+//HQX_API void HQX_CALLCONV hq3x_32(wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness )
+//{
+//    //uint32 rowBytesL = Xres * 4;                            // *** here here here //
 // HQX_API void HQX_CALLCONV hq3x_32_rb(       uint8 * sp, uint32 srb,     uint32 * dp, uint32 drb,       int Xres, int Yres, uint32 brightness )
-        hq3x_32_rb( 90,mybitmap, Xres,     Yres, brightness);
-
-}
-
-HQX_API void HQX_CALLCONV hq3x_32_3a(wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness )
-{
-    //uint32 rowBytesL = Xres * 4;                            // *** here here here //
-// HQX_API void HQX_CALLCONV hq3x_32_rb(       uint8 * sp, uint32 srb,     uint32 * dp, uint32 drb,       int Xres, int Yres, uint32 brightness )
-        hq3x_32_rb( 76,mybitmap,  Xres,     Yres, brightness);
-
-}
+//        hq3x_32_rb( 90,mybitmap, Xres,     Yres, brightness);
+//
+//}
+//
+//HQX_API void HQX_CALLCONV hq3x_32_3a(wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness )
+//{
+//    //uint32 rowBytesL = Xres * 4;                            // *** here here here //
+//// HQX_API void HQX_CALLCONV hq3x_32_rb(       uint8 * sp, uint32 srb,     uint32 * dp, uint32 drb,       int Xres, int Yres, uint32 brightness )
+//        hq3x_32_rb( 76,mybitmap,  Xres,     Yres, brightness);
+//
+//}

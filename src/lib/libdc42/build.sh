@@ -72,7 +72,7 @@ if [[ -z "$NOBANNER" ]]
 then
    image ${XTLD}/resources/libdc42-banner.png || (
       echo ' _____________ --------------------------------------------------------------'
-      echo "| |DC42    |.|   libdc42 ${VERSION}  -   Unified Build Script"
+      echo "| |libDC42 |.|   libdc42 ${VERSION}  -   Unified Build Script"
       echo '| |        | |                                                        '
       echo '| |________| |              http://lisaem.sunder.net'
       echo '|   ______   | Copyright (C) 2008 Ray Arachelian, All Rights Reserved'
@@ -84,8 +84,6 @@ fi
 
 CHECKDIRS include lib obj resources src
 CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h src/libdc42.c resources/libdc42-banner.png
-
-create_machine_h
 
 # Parse command line options if any, overriding defaults.
 #echo parsing options
@@ -156,23 +154,26 @@ do
 
     ;;
 
-  -64|--64)
+  -64|--64|-m64)
                                export SIXTYFOURBITS="--64"; 
                                export THIRTYTWOBITS="";
-                               export ARCH="-m64"                        ;;
+                               export ARCH="-m64"; export SARCH="-m64"  ;;
 
-  -32|--32)
+  -32|--32|-m32)
                                export SIXTYFOURBITS=""; 
                                export THIRTYTWOBITS="--32"; 
                                [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
-                               export ARCH="-m32"                        ;;
+                               export ARCH="-m32"; export SARCH="-m32" ;;
 
+ -march=*)                     export ARCH="${i} $ARCH"                ;;
+ -arch=*)                      export ARCH="$(echo ${i} | sed -e 's/=/ /g') $ARCH"
+                               export SARCH="$i $SARCH"                ;;
 
  --without-debug)              WITHDEBUG=""
                                WARNINGS=""                               ;;
 
  --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
-                               WARNINGS="-Wall"                          ;;
+                               WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
 
  --no-banner)                  NOBANNER="1";                             ;;
  *)                            UNKNOWNOPT="$UNKNOWNOPT $i"               ;;
@@ -180,6 +181,8 @@ do
 
 done
 
+
+create_machine_h
 
 if [ -n "$UNKNOWNOPT" ]
 then
@@ -242,9 +245,9 @@ MACHINE="`uname -mrsv`"
 
 if [[ "$needclean" -gt 0 ]]; then
    rm -f .last-opts last-opts
-   cd ./lib       && /bin/rm -f *.a *.o
-   cd ../obj      && /bin/rm -f *.a *.o
-   cd ..
+   cd ${XTLD}/lib       && /bin/rm -f *.a *.o
+   cd ${XTLD}/obj      && /bin/rm -f *.a *.o
+   cd ${XTLD}
 
 fi
 
@@ -253,12 +256,15 @@ echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
 echo "LASTBLITS=\"$WITHBLITS\""  >>.last-opts
 echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
 
+
+[[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1 COMPILEPHASE="libdc42"
+
 ###########################################################################
 echo Building libdc42...
 echo
 
 # :TODO: silence warnings via rewriting code that emits them
-CFLAGS="$CFLAGS   -Wno-empty-body  $NODUPEDECL $NOINCOMPATIBLEPTR \
+CFLAGS="$CFLAGS   $NOEMPTYBODY $NODUPEDECL $NOINCOMPATIBLEPTR \
                   -Wno-implicit-function-declaration -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration  \
                   -Wno-unused-parameter  -Wno-unused $EXTRADEFINES"
 
@@ -268,6 +274,8 @@ COMPILED=""
 if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
+
+   echo "Making libdc42.a library..." 1>&2
    makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi
 

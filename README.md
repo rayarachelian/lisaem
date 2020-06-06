@@ -1,165 +1,83 @@
 ![LisaEm Logo](resources/lisaem-banner.png)
 
-### Copyright © 2020 by Ray Arachelian, All Rights Reserved.
+### Copyright © MMXX by Ray Arachelian, All Rights Reserved.
 ### Released under the terms of the GNU Public License v3.
 
 ------------------------------------------------------------------------------
-Lisa Emulator Source Build README                    http://lisaem.sunder.net/
+# Lisa Emulator Source Build README
+ 
+* [https://lisaem.sunder.net/]() 
+* [https://lisafaq.sunder.net]() 
+* [https://lisalist2.com]() 
+* [https://github.com/rayarachelian/lisaem]()
+
 ------------------------------------------------------------------------------
 
 ## What is this thing?
 
-This is the source code for LisaEm 1.2.7. LisaEm is a emulator that runs on a wide variety of modern and somewhat old systems by means of the wxWidgets framework, implementing an emulation of the (in)famous Apple Lisa Computer. The Apple Lisa computer is the predecesor of the Mac and the "inspiration" of many GUI environments from Windows 1.x to GEOS. Many of the original ideas of the modern GUI were first envisioned in the Apple Lisa, so it's a historically very important machine.
+You're looking at the repository for the source code for LisaEm 1.2.7. 
+
+LisaEm is a emulator that runs on a wide variety of modern and somewhat old systems by means of the wxWidgets framework, implementing an emulation of the (in)famous Apple Lisa Computer. The Apple Lisa computer is the predecessor of the Mac and the "inspiration" of many GUI environments from Windows 1.x to GEOS, GEM, VisiOn, etc. 
+
+Many of the original ideas of the modern GUI, including copy and paste, were first envisioned in the Apple Lisa, so it's a historically very important machine. The seeds of these ideas were first found in the Xerox Alto, but the Lisa took them to their next logical step.
 
 This document contains a few brief updates that are also found in the ChangeLog file, as well as some information on how to compile wxWidgets and LisaEm.
+
 (The updates will go away once the bugs are removed as ChangeLog is better suited for them.)
 
-## 2020.03.31
+## How do you pronounce LisaEm
 
-Display works better on macos x, though it breaks up a bit by one pixel. But have to use wxDoubleBufferedPaintDC instead of wxPaintDC. Strangely enough wxAutoBufferedPaintDC does not work. Unfortunately this makes the display very slow. Grrrrrr.
+The "Em" at the end of LisaEm is short for emulator, so therefore you say "Lisa" followed by the first syllable in Emulator, "Em", or if you're a native English speaker, sound out the letter M.
+so: lee·suh·em,  \ ˈlē·sə·em \
 
-Reapplying fixes for AA/AAG flashing menu bar on updates that were somehow lost.
-
-Added -D define passthrough option for build script
-
-Fixed debugging warnings/errors on macos x 10.12, added fix for -lstdc++.6 vs -lstdc++
-
-Added a macos binary launcher - instead of making a fat universal binary using lipo, a script replaces the lisaem binary which then detects the OS and CPU architecture, and tries to locate the newest compatible binary for the current machine. This way we can have x86_64 bit binaries for macos 10.7, 10.10, 10.12, etc. and the most suited one for the current os will be launched.
-
-## 2020.03.14
-
-Bug fixes to blu-to-dc42 but still not working right
-Bug fixes to build scripts
-
-## 2020.03.03
-
-Numerous bug fixes, mostly to macos x code
-
-## 2020.02.22
-
-Fixed a bunch of windowing stuff for Windows. Still have some macos x issues
-when scale is other than 1.0 regarding refreshes, which leaves a white area
-near the Lisa's display. The disappearing window issue from 2020.02.22 is
-fixed (window resizing issue).
-
-2Y, 2X,3Y modes still have mouse issues and there are still other bugs.
-
-## 2020.02.22
-
-I've made many fixes, but there are still about a dozen bugs left. Most
-notably when the scale is changed the window size is wrong. On macos x
-it sometimes disappears entirely because it goes to size zero. A temporary
-work around is to install the Spectacle App from https://www.spectacleapp.com/
-and use the Command+Option+F to maximize the window. Normal macos x without
-this leaves you only with the Window >> Maximize menu.
-
-There's still some refresh issues with macos X as well.
-
-Zoom larger than 2.0 on macos x causes LisaEm to lock up, so I've disabled it
-for this platform only.
-
-2Y and 2X,3Y modes still have mouse location issues
+Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
 
 
-## 2019.12.25
+## 2020.05.27
 
-Cleaned up a bunch of stuff and fixed builds on both Windows and macos X.
-Both now install properly. There are still some bugs. Windows crashes on the
-hq3x renderer, and quits (I think on sound), but can now find its resources.
-Also cleaned up the old upper case function names in bashbuild that were a
-holdover from the 1.3.0 days.
-Added initial FreeBSD.sys support.
+Fixed most (all?) of the display refresh issues for macos x which are caused by two issues: 
 
-## 2019.12.12 
-I rewrote a lot of the 1.3.0 build scripts and separated the fn's out to their
-own include files, standardized the build scripts to the new "buildbash"
-way of doing things, added progress bar and image display for KiTTY
-(will do for iTerm2 as well), sub-build scripts are now source'd instead
-of executed separately for better performance.
+  1. there were bugs in the rectangle calculations for the refreshes, 
+  2. a bug in wxWidgets dc.Refresh and dc.RefreshRect methods on macos x where the erase boolean parameter being set to false is completely ignored. 
 
-The old git repo at https://github.com/rayarachelian/lisaem-1.2.x/ is now
-considered deprecated and only left there for historical purposes, and incase
-someone needs older stable versions such as 1.2.6, etc.
+Because the region was wrong, the erased area was exposed and made visible because consequent refreshes filled in a different area.
 
-While these scripts do produce a lisaem.exe on Windows with a Cygwin/mingw
-build environment, the resulting executable does not (yet) function, I'm
-unsure why, if you're familiar with Windows and understand MingW and wx
-Widgets, I'd welcome any insights you may have.
+Worse, fixing the refreshes caused more issues. Normal movement of a mouse would clear the region and only paint the mouse icon, causing flashes when evnetually the full screen refresh happened. This is not supposed to happen when you consume the Erase events and disable propagation, and yet! So for now, macos x refreshes are full screen. Ironically swithich to DoubleBuffered or AutoDC causes it to be even slower.
 
-There's a lot of stuff to clean up and debug, especially these README files.
-
-## 2019.10.13 Finally got it working on macos X 10.11+ but had to recompile
-both wxWidgets and LisaEm with -stdlib=libc++, and LisaEm with -lstdc++.6,
-there are still lots of bugs, there are stubs for HQX but this feature is
-incomplete so not yet included in the code. I've added a scripts directory
-to help the end user be able to build wxWidgets properly. Much more testing
-is needed on macos X, and certainly I need to rewrite all the Windows building
-code.
-
-
-## 2019.09.29 This is a developer grade preview, you can expect tons of bugs and
-incomplete features, likely it will turn into a release in a month or two
-depending on free time, etc.
-
-This is a bit of a rant here as I've not worked out all the details of all
-the moving pieces yet as well as to explain some of the decisions made,
-etc.
-
-Note that the Widget code is incomplete, don't attempt to use this with a
-2/10 88 ROM as it will fail to work. See the Changelog for descriptions of
-what has been worked on.
-
-Some planned features may not make it into 1.2.7 but may be moved to 1.2.8.
-
-The main driver for this release is the impending release of macosX Catalina
-which removes 32 bit support, thus forcing a 64 bit binary release of LisaEm
-
-There are also weird issues based on which version of wxWidgets you use.
-If you use wxWidgets earlier than 3.12, such as 3.11 or so, you may see
-lots of menu issues now that I've switched some of the menu items to Radio
-Button rather than checkbox.
-
-However, wx3.1.2 introduces a snag, at least in GTK on HiDPI ("retina" in
-Apple-speak) 4K+ displays. Instead of reporting the actual display resolution
-it returns 1920x1080p - not sure if this a GTK thing or a wxWidgets thing,
-however, wx3.1.1 does not behave this way. Ironically, I went into building
-1.2.7 with the goal of addressing HiDPI issues as in 2017 my 2011 17" Macbook
-Pro died due to GPU failure, and due to concerns about repairability of the
-newer machines which feature glued in batteries, soldered in RAM, soldered
-in SSD, non-pro high priced laptops branded as pro, but limited in RAM and
-CPU, and other user-unfriendly anti-features, I decided to give up on
-Apple Inc. and go to Linux. In doing so I went to a 17" Acer Predator with
-a GTX1070 GPU and a wonderful 17" 4K display and 64G of RAM, on which LisaEm
-1.2.6 and earlier look very tiny and unusable. So now with wx3.1.2 doing 
-weird things with HiDPI mode, I've come full circle. :)
-
-
-I highly recommend NOT using any wxWidgets that ships with your OS and
-instead compiling wx3.1.2 yourself, as they're going to be older and not
-as featureful.
-
-I've not YET tested this code on macOS X and Windows, but will do so over
-the next few days and release a few binary releases, hopefully before
-Apple releases Catalina, though it may wind up being after. Once vetted
-through a few beta and release-candidate versions on win10 and macosx, the
-final 1.2.7 will be released in binary form as well.
+Mouse location bugs were fixed, many crashes caused by switching from say, skinless 2X3Y mode to skinned HQX are now also fixed.
 
 ------------------------------------------------------------------------------
 ## Special steps for Windows:
 
 If you wish to build for Windows, Cygwin, along with regular gcc and mingw is required.
 
-Please examine the two cygwin installation batch files which will setup the appropriate packages. As you'll need to right click on the appropriate one (32 bit vs 64 bit) and run as Administrator, it's highly recommended that you carefully examine what they do.
+Please examine these two Cygwin installation batch files which will setup the appropriate packages.
 
-(The Cygwin installer requires that it be run as Administrator when scripted, otherwise it goes interactive and does not properly select the packages passed to it on the command line.)
+* `cygwin-install64.bat` - for 64 bit systems (all modern ones today)
+* `cygwin-install32.bat` - for older machines
 
-These scripts expect to be run from the E:\ drive, and that you've downloaded the Setup.exe for Cygwin and have named it properly as the script expects. Once cygwin is properly installed, copy the LisaEm source tarball (or do a git clone) to your home directory inside of Cygwin.
+They expect to live on the E:\ drive - this is because I use Virtualbox VMs for windows where the C:\ drive is for the OS, D:\ is the CDROM drive, and E:\ is the shared folder between my Linux machine and the VM.
 
-Next, use the scripts in the scripts directory that build wxWidgets.
+You'll need to first download the Cygwin installers and name them as follows:
+
+* `e:\setup-x86_64.exe` - for the 64 bit Cygwin installer
+* `e:\setup-x86.exe` - for the 32 bit Cygwin install
+
+As you'll need to right click on the appropriate one (32 bit vs 64 bit) and run as Administrator, it's highly recommended that you carefully examine what they do.
+
+[The Cygwin installer requires that it be run as Administrator when scripted, otherwise it goes interactive and does not properly select the packages passed to it on the command line, this is a limitation of Cygwin, take it up with them by filing bug reports.]
+
+These scripts expect to be run from the E:\ drive, and that you've downloaded the Setup.exe for Cygwin and have named it properly as the script expects. 
+
+If your system doesn't or can't match this, please edit the install scripts as needed. 
+
+This is recommended anyway, since you shouldn't trust anything that requires running as Administrator. Don't trust me because I'm trust worthy, trust me because you've personally verified that these scripts don't do anything malicious to your system. This should apply to anything you install on any machine. If you can't see the source code and verify for yourself that it does the right thing, you shouldn't be installing it.
+
+Next, open the Cygwin terminal (MinTTY), use the scripts in the scripts directory that build wxWidgets, and then add the bin directory from the wxWidgets build to your PATH, and then build LisaEm - all these steps are done from the Cygwin terminal.
 
 ## Compiling wxWidgets for your system
 
-The scripts directory contains several scripts that you could use to build wxWidgets for your system. We will generally link LisaEm statically, especially for macos x and 
+The scripts directory contains several scripts that you could use to build wxWidgets for your system. We will generally link LisaEm statically, especially for macOS x and 
 
 ```
 build-wx3.1.2-modern-macosx.sh
@@ -168,24 +86,55 @@ build-wxwidgets-gtk.sh
 ```
 After wxWidgets is installed to `/usr/local/wxsomething`, add `/usr/local/wxsomething/bin` to your path before running the LisaEm build script.
 
-## Compiling LisaEm for all platforms:
+![building-wx-widgets](resources/1-clone-and-build-wx-widgets.gif)
 
-You will need netpbm as well as wxWdigets 3.0.4-3.1.2 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
+
+## Compiling LisaEm (for all platforms):
+
+You will need wxWidgets 3.0.4-3.1.3 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
 
 You will want to install/compile wxWidgets **without** the shared library option, except perhaps on GTK systems, but if you do this, it will not be portable except to systems of the same kind and version.
 
-After installing/compiling wxWidgets, ensure that wx-config is in your path, cd to the source code directly and run
+Unlike most apps that use autotools, or cmake, LisaEm uses the [bashbuild](https://github.com/rayarachelian/bashbuild) system which was created as a side effect of developing LisaEm. There's a fake `./configure` and `Makefile` that are just wrappers around `bashbuild`.
+
+After installing/compiling wxWidgets, ensure that wx-config is in your path, cd to the LisaEm source code directly and run:
 
 	./build.sh clean build
 	sudo ./build.sh install 
 
-(Don't use sudo on Cygwin, instead you'll be prompted whether you wish to launch the command in an Administration MinTTY session.)
+(Don't use sudo on Cygwin, instead type in `./build.sh install` and you'll be prompted whether you wish to launch the command in an Administration MinTTY session, then the build will run from a second terminal window that runs within the Administrator context.)
 
-This will install the lisaem and lisafsh-tool binaries to /usr/local/bin, and will install skins and sound files to /usr/local/share/LisaEm/; on Windows it will be installed to C:\Program Files\Sunder.Net\LisaEm and /Applications for macos.
+This will install the lisaem and lisafsh-tool binaries to /usr/local/bin, and will install skins and sound files to /usr/local/share/LisaEm/; on Windows it will be installed to C:\Program Files\Sunder.Net\LisaEm and /Applications for macOS.
 
-If your system has the upx command available, it will also compress the resulting binary with upx in order to save space, it's a good idea to install this command. (The upx step is disabled for debug-enabled builds as it interferes with gdb.)
+![compiling lisaem](resources/2-build-lisaem.gif)
 
-On Windows and macos x we'll also want a static build so we don't have to ship
-a copy of wxWidgets along with the app. Of course building for your own system doesn't require that, however the included scripts are setupt to produce static libraries, except for Linux/GTK.
 
-OS provided copies of wxWidgets are likely not going to work with LisaEm. Please use the appropriate script in the scripts directory for your system to compile wxWidgets (although as I write this, the wxWidgets 3.0 provided with Ubuntu 18.04 seems to function correctly.)
+### Cross compiling
+
+Cross compiling is possible by passing the -arch=xxx option to the top level build.sh script. This is how PPC binaries are built on an i386 10.5 VM.
+
+(Sadly I could not get a wxWidgets 3.x compiled properly for macos x 10.4 - this would have been nice due to the ability of 10.4 to run classic macos 9 and earlier applications, which would have made a nice environment for running many classic apps, including Lisa Office Systems. If you find a way to get wxWidgets 3.0.2 or 3.0.4 on 10.4 please let me know.)
+
+### Compressing binaries with UPX
+
+If your system has the upx command available, it will also compress the resulting binary with upx in order to save space, it's a good idea to install this command. (The upx step is disabled for debug-enabled builds as it interferes with gdb, and on certain older versions of macOS X such as 10.8, 10.9 where it's broken and causes segfaults in the resulting binaries.)
+
+### Statically linked wxWidgets
+
+On Windows and macOS x we'll also want a static build so we don't have to ship a copy of wxWidgets along with the app. Of course building for your own system doesn't require that, however the included scripts are setup to produce static libraries, except for Linux/GTK.
+
+If you don't plan on using wxWidgets for anything else on Windows or macOS x and have compiled static versions of wxWidgets and LisaEm, you may then discard the wxWidgets directory. You could also uninstall Cygwin. 
+
+But you may find yourself needing to redo all this support infrastructure when a new version of LisaEm is released. Also, don't forget to clean up the resulting wxWidgets3.x.x directories under the script directory as they'll take up quite a lot of space.
+
+Native OS provided copies of wxWidgets, such as those packaged with various Linux distributions are likely not going to work as well with LisaEm, so your mileage may vary. If you experience issues with those, please use the appropriate script in the scripts directory for your system to compile wxWidgets (although as I write this, the wxWidgets 3.0 for GTK provided with Ubuntu 18.04 seems to function correctly.)
+
+### About macOS binary distributions
+
+Binary distributions of LisaEm for macOS X provided on `dmg` images, will include multiple binaries for multiple CPU architectures such as PPC, PPC64, i386, and x86-64. While the macOS x `lipo` command can glue multiple architecture binaries together, it cannot let you package up multiple copies of a single architecture. To get around this, I've added an internal selector script `lisaem.sh` in the resources directory which is copied to `LisaEm.app/Contents/MacOS/lisaem.sh` - this scripts looks at your system and figures out what macOS version and CPU architecture you're running and then attempts to find the most likely binary suitable for your machine and runs that one.
+
+Because some macOS/Xcode versions are only compatible with certain versions of wxWidgets, for example, Mac OS X 10.8 (Mountain Lion) will use a copy of LisaEm compiled against wxWidgets 3.0.4, while macOS 10.15 (Catalina) will run a copy of LisaEm compiled against wxWidgets 3.1.3. You can use the "About LisaEm" menu item under the credits to see the version.
+
+Additionally a `--delete-other-binaries` option is provided in the script, so if you run `/Applications/LisaEm.app/Contents/MacOS/lisaem.sh --delete-other-binaries` from iTerm or Terminal, it will delete the shipped binaries that are not appropriate to your system, saving you a few MB.
+
+![done compile](resources/3-done.gif)

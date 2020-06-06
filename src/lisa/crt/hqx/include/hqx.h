@@ -60,16 +60,5 @@
 
 
 HQX_API void HQX_CALLCONV hqxInit(void);
-//HQX_API void HQX_CALLCONV hq2x_32( uint32 * src, uint32 * dest, int width, int height );
-//HQX_API void HQX_CALLCONV hq3x_32( uint32 * src, uint32 * dest, int width, int height );
-//HQX_API void HQX_CALLCONV hq4x_32( uint32 * src, uint32 * dest, int width, int height );
-
-//HQX_API void HQX_CALLCONV hq2x_32_rb( uint32 * src, uint32 src_rowBytes, uint32 * dest, uint32 dest_rowBytes, int width, int height );
-
-//HQX_API void HQX_CALLCONV hq3x_32_rb( uint8 * sp, uint32 srb,      uint32 * dp, uint32 drb,       int Xres, int Yres, uint32 brightness );
-//HQX_API void HQX_CALLCONV hq3x_32_rb( uint32 * src, uint32 src_rowBytes, uint32 * dest, uint32 dest_rowBytes, int width, int height );
-//HQX_API void HQX_CALLCONV hq4x_32_rb( uint32 * src, uint32 src_rowBytes, uint32 * dest, uint32 dest_rowBytes, int width, int height );
-
-HQX_API void HQX_CALLCONV hq3x_32_rb( int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness );
-
+HQX_API void HQX_CALLCONV hq3x_32_rb(int startx, int starty, int width, int height, int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness );
 #endif

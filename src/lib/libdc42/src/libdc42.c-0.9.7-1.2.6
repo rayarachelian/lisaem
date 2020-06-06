@@ -59,7 +59,7 @@
 
 // needed for LisaEm compatibility, you can remove this, but you must
 // define int8, int16, int32, uint8, uint16, uint32.
-#include "machine.h"
+#include <machine.h>
 
 
 // normal includes
@@ -745,7 +745,7 @@ int dc42_is_valid_image(char *filename)
 //    FILE *handle;
     static DC42ImageType FF, *F=&FF;
     int i,flag=0;
-    int32 filesizetotal=0;
+    long filesizetotal=0;
     uint8 tempbuf[2048];
 
     strncpy(F->fname,filename,FILENAME_MAX);
@@ -814,7 +814,7 @@ int dc42_is_valid_image(char *filename)
 
 
 
-    if (filesizetotal>(1024*1024*64)) DC42_RET_CODE(F,0,"File too large to be valid disk image",return F->retval);
+    if (filesizetotal>4294967296) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
 
     if (F->fd>2)
        {
@@ -861,7 +861,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 {
 
     int i, flag;
-    int32 filesizetotal=0;
+    long filesizetotal=0;
     uint8 tempbuf[2048];
     F->dc42seekstart=0;
     F->retval=0;
@@ -900,7 +900,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
     F->dc42seekstart=0;
 
-    if (filesizetotal>(1024*1024*64)) DC42_RET_CODE(F,88,"File too large to be a valid disk image",return F->retval);
+    if (filesizetotal>4294967296) DC42_RET_CODE(F,88,"File too large to be a valid disk image",return F->retval);
 
     if (F->fd>2)
        { int i;

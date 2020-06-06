@@ -8,6 +8,35 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.06.03 - more automation for building macos x releases
+
+2020.06.02 - added libdc42 image tester
+
+2020.05.27 - fixed most of the ui display bugs on macos x
+           - RC1 release
+
+2020.05.19 - fixed some minor ui bugs on macos x
+
+2020.05.12 - added region handling to hq35x-3x code for partial updates
+
+2020.05.10 - more fixes to bashbuild - forced min NUMCPU to two to fix 
+             handling inconsistencies
+
+2020.04.24 - found the reason for the flashing rectangle, it's the VidRefresh
+             method which calls wxFrame::Refresh - this is documented as having
+             a boolean param which is supposed to NOT erase the background when
+             called with false, but this motherfucker does so anyway, even on
+             wx3.1.3! omgwtfbbw!
+             https://docs.wxwidgets.org/3.0/classwx_window.html#a29dc7251746154c821b17841b9877830
+             Even worse, the ::OnErase method it calls cannot suppress the
+             erase event even when the event.Skip() and event.StopPropagation()
+             are called! Only realized this because I had the wrong area being
+             passed to VidRefresh, which is the cause of the flashing rects.
+
+             But in the process broke skinned AntiAlias w/Gray Replacement
+             when --rawbits is not used.
+
+
 2020.04.01 - Infrastructure work: setting up macos VMs and retooling the
 2020.04.11   build-wx3.1.2-modern-macosx.sh build script to be more flexible,
              compiling LisaEm for various macos versions.

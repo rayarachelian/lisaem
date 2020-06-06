@@ -42,6 +42,7 @@ function save_environment() {
 
    ## This only saves the environment variables our script at this level has set
    ## it excludes anything inside of .env-ext (external environment)
+   [[ -f ${XTLD}/.env-ext ]] && \
    eval $(echo -n 'env'; cat ${XTLD}/.env-ext | while read i; do echo -n "|grep -v \"^${i}\""; done ) \
         |  sed -e '/^$/d' | grep '=' | sed -e 's/^/export /g' -e 's/=/="/' -e 's/$/"/' >"${XTLD}/.env-saved"
    #set >.env-set

@@ -12,7 +12,7 @@ echo "MIN_MACOSX_VERSION: $MIN_MACOSX_VERSION"
 
 # note that 10.8 will only build 3.0.4 and 3.0.2
 
-for VER in 3.1.2; do
+for VER in 3.0.4 3.0.2; do
 
 if [[ ! -d "wxWidgets-${VER}" ]]; then
 
@@ -38,29 +38,12 @@ rm -rf build-${TYPE}
 mkdir  build-${TYPE}
 cd     build-${TYPE}
 
-XLIBS='LIBS="-lstdc++.6 -L /usr/lib"'
+#XLIBS='LIBS="-lstdc++.6 -L /usr/lib"'
 CPUS="x86_64,i386"
-CCXXFLAGS='CXXFLAGS="-std=c++0x -stdlib=libc++"'
-if [[ "$OSVER" > "macOS-10.14" ]]; then 
-   CPUS="x86_64"
-   XLIBS=""
-fi
+#CCXXFLAGS='CXXFLAGS="-std=c++0x -stdlib=libc++"'
 
-# cc1plus: error: unrecognized command line option "-std=c++0x"
-# cc1plus: error: unrecognized command line option "-stdlib=libc++"
 
-if [[ "$OSVER" < "macOS-10.9" ]]; then 
-   XLIBS=""
-   CCXXFLAGS=""
-fi
-
-# catalina: ld: library not found for -lstdc++.6
-# ray@catalina scripts % find /usr -name "libstdc++.*" -ls 2>/dev/null 
-# lrwxr-xr-x    1 root             wheel                  21 Nov  3 12:45 /usr/lib/libstdc++.6.dylib -> libstdc++.6.0.9.dylib
-# -rwxr-xr-x    1 root             wheel              725280 Sep 29  2019 /usr/lib/libstdc++.6.0.9.dylib
-# lrwxr-xr-x    1 root             wheel                  17 Nov  3 12:45 /usr/lib/libstdc++.dylib -> libstdc++.6.dylib
-
-#../configure --enable-monolithic --enable-unicode --with-cocoa  LIBS=-lc++ CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
+#../configure --enable-monolithic --enable-unicode --with-cocoa  LIBS=-lc++ CXXFLAGS="-std=c++0x"  \
 # vs LIBS="-lstdc++.6 -L /usr/lib"
 ../configure --enable-monolithic --enable-unicode --with-cocoa ${CCXXFLAGS} ${XLIBS} \
              --enable-universal-binary=${CPUS} \

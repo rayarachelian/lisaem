@@ -30,10 +30,10 @@ fi
 # if you're making your own package using the src.build system, you'll want to set
 # these variables.  These will help pupulate the appropriate fields in packages.
 ###########################################################################################
-   SOFTWARE="dc42 tools"                   # name of the software (can contain upper case)
-     LCNAME="dc42 tools"                   # lower case name used for the directory
-DESCRIPTION="dc42 tools for Apple Lisa"    # description of the package
-        VER="0.9.6"                        # just the version number
+   SOFTWARE="dc42 tester"                  # name of the software (can contain upper case)
+     LCNAME="dc42 tester"                  # lower case name used for the directory
+DESCRIPTION="dc42 tester for Apple Lisa"   # description of the package
+        VER="0.9.7"                        # just the version number
   STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
 RELEASEDATE="2020.03.31"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
@@ -54,7 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dumper  lisadiskinfo  lisafsh-tool  losdeserialize rraw-to-dc42"
+SRCLIST="tester test-interleave"
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 
@@ -69,11 +69,11 @@ if [[ -z "$NOBANNER" ]]; then
    image ${XTLD}/resources/libdc42-banner.png || (
 
       echo ' _____________ --------------------------------------------------------------'
-      echo "| |  dc42  |.|   dc42 tools ${VERSION}  -   Unified Build Script"
-      echo '| | tools  | |                                                        '
+      echo "| |  dc42  |.|   dc42 tester ${VERSION}  -   Unified Build Script"
+      echo '| | tester | |                                                        '
       echo '| |________| |              http://lisaem.sunder.net'
       echo '|   ______   | Copyright (C) MMXX Ray Arachelian, All Rights Reserved'
-      echo '|  |    | |  |Released under the terms of the GNU General Public License 2.0'
+      echo '|  |????| |  |Released under the terms of the GNU General Public License 2.0'
       echo '\__|____|_|__| --------------------------------------------------------------'
    )
 fi
@@ -99,7 +99,7 @@ for i in $@; do
             ;;
   clean)
             cd ${XTLD}/obj
-            echo "* Removing fsh tools objs and bins"
+            echo "* Removing tester objs and bins"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types*
             cd "${XTLD}/bin/${MACOSX_MAJOR_VER}/" && for b in $SRCLIST; do rm -f ${b}${EXT}; rm -rf "${b}.dSYM"; done
 
@@ -138,7 +138,7 @@ for i in $@; do
 
            echo Uninstalling from $PREFIX and $PREFIXLIB
            rm -rf $PREFIXLIB/lisaem/
-	        rm -rf $PREFIX/patchxenix${EXT} $PREFIX/blu-to-dc42${EXT}  $PREFIX/dc42-resize-to-400k${EXT}  $PREFIX/dumper${EXT}  $PREFIX/lisadiskinfo${EXT}  $PREFIX/lisafsh-tool${EXT}  $PREFIX/losdeserialize${EXT}  $PREFIX/rraw-to-dc42${EXT}
+	        rm -rf $PREFIX/test-interleave${EXT} $PREFIX/tester${EXT}
            exit 0
 
     ;;
@@ -253,35 +253,35 @@ CFLAGS="$CFLAGS   $NOEMPTYBODY $NODUPEDECL $NOINCOMPATIBLEPTR -Wno-implicit-func
                   -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration \
                   -Wno-unused-parameter  -Wno-unused "
 
-echo Building lisa disk utilities...
+echo Building libdc42 testers
 echo
 
 # Check to see if libdc42 exists locally, or globally
-WHICHLIBDC42="`ls ../lib/libdc42/lib/libdc42.*.a 2>/dev/null`"
+WHICHLIBDC42="`ls ../lib/libdc42.*.a 2>/dev/null`"
 if [[ -z "$WHICHLIBDC42" ]]; then
    [[ -f "/usr/local/lib/libdc42.*.a" ]] && WHICHLIBDC42="/usr/local/lib/libdc42.*.a" && DC42INCLUDE="/usr/local/include/libdc42.h"
    [[ -f "/usr/lib/libdc42.*.a" ]]       && WHICHLIBDC42="/usr/lib/libdc42.*.a" && DC42INCLUDE="/usr/include/libdc42.h"
 else
-   DC42INCLUDE="../../lib/libdc42/include"
+   DC42INCLUDE="../include"
 fi
 
+echo "Looking for libdc42: $WHICHLIBDC42" 1>&2
 # if not found, build it by calling subbuild
 if [[ -n "$WHICHLIBDC42" ]]; then
    WHICHLIBDC42="../$WHICHLIBDC42"
 else
-   subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $SARCH
-   WHICHLIBDC42="`ls src/lib/libdc42/lib/libdc42.*.a 2>/dev/null`"
+   echo "Building libdc42..." 1>&2
+   subbuild ..  --no-banner      $SIXTYFOURBITS $SARCH
+   WHICHLIBDC42="`ls ../lib/libdc42.*.a 2>/dev/null`"
    if [[ ! -f "$WHICHLIBDC42" ]]; then exit 1; fi
    DC42INCLUDE="../../lib/libdc42/include"
    WHICHLIBDC42="../$WHICHLIBDC42"
 fi
 
-create_machine_h
-
 cd src
 
 export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
-LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=Compiled COMPILELIST \
 	$(for i in $SRCLIST; do echo $i; done) )
 
 if [[ -z "$XTLD" ]]; then

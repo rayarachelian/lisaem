@@ -8,5 +8,6 @@ function CLEANARTIFACTS {
   for i in $@; do 
     #echo "* Cleaning $i in $(pwd)" 1>&2
     find ./ -type f \( -path ./experimental -o -path ./scripts \) -prune -o  -name "${i}" -exec rm -f "{}" \; || exit $?
+    rm -f ${TLD}/pkg/*.pkg ${TLD}/pkg/*.deb ${TLD}/pkg/*.msi ${TLD}/pkg/*.rpm
   done
 }

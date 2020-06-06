@@ -10,8 +10,25 @@
 #
 ###############################################################################
 
+#---------------------------------------------------------------------------------------------
+# trim duplicate arguements, but keep any -I -L path args used for compilation and keep all
+# other arguements in the order they were received. Used to remove duplicate things like
+# -DDEBUG or -W-no-warn-blah from various appended strings to clean up compilation calls
+#--------------------------------------------------------------------------------------------
 
+function trim_duplicate_args() {
+  local SEEN=""
+  local ARGS=""
+  for var in "$@"; do
+      if [[ -z "$( echo $SEEN | grep :::$var::: | egrep -v ':::-L:::|:::-I:::|:::-framework:::' )" ]]; then
+         ARGS="$ARGS $var"
+         SEEN="$SEEN :::$var::: "
+      fi
+  done
 
+echo "${ARGS}"
+}
+#--------------------------------------------------------------------------------------------
 
 
 ##############################################################################
@@ -37,32 +54,16 @@ jobnum=0
 
 function qjob {
 
-  if [[ -z "$2" ]]; then
-     echo "qjob: $PWD qjob Missing Parameters $@ passed" 1>&2
-     exit 9
-  fi
+   if [[ -z "$2" ]]; then
+      echo "qjob: $PWD qjob Missing Parameters $@ passed" 1>&2
+      exit 9
+   fi
 
-  NAME="$1"
+   NAME="$1"
 
-  # if we only have one CPU, execute immediately, no need to waste effort queueing
-  getcpus
-#  if [[ $NUMCPUS -eq 1 ]]
-#  then
-#    [[ -z "$PERCENTJOB" ]] && PERCENTJOB=0
-#    export PERCENTJOB="$(( $PERCENTJOB +1 ))"
-#
-#    #if [[ -z "$PERCENTPROGRESS" ]]; then echo "$PWD qjob: 1 PERCENTPROGRESS is empty" 1>&2; exit 9; fi
-#    #if [[ -z "$PERCENTJOB"     ]]; then  echo "$PWD qjob: 2 PERCENTJOB is empty" 1>&2; exit 9; fi
-#    #if [[ -z "$NUMJOBSINPHASE" ]]; then  echo "$PWD qjob: 3 NUMJOBSINPHASE is empty" 1>&2; exit 9; fi
-#    #if [[ -z "$PERCENTCEILING" ]]; then  echo "$PWD qjob: 4 PERCENTCEILING is empty" 1>&2; exit 9; fi
-#    update_progress_bar $PERCENTPROGRESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
-#
-#    if [[ "${1:0:2}" == "!!" ]]; then echo -n "${1:2}" 1>&2; else echo "$1" 1>&2; fi
-#    shift
-#    $@ 1>&2
-#    if [[ $? -ne 0 ]]; then exit $?; fi
-#    return;
-#  else
+   # if we only have one CPU, execute immediately, no need to waste effort queueing
+   getcpus
+   [[ $NUMCPUS -eq 1 ]] && export NUMCPUS=2
 
     # make sure we have at least one free slot (and process any completed ones before adding more)
     waitq
@@ -82,41 +83,46 @@ function qjob {
     # systems /tmp is mounted with -o noexec
     # ------------------------------------------------------------------------------------------------
 
-    ( # shell for our slot script should also be bash
-     echo "#!/usr/bin/env bash"                          
-
      # $1 is the text to output.  i.e. "!!compiling foobar.c"
      # if $1 starts with !! then append a newline after it, otherwise, don't.
      NAME="$1"
-
      shift                                                     # remove $1 from the list of parameters
+     CMD="$( trim_duplicate_args $@ )"
 
-     echo "$@"                >>/tmp/${SLOTNAME}.out           # save compile command
+     # pre-seed the output file before launching the script.
+     echo "$CMD"              >>/tmp/${SLOTNAME}.out           # save compile command
      echo "in: $( /bin/pwd )" >>/tmp/${SLOTNAME}.out
      echo ""                  >>/tmp/${SLOTNAME}.out
-     echo "echo   \"${NAME}\" >>/tmp/${SLOTNAME}.out"          # output Name to the out file with newline
+     echo "${NAME}"           >>/tmp/${SLOTNAME}.out           # output Name to the out file with newline
 
-     echo "( $@ 2>&1 ) 2>&1   >>/tmp/${SLOTNAME}.out"          # execute $2 with params $3..$N and append to out file
+    ( # shell for our slot script should also be bash
+     echo "#!/usr/bin/env bash"                          
 
+     echo
+     echo "trap - EXIT"
+     echo
+
+     echo "( ${CMD} 2>&1 ) 2>&1 >>/tmp/${SLOTNAME}.out"        # execute $2 with params $3..$N and append to out file
+                                                               # we don't want this going to the tty!
      echo
      echo 'if [[ $? -ne 0 ]]; then'                            # check for errors.
-     echo "   mv /tmp/${SLOTNAME}.out /tmp/${SLOTNAME}.failed" # rename to .failed on failure, this acts as releasing a lock
-     echo "   cp ${SLOTNAME} /tmp"                             # keep the failed job in /tmp for analysis
+     echo "   cp ${SLOTNAME} /tmp"                             # keep the failed job in /tmp for later analysis
      echo
-     echo "   echo \"see: /tmp/${SLOTNAME} /tmp/${SLOTNAME}.failed for details\" >>/tmp/${SLOTNAME}.failed"
-     echo "   echo \"failed command was: $@\" >>/tmp/${SLOTNAME}.failed"
-     echo "   echo \"from: \$(/bin/pwd)\" >>/tmp/${SLOTNAME}.failed"
+     echo "   echo \"see: /tmp/${SLOTNAME} /tmp/${SLOTNAME}.failed for details\" >>/tmp/${SLOTNAME}.out"
+     echo "   echo \"failed command was: $@\" >>/tmp/${SLOTNAME}.out"
+     echo "   echo \"from: \$(/bin/pwd)\" >>/tmp/${SLOTNAME}.out"
+     echo "   mv /tmp/${SLOTNAME}.out /tmp/${SLOTNAME}.failed" # rename to .failed on failure, this acts as releasing a lock
      echo 'else'
      echo "   mv /tmp/$SLOTNAME.out /tmp/${SLOTNAME}.done"     # rename to .done on success, this acts as releasing a lock
      echo 'fi'
-     echo "rm ${SLOTNAME}"                                     # clean up from CWD
+     echo "rm ${SLOTNAME}"                                     # self-remove the slot script
      echo "exit 0"                                             # and we're done.
     )       > ./${SLOTNAME}                                    # create the slot script, make it executable
 
     chmod 755 ./${SLOTNAME}                                    # make it executable by our user
-    touch  /tmp/${SLOTNAME}.out                                # avoid race conditions where qjob is done, but output file
-                                                               # has been created, but we fall through waitqall
-    (./${SLOTNAME}) 1>&2 &                                     # launch it in the background.
+
+    (./${SLOTNAME} 1>&2) 1>&2 &                                # launch it in the background, output that hasn't been saved
+                                                               # to slot.x.outfile goes to stderr, not stdout!
 #  fi
 }
 
@@ -136,7 +142,7 @@ function waitq()
   local l=""
   getcpus
   twirl='/-\\|' # twirly cursor
-  if [[ $NUMCPUS -eq 1 ]]; then return; fi
+  [[ $NUMCPUS -eq 1 ]] && export NUMCPUS=2
   /usr/bin/tty -s && TTY="yes" || TTY=""   # don't bother with twirly cursor if non-interactive
   OUT="/tmp/slot.$$"
 
@@ -151,11 +157,11 @@ function waitq()
 
   while [[ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -ge $NUMCPUS ]]
   do
-     waitqc=$(( $waitqc + 1 ))
-     if [[ $waitqc -ge 5 ]]; then 
-        waitqc=0
-       update_progress_bar "${PERCENTPROGRESS}" "${PERCENTJOB}" "${NUMJOBSINPHASE}" "${PERCENTCEILING}"
-     fi
+     #waitqc=$(( $waitqc + 1 ))
+     #if [[ $waitqc -ge  ]]; then 
+     #   waitqc=0
+        update_progress_bar "${PERCENTPROGRESS}" "${PERCENTJOB}" "${NUMJOBSINPHASE}" "${PERCENTCEILING}"
+     #fi
      [[ -n "$TTY" ]] && printf "%c\b" "${twirl:$waitqc:1}" 1>&2
      sleep 0.1 2>/dev/null || sleep 1 # osx, linux, cygwin support fractions, solaris, aix do not.
   done
@@ -168,24 +174,24 @@ function waitq()
         # or errors if there are some, but output a newline at the end (for !! jobs) this will output the job name
         # if there are no errors
 
-        cat "$z" | (
+        (
            local count=0; 
            echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
-           while IFS= read -r l; do
+           while IFS= read -r -u42 l; do
                  count=$(( count + 1))
                  if [[ $count -gt 3 ]] && [[ $count -lt 9 ]]; then 
-                    [[ "${l:0:2}" != '!!' ]] && printf "%s" "${l}" || printf "%s\n" "${l:2}"
+                    [[ "${l:0:2}" != '!!' ]] && printf "%s" "${l}" 1>&2 || printf "%s\n" "${l:2}" 1>&2
                  else
-                    [[ $count -eq 9       ]] && printf "%s" "$l"
+                    [[ $count -eq 9       ]] && printf "%s" "$l" 1>&2
                  fi
                  echo "$l" >>${BUILDWARNINGS}
-           done
+           done 42<"$z"
            [[ "$count" -gt 8 ]] && echo "..."
         ) 1>&2
 
         # save warnings from the slot output file to build warnings
         #echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
-        cp "$z" "$z.final"
+        #DEBUG-KEEP#cp "$z" "$z.final"
         rm -f "$z"
 
         # update progress bar
@@ -217,15 +223,18 @@ function waitq()
         echo "---------------------------------------------------------------" 1>&2
         echo "${PWD}/waitq: failed job: $y"                                    1>&2
         echo "---------------------------------------------------------------" 1>&2
-        cat "$y"
+        cat "$y"                                                               1>&2
         echo "---------------------------------------------------------------" 1>&2
-        echo 1>&2
-        echo "---------------------- $y -----------------------" >>$BUILDWARNINGS
-        cat "$y"                                                 >>$BUILDWARNINGS
-        echo "------------- Compilation Aborted ------------"    >>$BUILDWARNINGS
+        echo                                                                   1>&2
+        echo "---------------------------- $y -------------------------------" >>$BUILDWARNINGS
+        cat "$y"                                                               >>$BUILDWARNINGS
+        echo "--------------------- Compilation Aborted ---------------------" >>$BUILDWARNINGS
      done
      # since there were failed jobs, we have to quit our build. Sorry.
      echo "${PWD}/waitq: Aborted due to a failed job! See $BUILDWARNINGS" 1>&2
+     sleep 3
+     kill %1 %2 %3 %4 %5 %6 %7 %8 %9 2>/dev/null >/dev/null
+     rm -f ${TLD}/slot*.sh
      exit 9
   fi
  fi
@@ -242,7 +251,7 @@ function waitqall()
   # busier than our script.
 
   [[ -z "$NUMCPUS"  ]] && getcpus
-  [[ $NUMCPUS -eq 1 ]] && return
+  [[ $NUMCPUS -eq 1 ]] && export NUMCPUS=2
 
   OUT="/tmp/slot.$$"  # /tmp/slot.6588.10.sh.done
 

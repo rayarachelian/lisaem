@@ -1,20 +1,5 @@
 Here's a list of some of the current known issues, there are likely many others.
 
-
-* Major Display issues:
-
-The display system is horribly broken, especially on macos x. Works failry well
-on Linux, but even there, certain Scale values and video modes cause issues. 
-Was able to mostly remediate this on macos x by using double buffering, but 
-this makes refreshes very slow and also some of the refreshes are slightly 
-horizontally and vertically off, making the display break a bit - but it's 
-no longer flashing a white rectangle.
-
-Some combinations of skins/video mode/scale work better than others. 
-Debugging this is not easy. In others the mouse movement or detection of
-clicking on the image of the floppy drive or power button or display in 
-skinned mode is somewhat off.
-
 * Various sound generation issues across several platforms, but works on 
 GTK if SDL is enabled, so turning on SDL for build wx scripts. 
 

@@ -20,6 +20,12 @@
 # these are updated by the compileq functions.
 ##############################################################################
 
+# save parameters to update progress bar to reapply on twirly
+___PERFECTBASE=""
+___PHASEPOSITION=""
+___PHASETOTAL=""
+___PERCENTCEILING=""
+
 function get_elapsed_time() {
     local now=""
     now=$( date '+%s' )
@@ -47,6 +53,11 @@ function update_progress_bar()
        set >/tmp/buildbash.set.out
        exit 9
     fi 
+
+    export ___PERFECTBASE="$1"
+    export ___PHASEPOSITION="$2"
+    export ___PHASETOTAL="$3"
+    export ___PERCENTCEILING="$4"
 
     local elapsed=""
  
@@ -97,4 +108,14 @@ function update_progress_bar()
     ansi_reset
     ansi_restore_cursor
   fi
+}
+
+function refresh_progress_bar()
+{
+   [[ -n "$___PERCENTCEILING" ]] && \
+     update_progress_bar            \
+           "$___PERFECTBASE"        \
+           "$___PHASEPOSITION"      \
+           "$___PHASETOTAL"         \
+           "$___PERCENTCEILING"
 }

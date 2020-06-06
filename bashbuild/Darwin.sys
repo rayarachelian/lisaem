@@ -30,6 +30,8 @@ export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION=$( printf "%02d.%d.%d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
 
+#[[ -n "$MIN_MACOSX_VERSION" ]] && export SDKROOT="$MIN_MACOSX_VERSION"
+
 export HASHOPTS="-b --tag"
 
 export PREFIX="/Applications"
@@ -51,6 +53,8 @@ if [[ "$MACOSX_VERSION" < "10.09" ]]; then
   export NOINCOMPATIBLEPTR=""
   export NOCPP11EXT=""
   export NODEPRECATEDCPY=""
+  export NOIGNOREDQUALIFIERS=""
+  export NOEMPTYBODY=""
 else
   export NOUNKNOWNWARNING="-Wno-unknown-warning-option"
 fi

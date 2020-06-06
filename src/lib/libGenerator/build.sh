@@ -153,20 +153,27 @@ for j in $@; do
     ;;
 #DEBUG DEBUGMEMCALLS IPC_COMMENTS
 
-  -64|--64)                     export SIXTYFOURBITS="--64"; 
+  -64|--64|-m64)                export SIXTYFOURBITS="--64"; 
                                 export THIRTYTWOBITS="";
-                                export ARCH="-m64"                        ;;
+                                export ARCH="-m64"; export SARCH="-m64"   ;;
 
-  -32|--32)                     export SIXTYFOURBITS=""; 
+  -32|--32|-m32)                export SIXTYFOURBITS=""; 
                                 export THIRTYTWOBITS="--32"; 
                                 [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
-                                export ARCH="-m32"                        ;;
+                                export ARCH="-m32"; export SARCH="-m32"   ;;
+
+  -march=*)                     export ARCH="${opt} $ARCH"                ;;
+  -arch=*)                      export ARCH="$(echo ${opt} | sed -e 's/=/ /g') $ARCH"
+                                export SARCH="${opt} $SARCH"              ;;
 
   --no-debug)                   WITHDEBUG=""
                                 WARNINGS=""                               ;;
 
-  --debug)                      WITHDEBUG="$WITHDEBUG -g"
-                                WARNINGS="-Wall"                          ;;
+  --debug*)                     WITHDEBUG="$WITHDEBUG -g"
+                                WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" 
+                                WITHTRACE="-DDEBUG"
+                                ;;
+                                
  #--ipc-comments)               WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
  #                              WARNINGS="-Wall"                          ;;
  #--reg-ipc-comments)           WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS -DIPC_COMMENT_REGS"
@@ -260,10 +267,10 @@ MACHINE="`uname -mrsv`"
 
 if  [[ "$needclean" -gt 0 ]]; then
     rm -f .last-opts last-opts
-    cd ./lib       && /bin/rm -f *.a *.o
-    cd ../obj      && /bin/rm -f *.a *.o
-    cd ../cpu68k   && /bin/rm -f *.exe def68k gen68k cpu68k-?.c
-    cd ..
+    cd ${XTLD}/lib      && /bin/rm -f *.a *.o
+    cd ${XTLD}/obj      && /bin/rm -f *.a *.o
+    cd ${XTLD}/cpu68k   && /bin/rm -f *.exe def68k gen68k cpu68k-?.c
+    cd ${XTLD}
 fi
 
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
@@ -298,20 +305,20 @@ then
   export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $ARCH -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
   LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiled COMPILELIST tab68k def68k )
 
-  cd ../obj
-
+  cd ${XTLD}/obj
+  waitqall
   $CC $CLICMD $ARCH  -o def68k tab68k.o def68k.o
 
-  cd ../cpu68k
+  cd ${XTLD}/cpu68k
   echo -n "  "
   ../obj/def68k || exit 1
 
   echo "  Compiled gen68k.c..."
   $CC $CLICMD $ARCH $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
 
-  $CC $CLICMD $ARCH $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o $LIB
+  $CC $CLICMD $ARCH $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o 
   echo -n "  "
-  ../obj/gen68k || exit 1
+  ${XTLD}/obj/gen68k || exit 1
 
   #          1         2         3         4         5         6         7
   #01234567890123456789012345678901234567890123456789012345678901234567890123456789
@@ -335,7 +342,7 @@ fi
 #Build libGenerator.a
 echo
 echo "* Generator CPU Library        (./generator)"
-cd ../generator
+cd ${XTLD}/generator
 
 DEPS=0
 [[ "$DEPS" -eq 0 ]] && if  needed cpu68k.c      ../lib/libGenerator.a;then  DEPS=1; fi
@@ -360,7 +367,7 @@ if [[ -n "$COMPILED" ]] || [[ ! -f ../lib/libGenerator.a ]]; then
   rm -f ../lib/libGenerator*
   makelibs  ../lib libGenerator "${VERSION}" static "../obj/cpu68k.o ../obj/reg68k.o ../obj/diss68k.o ../obj/tab68k.o ../obj/ui_log.o ../obj/cpu68k-?.o" # ../obj/lib68k.${VERSION}.a"
 fi
-cd ../lib/
+cd ${XTLD}/lib/
 
 fi
 
@@ -369,7 +376,8 @@ fi
 
 if [[ -n "$INSTALL" ]]
     then
-      cd ../lib/
+      cd ${XTLD}/lib/
+
       echo Installing libGenerator
       mkdir -pm755 "$PREFIX/lib"
       cp libGenerator-$VERSION.a "$PREFIX/lib/"

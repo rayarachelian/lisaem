@@ -18,8 +18,16 @@ MACHINE=$( uname -m )
 # x86_64
 
 ME="$0"
-MYDIR="$( dirname ${0})"
+#MYDIR="$( dirname ${0})"  # <- this fails when dirname contains spaces
+MYDIR="${ME%/*}"
 cd "$MYDIR"
+if [[ "$?" -ne 0 ]]; then
+    osascript <<-EOSCD
+    display dialog "Failed to change into directory for $ME, wound up in $(pwd) instead." with title "bug in lisaem.sh launch script"
+EOSCD
+exit 1
+fi
+
 
 OSVER=$( sw_vers -productVersion        )
 OSMAJOR=$( echo $OSVER | cut -d'.' -f1  )
