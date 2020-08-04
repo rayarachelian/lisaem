@@ -37,8 +37,8 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="RC1"                       # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.05.27"                # release date.  must be YYYY.MM.DD
+    STABILITY="RC2"                       # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2020.08.03"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -67,6 +67,7 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
+#VERSION="1.2.7-RC2_2020.05.27"
 #VERSION="1.2.7-BETA_2019.03.31"
 #VERSION="1.2.7-BETA_2019.03.24"
 #VERSION="1.2.7-BETA_2019.03.14"

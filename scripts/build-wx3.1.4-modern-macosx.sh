@@ -12,7 +12,7 @@ echo "MIN_MACOSX_VERSION: $MIN_MACOSX_VERSION"
 
 # note that 10.8 will only build 3.0.4 and 3.0.2
 
-for VER in 3.1.2; do
+for VER in 3.1.4; do
 
 if [[ ! -d "wxWidgets-${VER}" ]]; then
 

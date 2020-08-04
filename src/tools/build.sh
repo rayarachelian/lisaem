@@ -54,7 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dumper  lisadiskinfo  lisafsh-tool  losdeserialize rraw-to-dc42"
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 
@@ -69,7 +69,7 @@ if [[ -z "$NOBANNER" ]]; then
    image ${XTLD}/resources/libdc42-banner.png || (
 
       echo ' _____________ --------------------------------------------------------------'
-      echo "| |  dc42  |.|   dc42 tools ${VERSION}  -   Unified Build Script"
+      echo "| | LisaEm |.| LisaEm dc42 tools ${VERSION}  -   Unified Build Script"
       echo '| | tools  | |                                                        '
       echo '| |________| |              http://lisaem.sunder.net'
       echo '|   ______   | Copyright (C) MMXX Ray Arachelian, All Rights Reserved'
@@ -138,7 +138,7 @@ for i in $@; do
 
            echo Uninstalling from $PREFIX and $PREFIXLIB
            rm -rf $PREFIXLIB/lisaem/
-	        rm -rf $PREFIX/patchxenix${EXT} $PREFIX/blu-to-dc42${EXT}  $PREFIX/dc42-resize-to-400k${EXT}  $PREFIX/dumper${EXT}  $PREFIX/lisadiskinfo${EXT}  $PREFIX/lisafsh-tool${EXT}  $PREFIX/losdeserialize${EXT}  $PREFIX/rraw-to-dc42${EXT}
+	   for i in $SRCLIST; do rm -rf $PREFIX/${i}${EXT}; done
            exit 0
 
     ;;
@@ -279,6 +279,10 @@ fi
 create_machine_h
 
 cd src
+
+# if we're being called as the main program
+[[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 
+[[ -z "$PERCENTCEILING"  ]] && export PERCENTCEILING=$(wc -w <<< "$SRCLIST" )
 
 export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
 LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \

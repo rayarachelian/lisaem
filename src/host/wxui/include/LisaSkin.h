@@ -58,6 +58,7 @@ public:
 
         wxString floppy_eject; //    = "floppy_eject.wav";
         wxString floppy_insert; //   = "floppy_insert_sound.wav";
+        wxString floppy_insert_nopower;
         wxString floppy_motor1; //   = "floppy_motor1.wav";
         wxString floppy_motor2; //   = "floppy_motor2.wav";
         wxString poweroffclk; //     = "poweroffclk.wav";            

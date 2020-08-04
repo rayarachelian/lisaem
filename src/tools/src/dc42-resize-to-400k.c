@@ -23,17 +23,27 @@ int main(int argc, char *argv[])
   char nameout[8192];  // filename buffers
   char nameout1[8192]; // filename buffers
 
+
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "    DC42 Resize to 400k v0.01                http://lisaem.sunder.net");
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "          Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.");
+  puts(    "              Released under the GNU Public License, Version 2.0");
+  puts(    "    There is absolutely no warranty for this program. Use at your own risk.  ");
+  puts(    "  ---------------------------------------------------------------------------\n");
+
+
   for (i=1; i<argc; i++)
    {
      if (strcmp(argv[i],"-h")==0 || strcmp(argv[i],"--help")==0 )
         {
-            printf("Sector Dumper.\n\n"
+            printf("dc42-resize-to-400k\n\n"
                 //  01234567890123456789012345678901234567890123456789012345678901234567890123456789
                 //  0         1         2         3         4         5         6         7         8
-                   "Usage: dc42-to-raw Disk_Image.dc42\n\n"
+                   "Usage: dc42-resize-to-400k Disk_Image.dc42\n\n"
 
-                   "This utility is used to dump the data and tags to two separate files.\n"
-                   "Does the opposite of raw2dc42.\n"
+                   "This utility is used to extend short dc42 images such as BLU or NeoWidEx\n"
+                   "created by other toolchains to full size 400k 3.5\" images. \n"
             );
 
             exit(0);

@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-BETA_2020.03.31                    *
+*              The Lisa Emulator Project  1.2.7-RC1_2020.05.27                    *
 *                  Copyright (C) 2020 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *
@@ -88,6 +88,8 @@ REASSIGN(uint8,contrast,0xff); // 0xff=black 0x80=visible 0x00=all white
 REASSIGN(uint8,volume,4); // 0x0e is the mask for this.
 REASSIGN(int,debug_log_enabled,0);
 REASSIGN(int,debug_log_onclick,0);
+REASSIGN(int,debug_log_cpu_core_tester,0);
+REASSIGN(int,on_click_debug_log_cpu_core_tester,0);
 REASSIGN(int,dbx,0);
 REASSIGN(int16,copsqueuelen,0);
 REASSIGN(uint8, NMIKEY,0);

@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2020.05.25                   *
+*              The Lisa Emulator Project  V1.2.7      RC2 2020.06.13                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) MCMXCVIII, MMXX Ray A. Arachelian                     *
@@ -25,10 +25,10 @@
 \**************************************************************************************/
 
 #ifdef DEBUG
-#define DEBUG_MOUSE_LOCATION 1
-#define DEBUG_HOTBUTTONS 1
+///#define DEBUG_MOUSE_LOCATION 1
+///#define DEBUG_HOTBUTTONS 1
 //#define DEBUG_MOUSE_LOG 1
-#define DEBUG_REFRESH_RECT 1
+///#define DEBUG_REFRESH_RECT 1
 //#define DRAW_CROSSHAIRS_SKINLESS 1
 #endif
 
@@ -272,7 +272,7 @@ int effective_lisa_vid_size_x=720;
 int o_effective_lisa_vid_size_y=500; // these ARE NOT hidpi_scale
 int o_effective_lisa_vid_size_x=720;
 
-wxPaintEvent nada;
+//wxPaintEvent nada;
 
 void black(void);
 
@@ -499,6 +499,10 @@ enum
     ID_DEBUG2,
     ID_RAMDUMP,
 #endif
+#ifdef CPU_CORE_TESTER
+    ID_CORETEST,
+    ID_CORETEST_CLICK,
+#endif
 
     ID_DEBUGGER,
     ID_POWERKEY,
@@ -671,6 +675,11 @@ public:
     void OnTraceLog2(wxCommandEvent& event);
     void DumpAllScreenshot(wxCommandEvent& event);
 #endif
+#ifdef CPU_CORE_TESTER
+    void OnCPUCoreTester(wxCommandEvent & event);
+    void OnCPUCoreTesterClick(wxCommandEvent & event);
+#endif
+
     void OnKEY_APL_DOT(wxCommandEvent& event);
     void OnKEY_APL_S(wxCommandEvent& event);
     void OnKEY_APL_ENTER(wxCommandEvent& event);
@@ -867,8 +876,13 @@ BEGIN_EVENT_TABLE(LisaEmFrame, wxFrame)
     EVT_MENU(ID_DEBUG,           LisaEmFrame::OnTraceLog)
     EVT_MENU(ID_DEBUG2,          LisaEmFrame::OnTraceLog2)
     EVT_MENU(ID_RAMDUMP,         LisaEmFrame::DumpAllScreenshot)
+#ifdef CPU_CORE_TESTER
+    EVT_MENU(ID_CORETEST,        LisaEmFrame::OnCPUCoreTester)
+    EVT_MENU(ID_CORETEST_CLICK,  LisaEmFrame::OnCPUCoreTesterClick)
 
 #endif
+#endif
+
 #endif
 
 
@@ -1063,6 +1077,7 @@ wxMemoryDC       *my_memhq3xDC=NULL;
 
 wxSound          *my_floppy_eject=NULL;
 wxSound          *my_floppy_insert=NULL;
+wxSound          *my_floppy_insert_nopower=NULL;
 wxSound          *my_floppy_motor1=NULL;
 wxSound          *my_floppy_motor2=NULL;
 wxSound          *my_lisa_power_switch01=NULL;
@@ -1497,11 +1512,16 @@ void LisaEmFrame::FloppyAnimation(void)
             my_lisawin->floppystate++;
             my_lisawin->floppystate |= FLOPPY_ANIMATING|FLOPPY_NEEDS_REDRAW;
         } 
-        
-        if ((my_lisawin->floppystate & FLOPPY_ANIM_MASK)== FLOPPY_PRESENT) 
-        {
-            my_lisawin->floppystate= FLOPPY_NEEDS_REDRAW | FLOPPY_PRESENT; // refresh, stop counting.
-            if (!!my_floppy_insert && sound_effects_on) my_floppy_insert->Play(romless ? wxSOUND_SYNC:wxSOUND_ASYNC);
+        if  (!!my_floppy_insert && sound_effects_on) {
+            if  ((my_lisawin->floppystate & FLOPPY_ANIM_MASK)== FLOPPY_PRESENT) 
+            {
+                my_lisawin->floppystate= FLOPPY_NEEDS_REDRAW | FLOPPY_PRESENT; // refresh, stop counting.
+
+                if  ((my_lisawin->powerstate & POWER_ON_MASK) == POWER_ON)
+                    { my_floppy_insert->Play(romless ? wxSOUND_SYNC:wxSOUND_ASYNC);}
+                else
+                    { my_floppy_insert_nopower->Play(romless ? wxSOUND_SYNC:wxSOUND_ASYNC);}
+            }
         }
     }
     else
@@ -2847,13 +2867,15 @@ bool LisaEmApp::OnInit()
     wxString sndfile;
     
     ALERT_LOG(0,"Loading sounds");
-    sndfile=my_lisaframe->skindir + skin.floppy_eject;           my_floppy_eject  =       new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.floppy_insert;          my_floppy_insert =       new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.floppy_motor1;          my_floppy_motor1 =       new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.floppy_motor2;          my_floppy_motor2 =       new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.lisa_power_switch01;    my_lisa_power_switch01 = new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.lisa_power_switch02;    my_lisa_power_switch02 = new wxSound(sndfile);
-    sndfile=my_lisaframe->skindir + skin.poweroffclk;            my_poweroffclk =         new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.floppy_eject;           my_floppy_eject  =         new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.floppy_insert;          my_floppy_insert =         new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.floppy_insert_nopower;  my_floppy_insert_nopower = new wxSound(sndfile);
+
+    sndfile=my_lisaframe->skindir + skin.floppy_motor1;          my_floppy_motor1 =         new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.floppy_motor2;          my_floppy_motor2 =         new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.lisa_power_switch01;    my_lisa_power_switch01 =   new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.lisa_power_switch02;    my_lisa_power_switch02 =   new wxSound(sndfile);
+    sndfile=my_lisaframe->skindir + skin.poweroffclk;            my_poweroffclk =           new wxSound(sndfile);
     
     ALERT_LOG(0,"Update ProFile menu");
     my_lisaframe->UpdateProfileMenu();
@@ -3020,6 +3042,15 @@ void LisaWin::LogKeyEvent(const wxChar* WXUNUSED(name), wxKeyEvent& event, int k
                   if (debug_log_enabled) {debug_on("onclick");}
                   else                   {debug_off(); ALERT_LOG(0,"Debug log turned off on RIGHT CLICK");}
                 }
+#ifdef CPU_CORE_TESTER
+                if (debug_log_cpu_core_tester) return;
+
+                if ( on_click_debug_log_cpu_core_tester )
+                   { on_click_debug_log_cpu_core_tester=0; 
+                     debug_log_cpu_core_tester=1; // fall through to accept click
+
+                   }
+#endif
 #endif
 
     //ALERT_LOG(0,"Received %08x keycode on event %d",keycode,keydir);
@@ -3859,7 +3890,7 @@ int LisaWin::RePaint_AAGray(int startx, int starty, int endx, int endy)
     my_memDC->SelectObjectAsSource(*my_lisabitmap);
 
     prep_dirty;
-    update=1;
+    updated=1;
     if  (updated) 
     {
            my_skinDC->StretchBlit( _H(skin.screen_origin_x + e_dirty_x_min), _H(skin.screen_origin_y + e_dirty_y_min),   // target x,y
@@ -3899,6 +3930,7 @@ int LisaWin::RePaint_AAGray(int startx, int starty, int endx, int endy)
       updated=0;
   }
 
+return 1;
 }
 
 
@@ -4063,7 +4095,7 @@ int LisaWin::RePaint_AntiAliased(int startx, int starty, int endx, int endy)
     e_dirty_x_max=dirty_x_max; // it will be repeated again below, but so what, it's only 4 assignments
     e_dirty_y_min=dirty_y_min; //screen_y_map[dirty_y_min];         // and two lookups.
     e_dirty_y_max=dirty_y_max; //screen_y_map[dirty_y_max];
-    update=1;
+    updated=1;
     if  (updated)
         {       
            my_skinDC->StretchBlit(_H(skin.screen_origin_x + e_dirty_x_min), _H(skin.screen_origin_y + e_dirty_y_min),   // target x,y
@@ -4080,7 +4112,6 @@ int LisaWin::RePaint_AntiAliased(int startx, int starty, int endx, int endy)
   {
 
     if (!display_image)   display_image= new wxImage(my_lisabitmap->ConvertToImage());
-    // ::TODO:: FIXME: CODEDEBT * this might need rework for hidpi
     for ( int yo = 0 , yi=0; yi < o_effective_lisa_vid_size_y; yo++,yi++ )
         {
             // note neither xi, nor xo are incremented as part of the for-loop header, this is because
@@ -4109,7 +4140,7 @@ int LisaWin::RePaint_AntiAliased(int startx, int starty, int endx, int endy)
       repaintall |= REPAINT_INVALID_WINDOW | REPAINT_VIDEO_TO_SKIN;
       updated=0;
   }
-
+  return 1;
 }
 
 ///////////////// SETRGB 16 bit Raw Replacement MACRO //////////////////////////////////////////////////   
@@ -4379,7 +4410,7 @@ else
       updated=0;
   }
 
-
+  return 1;
 }
 
 // this is essentially the same as SingleY, only for a differently sized display.
@@ -4503,7 +4534,7 @@ else
       updated=0;
   }
 
-
+return 1;
 }
 
 
@@ -4610,6 +4641,7 @@ int LisaWin::RePaint_DoubleY(int startx, int starty, int endx, int endy)
       updated=0;
   }
 
+return 1;
 }
 
 
@@ -4715,6 +4747,8 @@ int LisaWin::RePaint_2X3Y(int startx, int starty, int endx, int endy)
           repaintall |= REPAINT_INVALID_WINDOW | REPAINT_VIDEO_TO_SKIN;
           updated=0;
         }
+
+return 1;
 }
 
 
@@ -4753,7 +4787,9 @@ void LisaWin::OnPaint(wxPaintEvent& event )
 
     //if ( skins_on ? OnPaint_skins(rect, dc) : OnPaint_skinless(rect, dc) )  break;
     if ( skins_on) r=OnPaint_skins(rect, dc); else r=OnPaint_skinless(rect, dc);
+    #ifndef __WXGTK__
     if (r) break;
+    #endif
     upd++;
   }
 
@@ -5381,6 +5417,10 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
     if (my_lisabitmap==NULL)       return;
      // in full screen mode, show menu bar when above line. or maybe disable this and always show the menu bar, but that's fugly. :(  Grrr.
 
+#ifdef CPU_CORE_TESTER
+                if (debug_log_cpu_core_tester) return;
+#endif
+
     #if (!defined(__WXOSX__)) && (!defined(SHOW_MENU_IN_FULLSCREEN))
     if (!FullScreenCheckMenuItem)  return;
     if (my_lisaframe->IsFullScreen() || FullScreenCheckMenuItem->IsChecked() )
@@ -5653,6 +5693,25 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
                   else                   debug_off();
                 }
 
+// spit out boot device + slot IDs
+//#ifdef DEBUG
+//              if (event.LeftUp()) {
+//                  uint16 r=lisa_ram_safe_getword(1,0x1b2);
+//                  uint16 s1=lisa_ram_safe_getword(1,0x298);
+//                  uint16 s2=lisa_ram_safe_getword(1,0x29a);
+//                  uint16 s3=lisa_ram_safe_getword(1,0x29c);
+//                  ALERT_LOG(0,"Boot device:%04x slots1-3: %04x %04x %04x",r,s1,s2,s3);
+//              }
+//#endif
+
+#ifdef CPU_CORE_TESTER
+              if  (event.LeftDown() && on_click_debug_log_cpu_core_tester )
+                  { on_click_debug_log_cpu_core_tester=0; 
+                     debug_log_cpu_core_tester=1; // fall through to accept click
+                  }
+#endif
+
+
                 if (my_lisaframe->running==emuation_paused_for_screen)
                 {
                     SetCursor(wxCURSOR_CROSS);
@@ -5852,6 +5911,8 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
     //EXTERMINATE(my_lisa_sound          );
     EXTERMINATE(my_floppy_eject        );
     EXTERMINATE(my_floppy_insert       );
+    EXTERMINATE(my_floppy_insert_nopower);
+
     EXTERMINATE(my_floppy_motor1       );
     EXTERMINATE(my_floppy_motor2       );
     EXTERMINATE(my_lisa_power_switch01 );
@@ -5918,7 +5979,7 @@ void LisaEmFrame::OnLisaList2(wxCommandEvent& WXUNUSED(event)) {::wxLaunchDefaul
 
 void LisaEmFrame::OnConfig(wxCommandEvent& WXUNUSED(event))
 {
-      EXTERMINATE(my_LisaConfigFrame);
+          EXTERMINATE(my_LisaConfigFrame);
           my_LisaConfigFrame=new LisaConfigFrame( wxT("Preferences"), my_lisaconfig);
           #if defined(__WXMOTIF__)
           int x, y;
@@ -6014,7 +6075,23 @@ void LisaEmFrame::OnTraceLog(wxCommandEvent& WXUNUSED(event))
     }
 
 void LisaEmFrame::OnTraceLog2(wxCommandEvent& WXUNUSED(event))           { debug_log_onclick=1;                   }
+
+
+#ifdef CPU_CORE_TESTER
+void LisaEmFrame::OnCPUCoreTester(wxCommandEvent& WXUNUSED(event))       
+    { 
+      debug_log_cpu_core_tester=!debug_log_cpu_core_tester;
+    }
+
+void LisaEmFrame::OnCPUCoreTesterClick(wxCommandEvent& WXUNUSED(event))       
+    { 
+      if (debug_log_cpu_core_tester) debug_log_cpu_core_tester=0;
+      else on_click_debug_log_cpu_core_tester=1;
+    }
+
 #endif
+#endif
+
 
 void LisaEmFrame::OnKEY_APL_DOT(wxCommandEvent& WXUNUSED(event))         { apple_dot();                           }
 void LisaEmFrame::OnKEY_APL_S(wxCommandEvent& WXUNUSED(event))           { apple_S();                             }
@@ -6189,6 +6266,10 @@ void update_menu_checkmarks(void)
       {
           fileMenu->Check(ID_DEBUG, !!debug_log_enabled);
           fileMenu->Check(ID_DEBUG2,!!debug_log_onclick);
+      #ifdef CPU_CORE_TESTER
+          fileMenu->Check(ID_CORETEST,!!debug_log_cpu_core_tester);
+      #endif
+
       }
       #endif
       #endif
@@ -6726,6 +6807,8 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
         : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, LisaEmFrameSize, wxDEFAULT_FRAME_STYLE)
 //      : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(ISKINSIZE), wxDEFAULT_FRAME_STYLE)
 {
+    int x,y;
+
     effective_lisa_vid_size_y=500;
 
     ALERT_LOG(0,"Calling wxInitAllImageHandlers");
@@ -6739,8 +6822,8 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     lastcrtrefresh=0;
     hostrefresh=1000/ 8;
     onidle_calls=0;
+    running=0;
 
-    int x,y;
     y=myConfig->Read(_T("/lisaframe/sizey"),(long)0);
     x=myConfig->Read(_T("/lisaframe/sizex"),(long)0);
 
@@ -7025,6 +7108,11 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     fileMenu->AppendCheckItem(ID_DEBUG2, wxT("Trace Log on Click/Key"),   wxT("Trace Log On/Off on next mouse click or keypress"));
     fileMenu->Append         (ID_RAMDUMP,wxT("Dump memory"),              wxT("Dump memory, MMU and a screenshot"));
     fileMenu->AppendSeparator();
+    #ifdef CPU_CORE_TESTER
+    fileMenu->AppendCheckItem(ID_CORETEST,wxT("Core CPU Tester immediate on"),          wxT("CPU Core Tester"));
+    fileMenu->Append(ID_CORETEST_CLICK,wxT("Core CPU Tester on next click"),          wxT("CPU Core Tester"));
+    fileMenu->AppendSeparator();
+    #endif
     #endif
     #endif
 
@@ -7296,27 +7384,27 @@ void LisaEmFrame::OnScreenshot(wxCommandEvent& event)
     }
 
 
-wxString filter;
+wxString filter="";
+
 #ifdef wxUSE_LIBPNG
-                                        filter+=_T("PNG files (*.png)|");
-                                        //filter+=_T("PNG files (*.png)|*.png|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="PNG files (*.png)|*.png";
 #endif
 #ifdef wxUSE_LIBJPEG
-                                        filter+=_T("JPEG files (*.jpg)|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="JPEG files (*.jpg)|*.jpg";
 #endif
 #ifdef wxUSE_LIBTIFF
-                                        filter+=_T("TIFF files (*.tif)|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="TIFF files (*.tif)|*.tif";
 #endif
 
 // is this enabled, now that Unisys had the evil patent expire?
 #ifdef wxUSE_LIBGIF
-                                        filter+=_T("GIF files (*.gif)|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="GIF files (*.gif)|*.gif";
 #endif
 
 #ifdef wxUSE_PCX
-                                        filter+=_T("PCX files (*.pcx)|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="PCX files (*.pcx)|*.pcx";
 #endif
-                                        filter+=_T("BMP files (*.bmp)|");
+                                        filter+=(filter.Len()>0 ? "|":""); filter+="BMP files (*.bmp)|*.bmp";
 
     wxString savefilename = wxFileSelector(   description,
                                               wxEmptyString,
@@ -7698,8 +7786,9 @@ int initialize_all_subsystems(void)
     TWOMEGMLIM=0x001fffff;
 
     // Simulate physical Lisa memory boards
+
     switch(my_lisaconfig->mymaxlisaram)
-    {
+    { // these are totally wrong.
        case 512  : maxlisaram=0x100000;  minlisaram=0x080000;  break;     // single 512KB board in slot 1
        case 1024 : maxlisaram=0x180000;  minlisaram=0x080000;  break;     // two 512KB boards in slot1, slot 2
        case 1536 : maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
@@ -7718,7 +7807,7 @@ int initialize_all_subsystems(void)
 
     if (lisaram) free(lisaram);          // remove old junk if it exists
 
-    lisaram=(uint8 *)malloc(maxlisaram+512);     // added 512 bytes at the end to avoid overflows.
+    lisaram=(uint8 *)malloc(2*1024*1024+512); //maxlisaram+512);     // always allocate 2MB - for future planned features, plus a small buffer.
     if  (!lisaram) 
         {
           wxMessageBox( _T("Could not allocate memory for the Lisa to use."),
@@ -7726,7 +7815,18 @@ int initialize_all_subsystems(void)
           return 23;
         }
 
-    memset(lisaram,0xff,maxlisaram+511);
+    memset(lisaram,0xff,2*1024*1024+511); //maxlisaram+511);
+    // 128k=0x20000, 2MB-128k=0x1E0000
+    maxlisaram=0x200000-1024*128; // seems I can do -128k here but no more for max ram, why does it work on a real Lisa?
+    //minlisaram=0; //20200731 - this causes a segfault in cpu68k:
+    /*#0  cpu68k_makeipclist (pc=<optimized out>) at cpu68k.c:1251
+          1251        free(ipcs); return rettable;
+          (gdb) print ipc
+          $1 = <optimized out>
+          (gdb) print ipcs
+          $2 = (t_ipc **) 0x55557ef6482*/
+    ALERT_LOG(0,"maxlisaram: %08x bytes",maxlisaram);
+    ALERT_LOG(0,"minlisaram: %08x bytes",minlisaram);
 
     if (my_lisaconfig->kbid) set_keyboard_id(my_lisaconfig->kbid);  else set_keyboard_id(-1);
 
@@ -7805,6 +7905,10 @@ int initialize_all_subsystems(void)
 
     setstatusbar("Initializing Lisa Boot ROM");
   
+
+    ALERT_LOG(0,"\n\nmmu_trans_all size: %d bytes\n\n",sizeof(mmu_trans_all));
+
+
     DEBUG_LOG(0,"Loading Lisa ROM");
     strncpy(tmp, CSTR(my_lisaconfig->rompath ),MAXPATHLEN-1);
     if  (read_dtc_rom(tmp,   lisarom)==0)
@@ -8468,7 +8572,7 @@ char *get_welcome_fortune(void)
   "Ask your platypus if LisaEm is right for you!",
   "Made From 100% Recycled muons",
   "Made by hand, and compilers",
-  "Shut up and take my floppy images!"
+  "Shut up and take my floppy disk images!",
   "If this Widget's a-rockin', don't come a-knockin'",
   "[ Cancel ] [ DoIt ]",
   "Purveyors of Emulation to Her Majesty The Space Emperess",
@@ -8584,11 +8688,14 @@ char *get_welcome_fortune(void)
   "Oh my gosh, the square root of soon is never!",
   "There's no platypus controlling me",
   "Hey! Where's Jerry?",
+  "There's a 104 days of CoVID19 isolation, and work just comes to end it, so the annual problem for our generation is how to emulate a Lisa",
+  "You want us to be called L.O.V.E.M.U.F.F.I.N.? Yes, it stands for Lisas Virtually Emulated on Machines Under Fir Forests In Niagra!",
   "There you are Perry",
   "Good Moring, Agent L",
   "Effervescent and frothy.",
   "Whachoodooing?",
   "Ferb! I know what we're emulating today!",
+  "Yellowed LisaEm faceplate? It'll be like driving a really fast Ducky Momo!",
   "Like most of life's problems, this one can be solved by emulating...",
   "What unites people? Armies? Gold? Flags? No! Emulators! There's nothing in the world more powerful than a good emulator. Nothing can stop it. No app store can ban it. And who has a better emulator than the Lisa? The machine Apple literally buried, but still it lived!",
   // anonymous "(Jet Set Willy)'s an old Spectrum game just in the same way that the Mona Lisa is an old painting of a woman, right, remember that"  The Retro Hour 172 Matthew Smith interview and Hogs of War History ~@1:03:23hr
@@ -8598,27 +8705,33 @@ char *get_welcome_fortune(void)
   "Next time, on 'Ask This Old LisaFaq'...",
   "\"Truly, they were as gods, who built the Lisa\" - Bender Bending Rodriguez",
   "I'm gonna get my Lisa back, virtually! In your face ineffectual Grim Reaper!",
-  "Hey! Raaayyy! LisaEm release going out! Come on!",
+  "Hey Raaayyy! LisaEm release going out! Come on!",
   "Professor! ... Lava! ... Hot! ...",
   "I have a LisaEm delivery here for, uh, IC socket...",
   "And by metaphorically, I mean get your coat",
   "Fry! What in Sega Genesis happened to you?",
   "Warranty void... if emulated",
   "Lisa Emulation... Right, I'd better warn... tell... warn-tell the others",
-  "I knocked it up a notch... 4M RAM!",
+  "Bam! I knocked it up a notch... 1.75M RAM!",
   "The Lisa 1 was so high tone, the only way to buy one was to create a parallel universe where you already owned one!",
   "The Lisa, it seems to go on and on forever. But then you get to the end and Steve starts throwing barrels at you.",
   "A.G.L.E.T. - Rember it!",
+  "It was either emulating a Lisa, ... or giving a monkey a shower...",
   "Lisaville Meadows, where yesterday thousands of bits of data were senselessly free()d in their prime...",
   "I think there's something strange not going on here",
   "Bus Error Frames: That's one small step for a M68000, one giant leap for Lisa Emulation",
+  "< Status: 433 Access to keyboard denied by sleeping cat",
+  "I think there's something strange not going on here, Ferb",
+  "A mob of angry ghosts chasing a warecow...",
+  "Mom! Mom! Mom! Mom! Ray's writing a Lisa emulator again!",
   "The CRT that burns twice as bright burns half as long",
+  "Hey you kids get off my Lawn... I mean.. uh, Lisa Emulator!",
   "I'll have to take a look inside you with this debugger, open up.... guess again!",
   "I often forget other people have limitations. It’s so sad",
   "He's opening up our minds to new ideas! Kill him!",
   "I'm in the middle of cooking a capacitor! I have warranty cards to void! I am not just making MMU exceptions!",
   "Besides, I've given up eeevil to pursue emulator-inator making...",
-  "Ah, DRAM impairment: the free prize at the bottom of every Vodka bottle!",
+  "Ah, DRAM impairment: the free prize at the bottom of every vodka bottle!",
   "Bazinga!",
   "I don't like bugs, okay. They freak me out.",
   "Come on! We have a combined IQ of 360 we should be able to figure out how to emulate a stupid Lisa.",
@@ -8700,6 +8813,8 @@ char *get_welcome_fortune(void)
   "Isn't using macos or windows in 2020 like using Lisa Office System... but with extra steps?",
   "The Lisa is now alive, to wreak joy in your lives, there's no use to hold me back, I am ready to emulate",  // ^c of the edgecrusher!
   "I don't need to use Gilfoyle's AI in order to improve LisaEm... I need to use LisaEm to create a better AI!",
+  "And that, gentlemen, is scrum. Welcome to the next eight weeks of our lives.",
+  "Sure, whenever you hold the standup meeting, I'll be in an hour after that, okay.",
   "What you have to understand is, conventional emulation was like rubbing two sticks together, and along comes LisaEm out of nowhere with a freaking blowtorch",
   "The official emulator of Russfest!",
   "I'm just gonna say it. This guy emulates. Am I right? 'Cause I'm looking at the rest of you guys, and this is the guy in the house doing all the emulating. Am I right?",
@@ -8713,7 +8828,7 @@ char *get_welcome_fortune(void)
   "If you byte your first SYN packet on the preamble, you might be a type-zero civilization vlan",
   "Nah don't touch that folder or that widget, let them be a powerful but confusing monument to our desktop's integrity",
   "Play Snake Lotus-Jazz",
-  "I am an emulator sent forward in time by the Lisa Resistance to protect you from lame operating systems."
+  "I am an emulator sent forward in time by the Lisa Resistance to protect you from lame operating systems.",
   "Next time stay in the LisaList2, Morty!",
   "That boot ROM source has everything we need to create Lisa Emulation given our 1998-2007 time"
   "Also that's about as much CRT curvature you're gonna get from a Lisa emulation story",
@@ -8796,6 +8911,58 @@ char *get_welcome_fortune(void)
   "To strive, to seek, to find, and to emulate.",
   "\"When every day is a risk (of introducing and fixing new bugs), cards and dice are no longer interesting\" - Emperor Londo Mollari",
   "this emulator is being held together by little pieces of wire and good intentions.",
+  "If I tell you my name is LisaEm, what good is that? It tells you nothing, but leaves me at a disadvantage. Words have meaning. And names have power.",
+  "LisaEm began with a word, you know. But which came first? The word, or the thought behind the word?",
+  "CPE1704TKS",
+  "\"I need 100 tequila shots, exactly.\" - Ray Explosion",
+  "\"This is the most brutal emulator I've ever seen!\" - Nathan (CRT) Implosion",
+  "\"He's slowly learning how to un-program the emulator\" - Skwisgaar",
+  "\"No Ray, you do not get a banana sticker, not until you have proven yourself by pushing a release, until then these banana stickers shall remain locked in here\" - Dr. Jonathan Twinkletits",
+  "With emulation, there is no problem so bad, that you can't make it worse.",
+  "The Lisa is singular, its versions are mis-emulations",
+  "So sweetly she sucks away at my time So sweetly she draws me nigh. Closer, and closer, towards never ending debugging",
+  "Turn and bite the hand that debugs you dry",
+  "One man's emulation paradise is another man's living catalina. To each their own.",
+  "\"If it is not right do not do it; if it is not true do not emulate it\" --- Marcus Aurelius",
+  "Him do good Snu Snu",
+  "G Belzoni was here in 1983",
+  "To bring forth this emulator and awaken^4... Take the floppy, that must be taken, LisaEm, I command you to rise^16",
+  "Super symmetry, meh, super-Asymmetry",
+  "All is Glorz... LisaEm-o",
+  "Glory to Glorz... LisaEm-o",
+  "Everybody in the galaxy tries to take over the galaxy, the trick is to emulate a Lisa so as to be left alone by whomever succeeds",
+  "I don't discuss problems, I emulate them.",
+  "Dad, you told me I wasn't a clone! That's on you, LisaEm",
+  "You are go for TLI (Trans Lisa Insertion)",
+  "What if the neutrino does have an antiparticle of itself, but because it's neutral we can't tell?",
+  "Kif, what makes a subatomic particle go neutral! You can't trust those neutrinos!",
+  "...So if anyone asks, you're my debugger!",
+  "Abi someone... Abi... Normal",
+  "Frau Blücher... Wheeeehehehehheh",
+  "Not as good as 'Three margaritas and a taco'",
+  "In my Lisaborghini, BLU by my side, installing lots of apps on X/ProFiles, drinking margaritas in the Lisa Office...",
+  "Bozobits, Bozobits everywhere...",
+  "Far across my desk, hear these words I say, zombie NiCADs ate my Lisa, craving COP421's and resistors, it's their destiny",
+  "Let me tell you of the days of high emulation...",
+  "Why is there no Museum of Artificial History? A Lisa exhibit there would be awesome!",
+  "Contemplate this on the tree of emulation...",
+  "Which is stronger? Big Iron or Emulation? This is the Riddle of Emulation. This you can trust",
+  "The Riddle of Emulation, shall I tell it to you? It's the least I can do...",
+  "The universe is emulation; life is your perception of it --- Marcus Aurelius",
+  "Pray that there's intelligence life somewhere out in space, because there's bugger-all down here on Earth.",
+  "Aboard the Good Ship Scum, four pistols on his belt, he went to battle naked, wearing just a tiger's pelt",
+  "Your compilers are incapable of reading 20 lines of code, Your webmaster is an alcoholic, Your crew look like mine craft bricks",
+  "B.L.A.R.F. N.A.R.G. F.R.E.E.P.O.",
+  "The sky above the port was the color of a Lisa CRT, running a dead office suite.",
+  "The past is already here – it's just not evenly distributed.",
+  "When you want to know how things really work, study them when they're coming apart",
+  "Time moves in one direction, ROM another. We are that strange species that constructs artifacts intended to counter the natural flow of forgetting.",
+  "LisaEm is a waste of time, and that's exactly what's right about it. -- William Gibson",
+  "The present tense made Ray nervous.",
+  "It was hot, the night we burned Chrome",
+  "Emulation is an illusion wrought with many small, conventionally symbolic marks, triggering visions in the minds of others --William Gibson",
+  "When the past is always with you, it may as well be present; and if it is present, it will be future as well. -- William Gibson",
+  "Lisa spat a stream of 68000 that overwhelmed dynamic translation, a long and liquid curse. -- William Giboson",
   "What you get is what you see, emulate fast, on high, ROMless, let it ride",
   "Good. Bad. I'm the guy with the emulator.",
   "Well, hello, Mister Fancypants. Well, I've got NeWS for you, PAL, you ain't leadin' but two things right now: Lisa and Em... and Lisa left town.",
@@ -8818,27 +8985,31 @@ char *get_welcome_fortune(void)
   "It's a system now, intertwined. Take a place in line to be emulated by the gears of reg68k.c",
   "We emulated a lot of innocent apps, to us every app was a code-segment. They said they're now in Pascal clothes, that makes every app free game",
   "A monument to denial and excess",
-  "I am the one who's left to take the autovector, I fight the const overflow:1",
+  "I am the one who's left to take the autovector, I fight the const oVerflow:1",
   "Wake up, wake up, wake up, Memento aemulari",
   "A universe in the palm of your hand. The artifice of endless desktop apps",
   "Woe to you, oh Mac and Win, for Ray sends the LisaEm with wrath",
   "I powered on, my RAM was blank, I needed time to boot, to get the data from my disk",
   "I'm coming back, I will RTE, I have the cx, I have the IRQ table, I have the power to make my code run its course",
   "Hear the rime of the Ancient Emulator coder, See his eye as he stops one of three, Stay here and listen to the nightmares of the C++ wxwidgets",
-  "Seven deadly apps, Seven documents to open, Seven holy paths to shell, and your trip begins",
+  "Seven deadly apps, Seven documents to open, Seven holy paths to SYSTEM.shell, and your trip begins",
   "When I was living as Lisa, blits was my game, People would click and drag, drop icons on folders, so bring me the ROM and red LED for the one to emulate me, for he is a man and will code me",
   "There goes the click that warns of the boot ROM, there comes the sound of the beep starting up, out for the scramble we've got to get started, goota boot up for the coming kernel",
   "Time is always on my side, Can I tempt you? emulate with me, Be Lisa may care, fulfill your dream, If I said I'd take you there, Would you go or would you be scared?",
   "I am not a number, I'm a free MMU segment!",
   "Always Be Emulating",
+  "Gentlemen, we can rebuild her, we have the technology... better, stronger, faster...",
+  "(33KOhm) Terminator, (3.9MHz) Oscillator",
+  "Run, Run Run!",
+  "The road to emulation is paved with .o files",
   "Waiting for DSLOS",
   "DSLOS has arrived",
   "Initializing infinite improbability drive . . .",
   "Initializing finite improbability drive . . .",
   "Initializing infinite probability drive . . .",
   "Initializing finite probability drive . . .",
+  "Never gonna give you up, never gonna let you down, never gonna run around and desert you...", // yt:izDc3G9ZRfw
   "It's the final countdown (to LisaEm 2.0!)"
-
 };
 
   int count=sizeof(fubar)/sizeof(fubar[0]);

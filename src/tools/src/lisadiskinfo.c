@@ -17,8 +17,6 @@ int main(int argc, char *argv[])
   DC42ImageType  F;
   char creatortype[10];
 
-  if (argc<=1)
-  {
       puts("  ---------------------------------------------------------------------------");
       puts("    Lisa Disk Info Tool V0.01                       http://lisaem.sunder.net");
       puts("  ---------------------------------------------------------------------------");
@@ -26,6 +24,9 @@ int main(int argc, char *argv[])
       puts("              Released under the GNU Public License, Version 2.0");
       puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
       puts("  ---------------------------------------------------------------------------\n");
+
+  if (argc<=1)
+  {
       puts("");
       puts("  This program is used to provide information about disk images that might be");
       puts("  useful on the Lisa Emulator, or with a real Lisa.  It will tell you whether");

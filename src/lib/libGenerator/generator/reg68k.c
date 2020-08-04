@@ -80,8 +80,6 @@ extern char *slrname(uint16 slr);       // from memory.c
 #include <diss68k.h>
 // Make sure that the bitfield unions work correctly - if they're in the wrong order, they won't.  This double checks
 // that ./configure got the right order.
-//
-
 
 void reg68k_sanity_check_bitorder(void)
 {
@@ -307,7 +305,6 @@ static inline uint8 get_pending_vector(void)
 
 
   //---- recalculated pending vector bitmap, and find the highest IRQ to be serviced  ------------
-
 
   #ifdef DEBUG
   pending_vector_bitmap=                                         // no such thing as IRQ0 on 68000
@@ -574,11 +571,6 @@ unsigned int reg68k_external_step(void)
     static unsigned long clks;
 
     {
-    /* move PC and register block into global processor register variables */
-//20190601        reg68k_pc = regs.pc;
-//20190601        reg68k_regs = regs.regs;
-//20190601        reg68k_sr.sr_int = regs.sr.sr_int;
-
         regs.pending = get_pending_vector();
         if (regs.pending && ((reg68k_sr.sr_int >> 8) & 7) < regs.pending)
             reg68k_internal_autovector(regs.pending);
@@ -664,13 +656,9 @@ void printregs(FILE *buglog,char *tag)
  */
 void extprintregs(FILE *buglog,char *tag)
 {
-
-
     if (!debug_log_enabled || !buglog) return;
     if (insetjmpland) {printregs(buglog,tag); return;}
-
-
-                    // the SRC: at the end is so I can grep the output and see both registers and source code. :)
+    // the SRC: at the end is so I can grep the output and see both registers and source code. :)
     fprintf(buglog,"%sD 0:%08x 1:%08x 2:%08x 3:%08x 4:%08x 5:%08x 6:%08x 7:%08x %c%c%c%c%c%c%c irqmsk:%d  %d/%d/%d context:%d SRC:\n",tag,
         regs.regs[0], regs.regs[1], regs.regs[2], regs.regs[3], regs.regs[4],
         regs.regs[5], regs.regs[6], regs.regs[7],
@@ -697,12 +685,8 @@ void dumpram(char *reason)
   FILE *ramdump, *ramdumpM0, *ramdumpM1, *ramdumpM2, *ramdumpM3;
   char filename[256];
   uint32 i,j; //,k;
-  uint16 slr, sor; //, mfn;
-  //uint32 a9 =((pc24) & 0x00ffffff)>>9;
-  //uint32 a17=((pc24) & 0x00ffffff)>>17;
-  uint32 mad; //filter; mtd;
-  //lisa_mem_t fn;
-
+  uint16 slr, sor; 
+  uint32 mad;
   snprintf(filename,256,"lisaem-output-ramdump-%s-%08lx.%016llx",reason,(long)pc24,(long long)cpu68k_clocks);
   ramdump=fopen(filename,"wt");
   if (!ramdump)
@@ -882,7 +866,7 @@ int is_valid_procname_w(uint16 w){ return (is_valid_procname(w>>8) && is_valid_p
 
 int get_address_mmu_rfn_type(uint32 addr)
 {
-  addr=addr & 0x00ffffff;
+  addr=addr & ADDRESSFILT;
   return mmu_trans[(addr>>9) & 32767].readfn;
 }
 
@@ -904,9 +888,6 @@ inline void debug_reg68k_exec_disasm_skipped(void)
             static t_iib *mypiib;
 
             DEBUG_LOG(0,"disassembling skipped opcodes between %08lx-%08lx",(long)cursor,(long)pc24);
-
-          //20180401//pc24 = reg68k_pc & 0x00ffffff;
-
 
             while (cursor<pc24)
             {
@@ -1252,25 +1233,35 @@ void reg68k_ext_exec_various_dbug(void)
 }
 #endif  /// end of ifdef XXXDEBUG disabled code
 
+// move these to cpu-record-master.c and use #include ../../../experimental/cpu-record-master.c
 #ifdef CPU_CORE_TESTER
-void reg68k_ext_core_tester(void)
-{
-  char texttext[1024];
+#include "../../../../experimental/cpu-record-master.c"
 
-  abort_opcode=2;  diss68k_gettext(ipc, text);
-  snprintf(texttext,1024,"opcode:%s (%04x) @%ld/%08lx icache:%02lx%02lx %02lx%02lx  %02lx%02lx %02lx%02lx  %02lx%02lx %02lx%02lx  %02lx%02lx %02lx%02lx\n",
-            text,(long)ipc->opcode,(long)context,(long)reg68k_pc,
-              (long)lisa_ram_safe_getbyte(context,pc24+0),    (long)lisa_ram_safe_getbyte(context,pc24+1),    (long)lisa_ram_safe_getbyte(context,pc24+2),
-              (long)lisa_ram_safe_getbyte(context,pc24+3),    (long)lisa_ram_safe_getbyte(context,pc24+4),    (long)lisa_ram_safe_getbyte(context,pc24+5),
-              (long)lisa_ram_safe_getbyte(context,pc24+6),    (long)lisa_ram_safe_getbyte(context,pc24+7),    (long)lisa_ram_safe_getbyte(context,pc24+8),
-              (long)lisa_ram_safe_getbyte(context,pc24+9),    (long)lisa_ram_safe_getbyte(context,pc24+10),   (long)lisa_ram_safe_getbyte(context,pc24+11),
-              (long)lisa_ram_safe_getbyte(context,pc24+12),   (long)lisa_ram_safe_getbyte(context,pc24+13),   (long)lisa_ram_safe_getbyte(context,pc24+14),
-              (long)lisa_ram_safe_getbyte(context,pc24+15) );
-              corecpu_start_opcode(texttext, context);
+void print_ipc(uint32 pc)
+{
+    t_ipc *ipc;
+    t_iib *piib;
+    mmu_trans_t *mt;
+
+    uint32 page;
+    page=(pc & 0x00ffffff)>>9;     
+    mt=&mmu_trans[page];
+    ipc=&(mt->table->ipc[(pc & 0x1ff)>>1]);
+    piib = cpu68k_iibtable[ipc->opcode];
+
+    fprintf(stdout,"ipc-opcode:%04x used/set:%02x/%02x wordlen:%d src:dst: %08x %08x s/dreg:%04x/%04x\n",
+                    ipc->opcode,ipc->set,ipc->used,ipc->wordlen, ipc->src,ipc->dst, ipc->sreg, ipc->dreg);
+
+    fprintf(stdout,"iib: mask/bits:%04x/%04x len:%d size:%d s/dtype:%d/%d s/dbitpos:%d immvalue:%08x/%d cc:%x\niib: priv:%d endblk:%d notzero:%d used:%d set:%d, fn:%d",
+            piib->mask,piib->bits,piib->wordlen,piib->size,piib->stype,piib->dtype,
+            piib->sbitpos, piib->dbitpos, piib->immvalue,
+            piib->cc,
+            piib->flags.priv,piib->flags.endblk,piib->flags.imm_notzero,piib->flags.used,piib->flags.set,
+            piib->funcnum);
 
 }
-#endif
 
+#endif
 
 
 #endif // end of if DEBUG for reg68k_external_execute debug inlines //////////////////////////////////////////////////////
@@ -1278,6 +1269,11 @@ void reg68k_ext_core_tester(void)
 
 #ifdef DEBUG
 extern void   check_ipct_memory(void);
+
+#ifdef CPU_CORE_TESTER_PATTERN_TEST
+void drive_pattern_test(void);
+#endif
+
 #endif
 
 int32 reg68k_external_execute(int32 clocks)
@@ -1285,9 +1281,6 @@ int32 reg68k_external_execute(int32 clocks)
   XTIMER entry=cpu68k_clocks;
   XTIMER entry_stop=cpu68k_clocks+clocks;
   XTIMER clks_stop=cpu68k_clocks+clocks;
-
- // remove these.
- // XTIMER entrystop=cpu68k_clocks_stop;
 
   int i,j,k=0;
 
@@ -1299,6 +1292,14 @@ int32 reg68k_external_execute(int32 clocks)
       int32 last_regs_idx=0;
       t_regs last_regs[MAX_LOOP_REGS];               // last opcode register values
     #endif
+
+    #ifdef CPU_CORE_TESTER_PATTERN_TEST
+    if  (debug_log_cpu_core_tester==1) {                     
+         debug_log_cpu_core_tester=100;
+         drive_pattern_test();
+    }
+    #endif
+
 #endif
 
 
@@ -1320,11 +1321,6 @@ static uint32 last_pc;
 #endif
 
 {
-
-/* move PC and register block into global variables */
-//20190601        reg68k_pc   = regs.pc;//20060129// & 0x00ffffff;
-//20190601        reg68k_regs = regs.regs;
-//20190601        reg68k_sr.sr_int   = regs.sr.sr_int;
     last_bus_error_pc=0;
 
     if ( (reg68k_pc) & 1  || (regs.pc &1)  )  LISA_REBOOTED(0);
@@ -1388,7 +1384,7 @@ static uint32 last_pc;
               #endif
             #endif
             // get the page and the mmu_translation table entry for this pc24
-            page=(pc24 & 0x00ffffff)>>9;     mt=&mmu_trans[page];
+            page=(pc24 & ADDRESSFILT)>>9;     mt=&mmu_trans[page];
 
             // Is this page table allocated?  If not allocate it as needed.
             if (mt!=NULL && mt->table!=NULL)
@@ -1409,7 +1405,7 @@ static uint32 last_pc;
                   if  (!flag) flag=(ipc->function==NULL);
 
                   if  (!flag) 
-                      {   uint16 myword=fetchword(pc24 & 0x00ffffff);
+                      {   uint16 myword=fetchword(pc24 & ADDRESSFILT);
                           if (ipc->opcode!=myword) flag=1;
                       }
 
@@ -1418,7 +1414,8 @@ static uint32 last_pc;
                 {
                     if (abort_opcode==1) break;
                     if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct since there's one already here.
-                    abort_opcode=2; cpu68k_makeipclist(pc24 & 0x00ffffff); if (abort_opcode==1) break; //==24726== Conditional jump or move depends on uninitialised value(s)
+                    abort_opcode=2; cpu68k_makeipclist(pc24 & ADDRESSFILT); //20200723 & 0x00ffffff); 
+                    if (abort_opcode==1) break; //==24726== Conditional jump or move depends on uninitialised value(s)
                     ipc=&(mt->table->ipc[(pc24 & 0x1ff)>>1]);
                 }
                 abort_opcode=0;
@@ -1476,12 +1473,14 @@ static uint32 last_pc;
 
                 InstructionRegister=ipc->opcode;
 
-                #if defined(DEBUG) && defined(CPU_CORE_TESTER)
-                  reg68k_ext_core_tester();
-                #endif
                 
                 if   (ipc->function)                               // if the IPC is valid, and loaded            // valgrind:==24726== Conditional jump or move depends on uninitialised value(s)
-                     {SET_CPU_FNC_DATA(); ipc->function(ipc);}     // execute the function, else rebuild the IPC //==24726==    by 0x300669: init_ipct_allocator (cpu68k.c:813)
+                     {
+                       #if defined(DEBUG) && defined(CPU_CORE_TESTER)
+                       reg68k_ext_core_tester_pre();
+                       #endif
+                       SET_CPU_FNC_DATA(); ipc->function(ipc);
+                     }     // execute the function, else rebuild the IPC //==24726==    by 0x300669: init_ipct_allocator (cpu68k.c:813)
                 else  {                                             //                                            // Uninitialised value was created by a heap allocation
                         static t_iib *piib;
 
@@ -1520,20 +1519,24 @@ static uint32 last_pc;
                         else {
                               InstructionRegister=ipc->opcode;
                               abort_opcode=0;
+                              #if defined(DEBUG) && defined(CPU_CORE_TESTER)
+                              reg68k_ext_core_tester_pre();
+                              #endif
+
                               if (ipc->function) ipc->function(ipc);
                               else {   EXITR(277,0,"No ipc function at %ld/%08lx, even after attempting to get one!\n",(long)context,(long)pc24);}
                             }
                       }
                   
                     #if defined(DEBUG) && defined(CPU_CORE_TESTER)
-                      corecpu_complete_opcode(context);
+                      reg68k_ext_core_tester_post();
                     #endif
 
                     #if defined(DEBUG) && defined(XXXDEBUG)
                       reg68k_ext_exec_various_dug();
                     #endif
 
-                    pc24 = reg68k_pc; //20060321// & 0x00ffffff;
+                    pc24 = reg68k_pc;
                     abort_opcode=0;
                     cpu68k_clocks+=ipc->clks;
               } // if execute from ram/rom else statement
@@ -1543,6 +1546,11 @@ static uint32 last_pc;
     #endif
 
     clks_stop=(MIN(clks_stop,cpu68k_clocks_stop));
+
+   // one opcode at a time if we're doing a pattern test
+   #ifdef CPU_CORE_TESTER
+   if (debug_log_cpu_core_tester==100) clks_stop=cpu68k_clocks;
+   #endif
 
   } while (clks_stop>cpu68k_clocks && !regs.stop);
 
@@ -1592,6 +1600,130 @@ static uint32 last_pc;
 }
 
 
+
+#ifdef CPU_CORE_TESTER_PATTERN_TEST
+
+void test_an_opcode_a(uint32 a0, uint32 a1, uint32 d0, uint32 d1, uint8 s) {
+
+  for (int i=0; i<16; i++) reg68k_regs[i]=0xdeadbeef;
+
+  regs.stop=0;
+  reg68k_pc=pc24=0x20000;
+  reg68k_regs[0]=d0;
+  reg68k_regs[1]=d1;
+  reg68k_regs[8]=a0;
+  reg68k_regs[9]=a1;
+  regs.sp=reg68k_regs[15]=0x40000;
+
+  regs.sr.sr_struct.t=0;
+  regs.sr.sr_struct.s=0;
+
+  regs.sr.sr_struct.z=!!(s &  1);
+  regs.sr.sr_struct.x=!!(s &  2);
+  regs.sr.sr_struct.n=!!(s &  4);
+  regs.sr.sr_struct.v=!!(s &  8);
+  regs.sr.sr_struct.c=!!(s & 16);
+  
+  regs.sr.sr_struct.i2=1;
+  regs.sr.sr_struct.i1=1;
+  regs.sr.sr_struct.i0=1;
+
+  reg68k_external_execute(1);
+  if (reg68k_pc<0x20000 || reg68k_pc>0x20010)
+     {fprintf(stdout,"Error in testing, PC is outside range:%08x\n",reg68k_pc);}
+}
+
+
+void drive_pattern_test(void)
+{
+
+uint32 i,j,k;
+
+uint32 pattern[]={
+0x00000000, 0x00000001, 0x00000002, 0x00000003, 0x00000004, 0x00000005, 0x00000006, 0x00000007, 0x00000008, 0x00000009,
+0x0000000a, 0x0000000b, 0x0000000c, 0x0000000d, 0x0000000e, 0x0000000f, 0x00000010, 0x00000011, 0x00000012, 0x00000013,
+0x00000014, 0x00000015, 0x00000016, 0x00000017, 0x00000018, 0x00000019, 0x0000001a, 0x0000001b, 0x0000001c, 0x0000001d,
+0x0000001e, 0x0000001f, 0x00000020, 0x00000021, 0x00000022, 0x00000023, 0x00000024, 0x00000025, 0x00000026, 0x00000027,
+0x00000028, 0x00000029, 0x0000002a, 0x0000002b, 0x0000002c, 0x0000002d, 0x0000002e, 0x0000002f, 0x00000030, 0x00000031,
+0x00000032, 0x00000033, 0x00000034, 0x00000035, 0x00000036, 0x00000037, 0x00000038, 0x00000039, 0x0000003a, 0x0000003b,
+0x0000003c, 0x0000003d, 0x0000003e, 0x0000003f, 0x00000040, 0x00000041, 0x00000042, 0x00000043, 0x00000044, 0x00000045,
+0x00000046, 0x00000047, 0x00000048, 0x00000049, 0x0000004a, 0x0000004b, 0x0000004c, 0x0000004d, 0x0000004e, 0x0000004f,
+0x00000050, 0x00000051, 0x00000052, 0x00000053, 0x00000054, 0x00000055, 0x00000056, 0x00000057, 0x00000058, 0x00000059,
+0x0000005a, 0x0000005b, 0x0000005c, 0x0000005d, 0x0000005e, 0x0000005f, 0x00000060, 0x00000061, 0x00000062, 0x00000063,
+0x00000064, 0x00000065, 0x00000066, 0x00000067, 0x00000068, 0x00000069, 0x0000006a, 0x0000006b, 0x0000006c, 0x0000006d,
+0x0000006e, 0x0000006f, 0x00000070, 0x00000071, 0x00000072, 0x00000073, 0x00000074, 0x00000075, 0x00000076, 0x00000077,
+0x00000078, 0x00000079, 0x0000007a, 0x0000007b, 0x0000007c, 0x0000007d, 0x0000007e, 0x0000007f, 0x00000080, 0x00000081,
+0x00000082, 0x00000083, 0x00000084, 0x00000085, 0x00000086, 0x00000087, 0x00000088, 0x00000089, 0x0000008a, 0x0000008b,
+0x0000008c, 0x0000008d, 0x0000008e, 0x0000008f, 0x00000090, 0x00000091, 0x00000092, 0x00000093, 0x00000094, 0x00000095,
+0x00000096, 0x00000097, 0x00000098, 0x00000099, 0x0000009a, 0x0000009b, 0x0000009c, 0x0000009d, 0x0000009e, 0x0000009f,
+0x000000a0, 0x000000a1, 0x000000a2, 0x000000a3, 0x000000a4, 0x000000a5, 0x000000a6, 0x000000a7, 0x000000a8, 0x000000a9,
+0x000000aa, 0x000000ab, 0x000000ac, 0x000000ad, 0x000000ae, 0x000000af, 0x000000b0, 0x000000b1, 0x000000b2, 0x000000b3,
+0x000000b4, 0x000000b5, 0x000000b6, 0x000000b7, 0x000000b8, 0x000000b9, 0x000000ba, 0x000000bb, 0x000000bc, 0x000000bd,
+0x000000be, 0x000000bf, 0x000000c0, 0x000000c1, 0x000000c2, 0x000000c3, 0x000000c4, 0x000000c5, 0x000000c6, 0x000000c7,
+0x000000c8, 0x000000c9, 0x000000ca, 0x000000cb, 0x000000cc, 0x000000cd, 0x000000ce, 0x000000cf, 0x000000d0, 0x000000d1,
+0x000000d2, 0x000000d3, 0x000000d4, 0x000000d5, 0x000000d6, 0x000000d7, 0x000000d8, 0x000000d9, 0x000000da, 0x000000db,
+0x000000dc, 0x000000dd, 0x000000de, 0x000000df, 0x000000e0, 0x000000e1, 0x000000e2, 0x000000e3, 0x000000e4, 0x000000e5,
+0x000000e6, 0x000000e7, 0x000000e8, 0x000000e9, 0x000000ea, 0x000000eb, 0x000000ec, 0x000000ed, 0x000000ee, 0x000000ef,
+0x000000f0, 0x000000f1, 0x000000f2, 0x000000f3, 0x000000f4, 0x000000f5, 0x000000f6, 0x000000f7, 0x000000f8, 0x000000f9,
+0x000000fa, 0x000000fb, 0x000000fc, 0x000000fd, 0x000000fe, 0x000000ff,                 0x7fff, 0x7fff7fff, 0x7fffffff,
+0x10101010, 0x01010101, 0x20202020, 0x02020202, 0x40404040, 0x04040404, 0x08080808, 0x80808080, 0xaa00aa00, 0x00aa00aa,
+0x0a0a0a0a, 0xa0a0a0a0, 0x55005500, 0x00550055, 0x50505050, 0x05050505, 0xff00ff00, 0x00ff00ff, 0xaa55aa55, 0x55aa55aa,
+0xff55ff55, 0x55ff55ff, 0xffaa55aa, 0xaaffaaff, 0xf0f0f0f0, 0x0f0f0f0f, 0x77777777, 0x88888888, 0xaaaaaaaa, 0xbbbbbbbb,
+0xcccccccc, 0xdddddddd, 0xeeeeeeee, 0xffffffff,
+0xdeadbeef}; // (misfolded) Prion enabled cow says "woof!" :)
+
+
+  for (i=0x20010; i<0x30000; i++) lisa_ww_ram(i,0x4EFA); // fill ram with JMP to end this basic block - long stretches of instructions kill the ipc creation process
+
+  for (i=0; i<294; i++) {
+        fprintf(stdout,"\n\n================================= test set %d of 293 ====================================================\n\n\n",i);
+        k=8192;
+        //for (k=0; k<32; k++) // x,c,v,z,n
+        {
+            uint32 d0=pattern[i], d1=pattern[i]; // 1st batch only d0 is used, d1 is filler
+            d0=d0 & 0xfffffffe; // avoid odd address errors
+            d1=d1 & 0xfffffffe; // avoid odd address errors
+
+//            lisa_ww_ram(0x20000,0x48c0);  test_an_opcode_a(d0,d1,d0,d1,k);                                         // c048 EXT.L D0
+//            lisa_ww_ram(0x20000,0x56c0);  test_an_opcode_a(d0,d1,d0,d1,k);                                         // c056 SNE.B.D0
+//            lisa_ww_ram(0x20000,0x57c0);  test_an_opcode_a(d0,d1,d0,d1,k);                                         // c056 SEQ.B.D0
+//            lisa_ww_ram(0x20000,0xe448);  test_an_opcode_a(d0,d1,d0,d1,k);                                         // 48e4 LSR #2, D0
+
+            for (j=0; j<294; j++) {
+               d1=pattern[j];
+               d1=d1 & 0xfffffffe; // avoid odd address errors
+
+               for (int z=0x20000; z<0x20010; z++) lisa_ww_ram(z,0x4E71); // fill ram with NOP
+
+//                lisa_ww_ram(0x20000,0xbc43); lisa_wb_ram(0x2002,(d0 & 0xffff));         test_an_opcode_a(d0,d1,d0,d1,k); // CHK.W #$0000,D1
+//                lisa_ww_ram(0x20000,0x47fb); lisa_wb_ram(0x2002,(d1 & 0xff) | 0x0800 ); test_an_opcode_a(d0,d1,d0,d1,k); // LEA (65,PC,D0.L),A3 // 65-2 because PC is involved.
+//                lisa_ww_ram(0x20000,0x47f0); lisa_wb_ram(0x2002,(d1 & 0xff) | 0x0800 ); test_an_opcode_a(d0,d1,d0,d1,k); // LEA (65,A0,D0.L),A3 // 0x41=65
+              //lisa_ww_ram(0x20000,0x47E8); lisa_wb_ram(0x2002,(d0 & 0xffff));         test_an_opcode_a(d0,d1,d0,d1,k); // LEA (65,A0),A3
+//                lisa_ww_ram(0x20000,0xd181);                                            test_an_opcode_a(d0,d1,d0,d1,k); // d181 ADDX.L D1,D0
+
+                //00020000  33B0 0002 1004            10     move.w 2(A0,D0.W),4(A1,D1.W):
+                lisa_ww_ram(0x20000,0x33b0); lisa_ww_ram(0x20002,0x0002); lisa_ww_ram(0x20004,0x1004); test_an_opcode_a(0x30000, 0x400000,d0,d1,k);
+                lisa_ww_ram(0x20000,0x47F1); lisa_ww_ram(0x20002,0x7004); test_an_opcode_a(0x30000, 0x400000,d0,d1,k); // 47F1 1004   lea  4(A1,D1.W),A3
+                lisa_ww_ram(0x20000,0x47F0); lisa_ww_ram(0x20002,0x6002); test_an_opcode_a(0x30000, 0x400000,d0,d1,k); // 47F0 1002   lea  2(A0,D1.W),A3
+                lisa_ww_ram(0x20000,0x47F1); lisa_ww_ram(0x20002,0x0008); test_an_opcode_a(0x30000, 0x400000,d0,d1,k); // 47F1 0008   lea  8(A1,D0.W),A3
+                lisa_ww_ram(0x20000,0x47F0); lisa_ww_ram(0x20002,0x000A); test_an_opcode_a(0x30000, 0x400000,d0,d1,k); // 47F0 000A   lea  10(A0,D0.W),A3
+
+
+        }
+    }
+   }
+
+   fprintf(stdout,"\n\n\n==========================================================================================\n");
+   fprintf(stdout,      "==========================================================================================\n");
+   fprintf(stdout,      "==========================================================================================\n");
+   fprintf(stdout,      "======================                That's all Folks!              =====================\n");
+   fprintf(stdout,      "==========================================================================================\n");
+   fprintf(stdout,      "==========================================================================================\n");
+   fprintf(stdout,      "==========================================================================================\n");
+
+   exit(1);
+}
+#endif
 
 
 void reg68k_external_autovector(int avno)
@@ -1810,12 +1942,14 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
     if (regs.stop && nmi_clk && nmi_pc) {regs.stop=0; nmi_addr_err=0;  nmi_clk=0; nmi_pc=0; nmi_stop=0;}      // clear flags
     else if (regs.stop)
     {
-        DEBUG_LOG(0,"exiting from STOP opcode @%08lx - will continue at %08lx after ISR handles IRQ:%ld.",(long)reg68k_pc,(long)reg68k_pc+4,(long)vno);
-        oldpc+=4;
+        
+        DEBUG_LOG(0,"exiting from STOP opcode @%08lx (oldpc=%08lx) - will continue at %08lx after ISR handles IRQ:%ld.",(long)reg68k_pc,(long)oldpc,(long)reg68k_pc+4,(long)vno);
+        oldpc=reg68k_pc+4;//20200712RA
         regs.stop = 0;
-        reg68k_pc=oldpc;
-        pc24=oldpc;
-        regs.pc = oldpc; regs.sr = reg68k_sr;
+        regs.pc=pc24=reg68k_pc=oldpc;
+        //pc24=oldpc;
+        //regs.pc = oldpc; 
+        regs.sr = reg68k_sr;
     }
 
     if  (vno==2 || vno==3)
@@ -1963,10 +2097,13 @@ void lisa_mmu_exception(uint32 addr_error)
 
 void lisa_addrerror(uint32 addr_error)
 {
+#ifndef CPU_CORE_TESTER
     ALERT_LOG(0,"Odd Address Exception @%08lx PC=%08lx clk:%016llx ",(long)addr_error,(long)reg68k_pc,(long long)cpu68k_clocks);
     DEBUG_LOG(0,"ADDRESS EXCEPTION @%08lx PC=%08lx",(long)addr_error,(long)reg68k_pc);
     reg68k_internal_vector(3,reg68k_pc,addr_error);
     abort_opcode=1;
+#endif
+
 }
 
 

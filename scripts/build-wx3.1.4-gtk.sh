@@ -3,8 +3,8 @@
 # I use this on my machine to test against multiple versions of wxWidgets, for normal people
 # 3.1.2 or eventually 3.1.4 should suffice.
 
-for VER in 3.1.2; do
-#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3; do
+for VER in 3.1.4; do
+#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3 3.1.4; do
 #^ swap these two to compile multiple versions for testing LisaEm against them vs just 3.1.2
   export VER
 

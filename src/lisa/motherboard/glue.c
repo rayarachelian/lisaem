@@ -342,7 +342,8 @@ int check_running_lisa_os(void)
             //ALERT_LOG(0,"Lisa Monitor Running: v1=%08x v2=%08x",v1,v2);
             return running_lisa_os;}
    else
-   if ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000)            // Macworks XL 3.0
+   if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||           // Macworks XL 3.0
+        ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) )            // 2020.08.03 did this move due to extra RAM?
       {
            //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;

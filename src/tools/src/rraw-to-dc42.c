@@ -43,16 +43,20 @@ int main(int argc, char *argv[])
     char dc42filename[8192]; 
     uint8 block[533];
 
+      puts("  ---------------------------------------------------------------------------");
+      puts("  rraw2dc42 (reverse tag/data raw) V0.0.1 Converter  http://lisaem.sunder.net");
+      puts("  ---------------------------------------------------------------------------");
+      puts("          Copyright (C) 2011, Ray A. Arachelian, All Rights Reserved.");
+      puts("              Released under the GNU Public License, Version 2.0");
+      puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
+      puts("  ---------------------------------------------------------------------------\n");
+
+
     if (argc<2)
     {
      puts("\n"
 //345678901234567890123456789012345678901234567890123456789012345678901234567890
 //       1         2         3         4         5         6         7
-"                          rraw2dc42 V0.0.1 Profile Drive Converter\n"
-"                              http://lisaem.sunder.net\n"
-"\n"
-"                           Copyright (C) 2018 Ray A. Arachelian  \n"
-"                                    All Rights Reserved.          \n"
 "\n"
 "  Usage: rraw2dc42 profile.raw\n"
 "\n"

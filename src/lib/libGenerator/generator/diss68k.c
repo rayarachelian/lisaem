@@ -164,9 +164,11 @@ void diss68k_getoperand(char *text, t_ipc * ipc, t_iib * iib, t_type type)
             break;
         case dt_Pdis:
             //sprintf(text, "%d(pc)",
-            sprintf(text, "{PDIS:%08x}=(PC%c#$%04x)",val,
+            sprintf(text, "{PDIS:%08x}=(PC%c#$%04x) src:%08x dst:%08x",val,
                      ((val-pc24) & 0x80000000 ?'-':'+'),
-                     ((val-pc24) & 0x80000000 ? (pc24-val):(val-pc24)) & 0xffff);   // RA 2004.11.13 +2 as per Macintosh ResEdit
+                     ((val-pc24) & 0x80000000 ? (pc24-val):(val-pc24)) & 0xffff,
+                     ipc->src,ipc->dst
+                     );   // RA 2004.11.13 +2 as per Macintosh ResEdit
             break;
 
         case dt_Pidx:

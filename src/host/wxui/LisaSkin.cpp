@@ -105,6 +105,7 @@ void LisaSkin::Load(wxFileConfig* config)
 
       floppy_eject            = config->Read(_T("/sounds/floppy_eject"),         _T("floppy_eject.wav") );
       floppy_insert           = config->Read(_T("/sounds/floppy_insert"),        _T("floppy_insert_sound.wav") );
+      floppy_insert_nopower   = config->Read(_T("/sounds/floppy_insert_nopower"),_T("floppy_insert_sound_nopower.wav") );
       floppy_motor1           = config->Read(_T("/sounds/floppy_motor1"),        _T("floppy_motor1.wav") );
       floppy_motor2           = config->Read(_T("/sounds/floppy_motor2"),        _T("floppy_motor2.wav") );
       lisa_power_switch01     = config->Read(_T("/sounds/powerswitch_push"),     _T("lisa_power_switch01.wav") );
@@ -142,32 +143,34 @@ void LisaSkin::Save(wxFileConfig* config)
       config->Write(_T("/skin/width"),width_size);
       config->Write(_T("/skin/height"),height_size);
 
-      config->Write(_T("/lisaface0"),                  lisaface0name );
-      config->Write(_T("/lisaface1"),                  lisaface1name );
-      config->Write(_T("/lisaface2"),                  lisaface2name );
-      config->Write(_T("/lisaface3"),                  lisaface3name );
+      config->Write(_T("/lisaface0"),                    lisaface0name );
+      config->Write(_T("/lisaface1"),                    lisaface1name );
+      config->Write(_T("/lisaface2"),                    lisaface2name );
+      config->Write(_T("/lisaface3"),                    lisaface3name );
 
-      config->Write(_T("/floppy1/anim0"),              floppy1anim0  );
-      config->Write(_T("/floppy1/anim1"),              floppy1anim1  );
-      config->Write(_T("/floppy1/anim2"),              floppy1anim2  );
-      config->Write(_T("/floppy1/anim3"),              floppy1anim3  );
-      config->Write(_T("/floppy1/animN"),              floppy1animN  );
+      config->Write(_T("/floppy1/anim0"),                floppy1anim0  );
+      config->Write(_T("/floppy1/anim1"),                floppy1anim1  );
+      config->Write(_T("/floppy1/anim2"),                floppy1anim2  );
+      config->Write(_T("/floppy1/anim3"),                floppy1anim3  );
+      config->Write(_T("/floppy1/animN"),                floppy1animN  );
 
-      config->Write(_T("/floppy2/anim0"),              floppy2anim0  );
-      config->Write(_T("/floppy2/anim1"),              floppy2anim1  );
-      config->Write(_T("/floppy2/anim2"),              floppy2anim2  );
-      config->Write(_T("/floppy2/anim3"),              floppy2anim3  );
-      config->Write(_T("/floppy2/animN"),              floppy2animN  );
+      config->Write(_T("/floppy2/anim0"),                floppy2anim0  );
+      config->Write(_T("/floppy2/anim1"),                floppy2anim1  );
+      config->Write(_T("/floppy2/anim2"),                floppy2anim2  );
+      config->Write(_T("/floppy2/anim3"),                floppy2anim3  );
+      config->Write(_T("/floppy2/animN"),                floppy2animN  );
 
-      config->Write(_T("/power/poweron-skin"),         powerOn ); 
-      config->Write(_T("/power/poweroff-skin"),        powerOff );
-      config->Write(_T("/sounds/floppy_eject"),        floppy_eject );
-      config->Write(_T("/sounds/floppy_insert"),       floppy_insert );
-      config->Write(_T("/sounds/floppy_motor1"),       floppy_motor1 );
-      config->Write(_T("/sounds/floppy_motor2"),       floppy_motor2 );
-      config->Write(_T("/sounds/powerswitch_push"),    lisa_power_switch01 );
-      config->Write(_T("/sounds/powerswitch_release"), lisa_power_switch02 );
-      config->Write(_T("/sounds/poweroff"),            poweroffclk );
+      config->Write(_T("/power/poweron-skin"),           powerOn ); 
+      config->Write(_T("/power/poweroff-skin"),          powerOff );
+      config->Write(_T("/sounds/floppy_eject"),          floppy_eject );
+      config->Write(_T("/sounds/floppy_insert"),         floppy_insert );
+      config->Write(_T("/sounds/floppy_insert_nopower"), floppy_insert_nopower );
+
+      config->Write(_T("/sounds/floppy_motor1"),         floppy_motor1 );
+      config->Write(_T("/sounds/floppy_motor2"),         floppy_motor2 );
+      config->Write(_T("/sounds/powerswitch_push"),      lisa_power_switch01 );
+      config->Write(_T("/sounds/powerswitch_release"),   lisa_power_switch02 );
+      config->Write(_T("/sounds/poweroff"),              poweroffclk );
 
       config->Flush();
 }

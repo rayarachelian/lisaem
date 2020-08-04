@@ -56,11 +56,16 @@ typedef enum {
 } t_size;
 
 typedef enum {
+//        0        1        2       3         4        5         6  <<--
     dt_Dreg, dt_Areg, dt_Aind, dt_Ainc, dt_Adec, dt_Adis, dt_Aidx,
+//        7        8        9       10
     dt_AbsW, dt_AbsL, dt_Pdis, dt_Pidx,
+//       11       12       13       14
     dt_ImmB, dt_ImmW, dt_ImmL, dt_ImmS,
+//       15       16       17       18        19
     dt_Imm3, dt_Imm4, dt_Imm8, dt_Imm8s, dt_ImmV,
     dt_Ill
+//      20
 } t_datatype;
 
 typedef enum {

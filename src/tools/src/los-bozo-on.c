@@ -1,10 +1,10 @@
 /**************************************************************************************\
 *                   A part of the Apple Lisa 2 Emulator Project                        *
 *                                                                                      *
-*                    Copyright (C) 2018  Ray A. Arachelian                             *
+*                    Copyright (C) 2020  Ray A. Arachelian                             *
 *                            All Rights Reserved                                       *
 *                                                                                      *
-*                     Deserialize Lisa Tools and Disk Label                            *
+*                     Turn on the bozobit (I mean, why!)                               *
 *                                                                                      *
 \**************************************************************************************/
 
@@ -72,15 +72,12 @@ void deserialize(DC42ImageType *F)
                         memcpy(name,&fsec[0x183],s);  // copy it over.
                         name[s]=0;                    // string terminator.
 
-                        char message[256];
-                        snprintf(message,256,
-                             "Found Office System tool %s serialized for Lisa #%02x%02x%02x%02x.",
-                             name,
-                             fsec[0x42], fsec[0x43], fsec[0x44], fsec[0x45]);
+                        fprintf(stderr, "Bozo-izing Office System tool %s\n", name); // I mean, why!
                        
                         uint8 buf[512];
                         memcpy(buf,fsec,512);
                         buf[0x42]=buf[0x43]=buf[0x44]=buf[0x45]=0;
+			buf[0x48]=buf[0x49]=1;
                         dc42_write_sector_data(F,sec,buf);
                       } 
                   }
@@ -99,21 +96,24 @@ int main(int argc, char *argv[])
   DC42ImageType  F;
   char creatortype[10];
 
-  if (argc<=1)
-  {
+      // yes, that is a negative version number, because this is an eeevil program.      //
       puts("  ---------------------------------------------------------------------------");
-      puts("    Lisa Tool Deserializer v0.01                    http://lisaem.sunder.net");
+      puts("    Lisa Tool Bozo bit Enabler v-0.01                http://lisaem.sunder.net");
       puts("  ---------------------------------------------------------------------------");
-      puts("          Copyright (C) 2018, Ray A. Arachelian, All Rights Reserved.");
+      puts("          Copyright (C) 2020, Ray A. Arachelian, All Rights Reserved.");
       puts("              Released under the GNU Public License, Version 2.0");
       puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
       puts("  ---------------------------------------------------------------------------\n");
+
+
+  if (argc<=1)
+  {
       puts("");
-      puts("  This program is used to deserialize Lisa Office System disk images that");
-      puts("  that contain serialized tools (LOS Applications)");
+      puts("  This program is used to enable the DRM protection for any tool found on");
+      puts("  a dc42 floppy image that contains LOS Applications (tools)");
       puts("");
-      puts("  Usage:   losdeserialize {filename1} {filename2} ... {filename N}");
-      puts("  i.e.   ./losdeserialize SomeImage.dc42 SomeOtherImage.dc42");
+      puts("  Usage:   los-bozo-on {filename1} {filename2} ... {filename N}");
+      puts("  i.e.   ./los-bozo-on SomeImage.dc42 SomeOtherImage.dc42");
       exit(0);
   }
 
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
   for (i=1; i<argc; i++)
   {
      int ret=0;
-     printf("\nDeserializing: %-50s ",argv[i]);
+     printf("\nBozo-ifying: %-50s ",argv[i]);
 
      ret=dc42_auto_open(&F, argv[i], "wb");
      if (!ret) deserialize(&F);
@@ -131,4 +131,3 @@ int main(int argc, char *argv[])
 
 return 0;
 }
-

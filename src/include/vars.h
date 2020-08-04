@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2019.10.15                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2020.08.02                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, MMXX Ray A. Arachelian                          *
@@ -61,7 +61,7 @@
 
 // If this is disabled the Generator CORE will calculate the status flags on every opcode
 // hack for LisaEm to see if there are flag calculation issues.
-#define NORMAL_GENERATOR_FLAGS 1
+//:TODO: 2020.07.06 for-testing only define NORMAL_GENERATOR_FLAGS 1
 
 // This forces each executed opcode to have it's IPC re-created - used to see if IPC cache
 // isn't working properly, or if we're hitting self-modifying code  -- very slow, do not use
@@ -137,7 +137,7 @@
 
 // switches to fn's that log memory calls, if undefined, these are macros, so they're much faster.
 // only turn this on if you need it.
-//#define DEBUGMEMCALLS 1
+#define DEBUGMEMCALLS 1
 // this 2nd one also enables mmu table output
 //#define DEBUGMEMCHKMMU
 
@@ -1007,7 +1007,7 @@ typedef struct _t_ipc {
 
     // //  // // // // // // // // // // // // // these are extensions to the normal generator code in order to refine it, etc.
 
-    uint16 reg;                            //2      // for cpu68k-inline idx_val macros/inlines replacing the bug that causes the
+    uint16 sreg, dreg;                     //2      // for cpu68k-inline idx_val macros/inlines replacing the bug that causes the
                                                     // high octet in PC (bits 31-24) to be filled, then causes negative PC on sign ext.
     
     uint8  clks;                           //1      // might be able to remove this if I can get this from iib without too much of a slowdown - maybe
@@ -1135,10 +1135,6 @@ GLOBAL(int,e_dirty_x_max,0);
 GLOBAL(int,e_dirty_y_min,500);
 GLOBAL(int,e_dirty_y_max,0);
 
-// hack for intermediate RC2 version - stolen from LisaCanvas.cpp as an ugly quick and dirty hack
-
-
-
 GLOBAL(uint8,contrast,0xff); // 0xff=black 0x80=visible 0x00=all white
 GLOBAL(uint8,volume,4); // 0x0e is the mask for this.
 GLOBAL(long,*dtc_rom_fseeks,NULL);
@@ -1146,6 +1142,11 @@ GLOBAL(FILE,*rom_source_file,NULL);
 
 GLOBAL(int,debug_log_enabled,0);
 GLOBAL(int,debug_log_onclick,0);
+
+//CPU_CORE_TESTER
+GLOBAL(int,debug_log_cpu_core_tester,0);
+GLOBAL(int,on_click_debug_log_cpu_core_tester,0);
+
 GLOBAL(int,dbx,0);
 GLOBAL(FILE,*buglog,NULL);
 
@@ -1600,10 +1601,11 @@ extern void on_lisa_exit(void);
 #define MMU_X_FIL 0x00ffffff
 #endif
 
-#define MMUSEGFILT 0x00fe0000
-#define MMUEPAGEFL 0x00fffe00
-//#define TWOMEGMLIM 0x001fffff
+#define MMUSEGFILT  0x00fe0000
+#define MMUEPAGEFL  0x00fffe00
+#define ADDRESSFILT 0x00ffffff
 
+//#define TWOMEGMLIM 0x001fffff
 GLOBAL(uint32,TWOMEGMLIM,0x001fffff);
 
 
@@ -1925,6 +1927,11 @@ GLOBAL(mmu_t,*mmu,NULL);
 
 DECLARE(mmu_trans_t,mmu_trans_all[5][32768]);
 
+//DECLARE(mmu_trans_t,mmu_trans_all[5][32768*256]);  // this is 640MB just for pointers, I don't think this is going to work
+// to fix the high byte pages, we'll have to go to 32768*256=4294967296 * 5. that's not feasable.
+// so ugly hacks it is. i.e. pc=0xa0xxxxxx.
+
+
 /* sadly if I used enums for lisa_mem_t.readfn/.writefn gcc would allocate 4 bytes for each so the total
    or this would be 12 bytes x 32768 pages/context x 5 = 1.85MB of ram for this table.  Instead I used
    defines and uint8's for lisa_mem_t, so this should be 1.25M depending on how they're packed    */
@@ -2209,13 +2216,13 @@ extern uint32 lisa_ram_safe_getlong(uint8 context, uint32 address);
   #define storelong(a,d) dmem68k_store_long((char *)__FILE__,(char *)__FUNCTION__,__LINE__,(uint32)(a),(uint32)(d))
 #else
 
-  #define fetchaddr(a)   mem68k_memptr[    (mmu_trans[((a) & 0x00fffe00)>>9].readfn)](a)
-  #define fetchbyte(a)   mem68k_fetch_byte[(mmu_trans[((a) & 0x00fffe00)>>9].readfn)](a)
-  #define fetchword(a)   mem68k_fetch_word[(mmu_trans[((a) & 0x00fffe00)>>9].readfn)](a)
-  #define fetchlong(a)   mem68k_fetch_long[(mmu_trans[((a) & 0x00fffe00)>>9].readfn)](a)
-  #define storebyte(a,d) mem68k_store_byte[(mmu_trans[((a) & 0x00fffe00)>>9].writefn)]((a),( uint8)(d))
-  #define storeword(a,d) mem68k_store_word[(mmu_trans[((a) & 0x00fffe00)>>9].writefn)]((a),(uint16)(d))
-  #define storelong(a,d) mem68k_store_long[(mmu_trans[((a) & 0x00fffe00)>>9].writefn)]((a),(uint32)(d))
+  #define fetchaddr(a)   mem68k_memptr[    (mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)](a)
+  #define fetchbyte(a)   mem68k_fetch_byte[(mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)](a)
+  #define fetchword(a)   mem68k_fetch_word[(mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)](a)
+  #define fetchlong(a)   mem68k_fetch_long[(mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)](a)
+  #define storebyte(a,d) mem68k_store_byte[(mmu_trans[((a) & MMUEPAGEFL)>>9].writefn)]((a),( uint8)(d))
+  #define storeword(a,d) mem68k_store_word[(mmu_trans[((a) & MMUEPAGEFL)>>9].writefn)]((a),(uint16)(d))
+  #define storelong(a,d) mem68k_store_long[(mmu_trans[((a) & MMUEPAGEFL)>>9].writefn)]((a),(uint32)(d))
 #endif
 
 
@@ -2661,7 +2668,7 @@ GLOBAL(uint32,minlisaram,0);
     uint32 sgn, usgn, xadd1, xadd2, slrchk;
 
     sgn=  ((int32)( (int32)(b & 0x00ffffff)+(int32)(mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address))    & 0x1fffff);
-    usgn= ((uint32)(        (b & 0x00ffffff)+       (mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address)))  & 0x1FFFFF;
+    usgn= ((uint32)(        (b & 0x00ffffff)+      (mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address)))   & 0x1FFFFF;
     xadd1=CHK_MMU_A_REGST(c,b);
     xadd2= 0x1FFFFF & (((mmu_all[c][b>>17].sor<<9) + (b & 0x1fe00))|(b &511));
     slrchk=0x1FFFFF & (((mmu_all[c][b>>17].slr & 0xff)<<9) + (b & 0x1fe00));
@@ -2739,10 +2746,10 @@ GLOBAL(uint32,minlisaram,0);
 #endif
 
 
-#define RFN_MMU_TRANS(addr)     (mmu_trans[                                    (addr & MMUEPAGEFL)>>9].readfn )
-#define WFN_MMU_TRANS(addr)     (mmu_trans[                                    (addr & MMUEPAGEFL)>>9].writefn)
-#define RFN_MMU_A_TRANS(c,addr) (mmu_trans_all[c][                             (addr & MMUEPAGEFL)>>9].readfn )
-#define WFN_MMU_A_TRANS(c,addr) (mmu_trans_all[c][                             (addr & MMUEPAGEFL)>>9].writefn)
+#define RFN_MMU_TRANS(addr)     (mmu_trans[        (addr & MMUEPAGEFL)>>9].readfn )
+#define WFN_MMU_TRANS(addr)     (mmu_trans[        (addr & MMUEPAGEFL)>>9].writefn)
+#define RFN_MMU_A_TRANS(c,addr) (mmu_trans_all[c][ (addr & MMUEPAGEFL)>>9].readfn )
+#define WFN_MMU_A_TRANS(c,addr) (mmu_trans_all[c][ (addr & MMUEPAGEFL)>>9].writefn)
 
 
 // Memory checking macros
@@ -2753,19 +2760,22 @@ GLOBAL(uint32,minlisaram,0);
 
 // can call CHK_RAM_LIMITS, then check for -1, else do lisaram[physaddr] for a pointer
 #define CHK_RAM_LIMITS(addr)                                                                                                 \
-{       physaddr=(        (((addr & 0x00ffffff)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
-        if (physaddr<(signed)minlisaram) physaddr=-2;  else if (physaddr>(signed)maxlisaram) physaddr=-1;                    \
+{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
+        if (physaddr<(signed)minlisaram)                                                                                     \
+           {ALERT_LOG(0,"physram underflow, addr:%08x min:%08x translated:%10x",addr,minlisaram,physaddr); physaddr=-2;}     \
+        else if (physaddr>(signed)maxlisaram)                                                                                \
+           {ALERT_LOG(0,"physram overflow, addr:%08x max:%08x translated:%10x",addr,maxlisaram,physaddr); physaddr=-2;}      \
 }
 
 #define CHK_RAM_A_LIMITS(c,addr)                                                                                             \
-{       physaddr=(        (((addr & 0x00ffffff)+mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address) ));                        \
+{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address) ));                        \
         if (physaddr<(signed)minlisaram) physaddr=-2;  else if (physaddr>(signed)maxlisaram) physaddr=-1;                    \
 }
 
 
 // check, and quit if error
 #define QCHK_RAM_LIMITS(addr)                                                                                                \
-{       physaddr=(        (((addr & 0x00ffffff)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
+{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
         if (physaddr<0||physaddr>(signed)maxlisaram)                                                                         \
            {fprintf(buglog,"*** %s:%s:%d:: mem out of range! @ %d/%08x :: @mmu=%08x\n\n",                                    \
                            __FILE__,__FUNCTION__,__LINE__,context,addr,physaddr); EXIT(2); }                                 \
@@ -2807,7 +2817,7 @@ GLOBAL(uint32,minlisaram,0);
 
 #define INVALIDATE_IPC()                                                                                                       \
         {                                                                                                                      \
-          uint32 iA9=(addr & 0x00ffffff)>>9;                                                                                   \
+          uint32 iA9=(addr & ADDRESSFILT)>>9;                                                                                   \
           int32  iAD=mmu_trans[iA9].address;                                                                                   \
           if (mmu_trans_all[context][iA9].address==iAD &&                                                                      \
               mmu_trans_all[context][iA9].table!=NULL )  {                                                                     \
@@ -2823,7 +2833,7 @@ GLOBAL(uint32,minlisaram,0);
 
 #define XXXINVALIDATE_IPC()                                                                                                 \
         {                                                                                                                   \
-          uint32 iA9=(addr & 0x00ffffff)>>9;                                                                                \
+          uint32 iA9=(addr & ADDRESSFILT)>>9;                                                                                \
           int32  iAD=mmu_trans[iA9].address;                                                                                \
           int iCTX;                                                                                                         \
           for (iCTX=0; iCTX<5; iCTX++) {                                                                                    \

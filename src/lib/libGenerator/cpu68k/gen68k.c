@@ -46,7 +46,14 @@
 
 /* forward references */
 
-void generate(FILE *output, int topnibble);
+#ifdef DEBUG
+  static int gendbg=0;
+  #define GENDBG(x) { if (gendbg) fprintf(o,"//DBG:%s:%s:%d %s\n",__FILE__,__FUNCTION__,__LINE__,x);}
+#else
+  #define GENDBG(x)
+#endif
+
+void generate(FILE *o, int topnibble);
 void generate_ea(FILE *o, t_iib *iib, t_type type, int update);
 void generate_eaval(FILE *o, t_iib *iib, t_type type);
 void generate_eastore(FILE *o, t_iib *iib, t_type type);
@@ -101,14 +108,14 @@ void generate_bits(FILE *o, t_iib *iib);
 
 #define HEADER "/*****************************************************************************/\n/*     Generator - Sega Genesis emulation - (c) James Ponder 1997-2001       */\n/*****************************************************************************/\n/*                                                                           */\n/* cpu68k-%x.c                                                                */\n/*                                                                           */\n/*****************************************************************************/\n\n"
 
-#define OUT(x) fputs(x,output);
+#define OUT(x) fputs(x,o);
 #define FNAME_GEN68K_CPU_OUT "cpu68k-%x.c"
 
 /* program entry routine */
 
 int main(int argc, char *argv[])
 {
-    FILE *output;
+    FILE *o;
     int i;
     char tmp[256];
 
@@ -124,23 +131,23 @@ int main(int argc, char *argv[])
         sprintf(tmp, FNAME_GEN68K_CPU_OUT, i);
 
     /* open output file */
-        if ((output = fopen(tmp, "w")) == NULL) {
+        if ((o = fopen(tmp, "w")) == NULL) {
             perror("fopen output");
             exit(1);
         }
 
     /* output header */
-        fprintf(output, HEADER, i);
-        fprintf(output, "#include <cpu68k-inline.h>\n\n");
+        fprintf(o, HEADER, i);
+        fprintf(o, "#include <cpu68k-inline.h>\n\n");
 
         // temporary vars - to for mmu error catching (would be nice in C++ due to try/catch)
-        fprintf(output, "\n\nstatic uint8 b1,b2,b3,b4; static uint16 w1,w2,w3,w4; static uint32 l1, l2, l3, l4;\n\n");
+        fprintf(o, "\n\nstatic uint8 b1,b2,b3,b4; static uint16 w1,w2,w3,w4; static uint32 l1, l2, l3, l4;\n\n");
 
 
-        generate(output, i);
+        generate(o, i);
 
     /* close output */
-        if (fclose(output)) {
+        if (fclose(o)) {
             perror("fclose output");
             exit(1);
         }
@@ -154,7 +161,7 @@ int main(int argc, char *argv[])
     return(0);
 }
 
-void generate(FILE *output, int topnibble)
+void generate(FILE *o, int topnibble)
 {
     t_iib *iib;
     int i, flags, pcinc;
@@ -181,15 +188,15 @@ void generate(FILE *output, int topnibble)
                 continue;
             }
 
-            fprintf(output, "void cpu_op_%i%s(t_ipc *ipc) /* %s */ {\n",
+            fprintf(o, "void cpu_op_%i%s(t_ipc *ipc) /* %s */ {\n",
                 i, flags ? "b" : "a", mnemonic_table[iib->mnemonic].name);
-            fprintf(output, "  /* mask %04x, bits %04x, mnemonic %d, priv %d, ",
+            fprintf(o, "  /* mask %04x, bits %04x, mnemonic %d, priv %d, ",
                 iib->mask, iib->bits, iib->mnemonic, iib->flags.priv);
-            fprintf(output, "endblk %d, imm_notzero %d, used %d",
+            fprintf(o, "endblk %d, imm_notzero %d, used %d",
                 iib->flags.endblk, iib->flags.imm_notzero, iib->flags.used);
-            fprintf(output, "     set %d, size %d, stype %d, dtype %d, sbitpos %d, ",
+            fprintf(o, "     set %d, size %d, stype %d, dtype %d, sbitpos %d, ",
                 iib->flags.set, iib->size, iib->stype, iib->dtype, iib->sbitpos);
-            fprintf(output, "dbitpos %d, immvalue %d */\n", iib->dbitpos,
+            fprintf(o, "dbitpos %d, immvalue %d */\n", iib->dbitpos,
                 iib->immvalue);
 
             pcinc = 1;
@@ -197,7 +204,8 @@ void generate(FILE *output, int topnibble)
             switch(iib->mnemonic) {
 
      case i_DIVS:
-        /* DIVx is the only instruction that has different sizes for the
+        GENDBG("");
+        /* DIVx is the only instruction that has different sizes for the 
            source and destination! */
         /*
         DIVU.W  <ea>,Dn     32/16 -> 16r:16q
@@ -214,22 +222,22 @@ void generate(FILE *output, int topnibble)
 
         if (iib->dtype != dt_Dreg)
           OUT("ERROR dtype\n");
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src); /* 16bit EA */
-        generate_ea(output, iib, tp_dst, 1); /* 32bit Dn */
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src); /* 16bit EA */
+        generate_ea(o, iib, tp_dst, 1); /* 32bit Dn */
         OUT("  sint32 dstdata = DATAREG(dstreg);\n");  // <<-- why is this 32 bit?
         OUT("  sint32 quotient;\n");
         OUT("  sint16 remainder;\n");
 
       //OUT("  ALERT_LOG(0,\"i_DIVS @ %08x src:%08x dest:%08x (dstreg:%d) abort_opcode:%d\",PC,srcdata,dstdata,dstreg,abort_opcode);\n" );
 
-        ABORT_CHECK(output);
+        ABORT_CHECK(o);
 
         OUT("\n");
         OUT("  if (srcdata == 0) {\n");
         OUT(            "    ALERT_LOG(0,\"DIVIDE_BY_ZERO @ %08lx src:%08lx dest:%08lx\",(long)PC,(long)srcdata,(long)dstdata);\n" );
         OUT(            "    ZFLAG=0; NFLAG=0;");
-        fprintf(output, "    reg68k_internal_vector(V_ZERO, PC+%d,0);\n",
+        fprintf(o, "    reg68k_internal_vector(V_ZERO, PC+%d,0);\n",
                 (iib->wordlen)*2);
         OUT("    return;\n");
         OUT("  }\n");
@@ -263,29 +271,30 @@ void generate(FILE *output, int topnibble)
 
 
       case i_ASR:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        generate_bits(output, iib);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        generate_bits(o, iib);
         OUT("  uint8 count = srcdata & 63;\n");
 
-        ABORT_CHECK(output);
+        ABORT_CHECK(o);
 
         // ASR 31 loops into 31, bit 0 goes to c/x -- this needs to sign extend!
 
 
         switch (iib->size) {
         case sz_byte:
-          generate_outdata(output, iib, "((sint8)dstdata) >> "
+          generate_outdata(o, iib, "((sint8)dstdata) >> "
                            "(count > 7 ? 7 : count)");
           break;
         case sz_word:
-          generate_outdata(output, iib, "((sint16)dstdata) >> "
+          generate_outdata(o, iib, "((sint16)dstdata) >> "
                            "(count > 15 ? 15 : count)");
           break;
         case sz_long:
-          generate_outdata(output, iib, "((sint32)dstdata) >> "
+          generate_outdata(o, iib, "((sint32)dstdata) >> "
                            "(count > 31 ? 31 : count)");
           break;
         default:
@@ -293,7 +302,7 @@ void generate(FILE *output, int topnibble)
           break;
         }
         OUT("\n");
-        generate_eastore(output, iib, tp_dst);
+        generate_eastore(o, iib, tp_dst);
 
 
         if (flags) {
@@ -314,34 +323,35 @@ void generate(FILE *output, int topnibble)
             OUT("    XFLAG = (dstdata >> (count - 1)) & 1;\n");
           OUT("  }\n");
           if (iib->flags.set & IIB_FLAG_V)
-            generate_clrflag_v(output, iib);
+            generate_clrflag_v(o, iib);
           if (iib->flags.set & IIB_FLAG_N)
-            generate_stdflag_n(output, iib);
+            generate_stdflag_n(o, iib);
           if (iib->flags.set & IIB_FLAG_Z)
-            generate_stdflag_z(output, iib);
+            generate_stdflag_z(o, iib);
         }
         break;
 
       case i_LSR:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        generate_bits(output, iib);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        generate_bits(o, iib);
 
     /* cbiere code*/
     OUT("  uint8 count = srcdata & 63;\n");
 
-    generate_outdata(output, iib,
+    generate_outdata(o, iib,
              "((count>(bits-1)) ? 0: (dstdata >> count))");  // RA2006.04.03 based on 68K tests
 
 
-    //generate_outdata(output, iib,
+    //generate_outdata(o, iib,
     //         "dstdata >> (count > (bits-1) ? (bits-1) : count)");
 
 
     OUT("\n");
-    generate_eastore(output, iib, tp_dst);
+    generate_eastore(o, iib, tp_dst);
     if (flags) {
       OUT("\n");
       OUT("  if (!count)\n");
@@ -359,19 +369,19 @@ void generate(FILE *output, int topnibble)
         OUT("    XFLAG = dstdata>>(count-1) & 1;\n");
       OUT("  }\n");
       if (iib->flags.set & IIB_FLAG_V)
-        generate_clrflag_v(output, iib);
+        generate_clrflag_v(o, iib);
       if (iib->flags.set & IIB_FLAG_N)
-        generate_stdflag_n(output, iib);
+        generate_stdflag_n(o, iib);
       if (iib->flags.set & IIB_FLAG_Z)
-        generate_stdflag_z(output, iib);
+        generate_stdflag_z(o, iib);
     }
 
 
         /* // original generator code
         OUT("  uint8 count = srcdata & 63;\n");
-        generate_outdata(output, iib, "dstdata >> count");
+        generate_outdata(o, iib, "dstdata >> count");
         OUT("\n");
-        generate_eastore(output, iib, tp_dst);
+        generate_eastore(o, iib, tp_dst);
 
         // LSR 0->bit31, 0->c/x
         if (flags) {
@@ -392,26 +402,27 @@ void generate(FILE *output, int topnibble)
             OUT("    XFLAG = (dstdata >> (count-1)) & 1;\n");
           OUT("  }\n");
           if (iib->flags.set & IIB_FLAG_V)
-            generate_clrflag_v(output, iib);
+            generate_clrflag_v(o, iib);
           if (iib->flags.set & IIB_FLAG_N)
-            generate_stdflag_n(output, iib);
+            generate_stdflag_n(o, iib);
           if (iib->flags.set & IIB_FLAG_Z)
-            generate_stdflag_z(output, iib);
+            generate_stdflag_z(o, iib);
         }
          */
         break;
 
       case i_ASL:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        generate_bits(output, iib);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        generate_bits(o, iib);
         OUT("  uint8 count = srcdata & 63;\n");
-        generate_outdata(output, iib,
+        generate_outdata(o, iib,
                          "count >= bits ? 0 : (dstdata << count)");
         OUT("\n");
-        generate_eastore(output, iib, tp_dst);
+        generate_eastore(o, iib, tp_dst);
 
         // ASL 0 into bit 0 bit 31->c/x
 
@@ -456,20 +467,21 @@ void generate(FILE *output, int topnibble)
             OUT("  }\n");
           }
           if (iib->flags.set & IIB_FLAG_N)
-            generate_stdflag_n(output, iib);
+            generate_stdflag_n(o, iib);
           if (iib->flags.set & IIB_FLAG_Z)
-            generate_stdflag_z(output, iib);
+            generate_stdflag_z(o, iib);
         }
         break;
 
       case i_LSL:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        generate_bits(output, iib);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        generate_bits(o, iib);
         OUT("  uint8 count = srcdata & 63;\n");
-        generate_outdata(output, iib,
+        generate_outdata(o, iib,
                          "(count >= bits) ? 0 : (dstdata << count)");
         OUT("\n");
 
@@ -479,8 +491,8 @@ void generate(FILE *output, int topnibble)
 
         // LSL 0>bit 0, 31->c/x
 
-        C_ABRT_CHK(output);
-        generate_eastore(output, iib, tp_dst);
+        C_ABRT_CHK(o);
+        generate_eastore(o, iib, tp_dst);
         if (flags) {
           OUT("\n");
           OUT("  if (!count)\n");
@@ -498,11 +510,11 @@ void generate(FILE *output, int topnibble)
             OUT("    XFLAG = (dstdata >> (bits-count)) & 1;\n");
           OUT("  }\n");
           if (iib->flags.set & IIB_FLAG_V)
-            generate_clrflag_v(output, iib);
+            generate_clrflag_v(o, iib);
           if (iib->flags.set & IIB_FLAG_N)
-            generate_stdflag_n(output, iib);
+            generate_stdflag_n(o, iib);
           if (iib->flags.set & IIB_FLAG_Z)
-            generate_stdflag_z(output, iib);
+            generate_stdflag_z(o, iib);
         }
         break;
 
@@ -512,14 +524,15 @@ void generate(FILE *output, int topnibble)
                 case i_OR:
                 case i_AND:
                 case i_EOR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    generate_outdata(output, iib, "dstdata");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    generate_outdata(o, iib, "dstdata");
                     OUT("\n");
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     switch(iib->mnemonic) {
                         case i_OR:
@@ -535,38 +548,39 @@ void generate(FILE *output, int topnibble)
                             OUT("ERROR\n");
                             break;
                     }
-                    generate_eastore(output, iib, tp_dst);
-                    C_ABRT_CHK(output);
+                    generate_eastore(o, iib, tp_dst);
+                    C_ABRT_CHK(o);
 
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     break;
 
                 case i_ORSR:
                 case i_ANDSR:
                 case i_EORSR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
                     OUT("  unsigned int sr = SFLAG;\n");
                     OUT("  int oim=IMASK;\n");
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     OUT("\n");
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     if (iib->size == sz_word) {
                         OUT("  if (!SFLAG)\n");
-                        fprintf(output, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                        fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                             (iib->wordlen)*2);
                         OUT("\n");
                     }
@@ -588,57 +602,59 @@ void generate(FILE *output, int topnibble)
                             OUT("ERROR\n");
                             break;
                     }
-                    ABORT_CHECK(output);                                     // added since this opcode doesn't call eastore
+                    ABORT_CHECK(o);                                     // added since this opcode doesn't call eastore
                     OUT("  if (sr != SFLAG) {SR_CHANGE()};\n");              // RA20050407
                     OUT("  if (oim>IMASK)   {IRQMASKLOWER();}\n");            // RA20050411
 
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     break;
 
                 case i_SUB:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    C_ABRT_CHK(o);
 
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "(sint8)dstdata - (sint8)srcdata");
+                            generate_outdata(o, iib, "(sint8)dstdata - (sint8)srcdata");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)dstdata - (sint16)srcdata");
+                            generate_outdata(o, iib, "(sint16)dstdata - (sint16)srcdata");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)dstdata - (sint32)srcdata");
+                            generate_outdata(o, iib, "(sint32)dstdata - (sint32)srcdata");
                             break;
                         default:
                             OUT("ERROR size\n");
                             break;
                     }
                     OUT("\n");
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_subflag_v(output, iib);
+                        generate_subflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_subflag_cx(output, iib);
+                        generate_subflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_SUBA:
+                    GENDBG("");
                     if (iib->dtype != dt_Areg)
                         OUT("Error\n");
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
                     OUT("  uint32 dstdata = ADDRREG(dstreg);\n");
                     switch (iib->size) {
                         case sz_byte:
@@ -655,30 +671,31 @@ void generate(FILE *output, int topnibble)
                             break;
                     }
                     OUT("\n");
-                    C_ABRT_CHK(output);
-//                    ABORT_CHECK(output);      // added since this opcode doesn't call eastore
+                    C_ABRT_CHK(o);
+//                    ABORT_CHECK(o);      // added since this opcode doesn't call eastore
                     OUT("  ADDRREG(dstreg) = outdata;\n");
                     break;
 
                 case i_SUBX:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "(sint8)dstdata - (sint8)srcdata "
+                            generate_outdata(o, iib, "(sint8)dstdata - (sint8)srcdata "
                                 "- XFLAG");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)dstdata - (sint16)srcdata"
+                            generate_outdata(o, iib, "(sint16)dstdata - (sint16)srcdata"
                                 "- XFLAG");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)dstdata - (sint32)srcdata"
+                            generate_outdata(o, iib, "(sint32)dstdata - (sint32)srcdata"
                                 "- XFLAG");
                             break;
                         default:
@@ -686,61 +703,63 @@ void generate(FILE *output, int topnibble)
                             break;
                     }
                     OUT("\n");
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_subflag_v(output, iib);
+                        generate_subflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_subxflag_cx(output, iib);
+                        generate_subxflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdxflag_z(output, iib);
+                        generate_stdxflag_z(o, iib);
                     break;
 
                 case i_ADD:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    C_ABRT_CHK(o);
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "(sint8)dstdata + (sint8)srcdata");
+                            generate_outdata(o, iib, "(sint8)dstdata + (sint8)srcdata");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)dstdata + (sint16)srcdata");
+                            generate_outdata(o, iib, "(sint16)dstdata + (sint16)srcdata");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)dstdata + (sint32)srcdata");
+                            generate_outdata(o, iib, "(sint32)dstdata + (sint32)srcdata");
                             break;
                         default:
                             OUT("ERROR size\n");
                             break;
                     }
                     OUT("\n");
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_addflag_v(output, iib);
+                        generate_addflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_addflag_cx(output, iib);
+                        generate_addflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_ADDA:
+                    GENDBG("");
                     if (iib->dtype != dt_Areg)
                         OUT("Error\n");
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
 
                     OUT("  uint32 dstdata = ADDRREG(dstreg);\n");
 
@@ -759,27 +778,28 @@ void generate(FILE *output, int topnibble)
                             break;
                     }
                     OUT("\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     OUT("  ADDRREG(dstreg) = outdata;\n");
                     break;
 
                 case i_ADDX:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    ABORT_CHECK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    ABORT_CHECK(o);
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "(sint8)dstdata + (sint8)srcdata "
+                            generate_outdata(o, iib, "(sint8)dstdata + (sint8)srcdata "
                                 "+ XFLAG");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)dstdata + (sint16)srcdata"
+                            generate_outdata(o, iib, "(sint16)dstdata + (sint16)srcdata"
                                 "+ XFLAG");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)dstdata + (sint32)srcdata"
+                            generate_outdata(o, iib, "(sint32)dstdata + (sint32)srcdata"
                                 "+ XFLAG");
                             break;
                         default:
@@ -788,48 +808,50 @@ void generate(FILE *output, int topnibble)
                     }
                     OUT("\n");
 
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_addflag_v(output, iib);
+                        generate_addflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_addxflag_cx(output, iib);
+                        generate_addxflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdxflag_z(output, iib);
+                        generate_stdxflag_z(o, iib);
                     break;
 
                 case i_MULU:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
                     OUT("\n");
                     OUT("  uint32 outdata = (uint32)srcdata * (uint32)dstdata;\n");
                     if (iib->dtype != dt_Dreg)
                         OUT("ERROR dtype\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     OUT("  DATAREG(dstreg) = outdata;\n");
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_N)
                         OUT("  NFLAG = ((sint32)outdata) < 0;\n");
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     break;
 
                 case i_MULS:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
 
                     OUT("\n");
                     OUT("  uint32 outdata = (sint32)(sint16)srcdata * "
@@ -837,7 +859,7 @@ void generate(FILE *output, int topnibble)
                     if (iib->dtype != dt_Dreg)
                         OUT("ERROR dtype\n");
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     OUT("  DATAREG(dstreg) = outdata;\n");
                     if (flags)
@@ -845,68 +867,70 @@ void generate(FILE *output, int topnibble)
                     if (flags && iib->flags.set & IIB_FLAG_N)
                         OUT("  NFLAG = ((sint32)outdata) < 0;\n");
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     break;
 
                 case i_CMP:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "(sint8)dstdata - (sint8)srcdata");
+                            generate_outdata(o, iib, "(sint8)dstdata - (sint8)srcdata");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)dstdata - (sint16)srcdata");
+                            generate_outdata(o, iib, "(sint16)dstdata - (sint16)srcdata");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)dstdata - (sint32)srcdata");
+                            generate_outdata(o, iib, "(sint32)dstdata - (sint32)srcdata");
                             break;
                         default:
                             OUT("ERROR size\n");
                             break;
                     }
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_subflag_v(output, iib);
+                        generate_subflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_subflag_c(output, iib);
+                        generate_subflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_CMPA:
+                    GENDBG("");
                     if (iib->dtype != dt_Areg || iib->size != sz_word)
                         OUT("Error\n");
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
                     iib->size = sz_long;
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
                     OUT("  uint32 outdata = (sint32)dstdata - (sint32)(sint16)srcdata;\n");
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_cmpaflag_v(output, iib);
+                        generate_cmpaflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_cmpaflag_c(output, iib);
+                        generate_cmpaflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     iib->size = sz_word;
                     break;
 
@@ -914,10 +938,11 @@ void generate(FILE *output, int topnibble)
                 case i_BCHG:
                 case i_BCLR:
                 case i_BSET:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
 
 
                     switch (iib->size) {
@@ -931,23 +956,23 @@ void generate(FILE *output, int topnibble)
                             OUT("ERROR size\n");
                             break;
                     }
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     OUT("\n");
                     switch(iib->mnemonic) {
                         case i_BTST:
 
                             break;
                         case i_BCHG:
-                            generate_outdata(output, iib, "dstdata ^ bitpos");
-                            generate_eastore(output, iib, tp_dst);
+                            generate_outdata(o, iib, "dstdata ^ bitpos");
+                            generate_eastore(o, iib, tp_dst);
                             break;
                         case i_BCLR:
-                            generate_outdata(output, iib, "dstdata & ~bitpos");
-                            generate_eastore(output, iib, tp_dst);
+                            generate_outdata(o, iib, "dstdata & ~bitpos");
+                            generate_eastore(o, iib, tp_dst);
                             break;
                         case i_BSET:
-                            generate_outdata(output, iib, "dstdata | bitpos");
-                            generate_eastore(output, iib, tp_dst);
+                            generate_outdata(o, iib, "dstdata | bitpos");
+                            generate_eastore(o, iib, tp_dst);
                             break;
                         default:
                             OUT("ERROR\n");
@@ -958,29 +983,64 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVE:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_outdata(output, iib, "srcdata");
+                    #ifdef XXXDEBUG
+                    if ( iib->bits == 0x23b0 || iib->bits==0x33b0 || iib->bits==0x31b0) gendbg=1;
+                    #endif 
+                    //OUT("// generate_ea(o,iib,tp_src):\n"); // likely this guy
+                    generate_ea(o, iib, tp_src, 1);
+                    //OUT("// generate_eaval(o, iib, tp_src):\n"); // or this guy.
+                    generate_eaval(o, iib, tp_src);
                     OUT("\n");
-                    generate_eastore(output, iib, tp_dst);
+
+                    //OUT("// generate_ea(o, iib, tp_dst, 1);:\n");
+                    generate_ea(o, iib, tp_dst, 1);
+                    OUT("\n");
+
+                    //OUT("// generate_outdata(o, iib, srcdata);:\n");
+                    generate_outdata(o, iib, "srcdata"); // maybe
+                    OUT("\n");
+                    //OUT("// generate_eastore(o, iib, tp_dst);:\n")
+                    generate_eastore(o, iib, tp_dst);
+                    //OUT("//\n");
+                    //GENDBG("");
+                    #ifdef XXXDEBUG
+                    //if ( iib->bits == 0x23b0 || iib->bits==0x33b0 || iib->bits==0x31b0) {
+                    if ((iib->bits & iib->mask)==0x31b0) { //(ipc->opcode==0x23b0 || ipc->opcode==0x33b0 || ipc->opcode==0x31b0)
+                       OUT(" if ((ipc->opcode & 0xf1f8)==0x31b0)  {\n");
+                       OUT("    fprintf(stderr,\"\\n\\n\\n%s:%s:%d: buggy bug is here.\\n\\n\\n\",__FILE__,__FUNCTION__,__LINE__);\n");
+                       OUT("    fprintf(stderr,\"srcreg:%d dstreg:%d \\n\",srcreg,dstreg);\n");
+                       OUT("    fprintf(stderr,\"idxval_dst(ipc):%08x   idxval_src(ipc):%08x :%s \\n\", idxval_dst(ipc), idxval_src(ipc),(idxval_dst(ipc)==idxval_src(ipc))?\"BROKEN\":\"\" );\n");
+                       OUT("    fprintf(stderr,\"ipc->dst:%08x ipc->src:%08x ipc->reg s/d:%04x/%04x ipc->wordlen:%d\\n\", ipc->dst, ipc->src,ipc->sreg,ipc->dreg,ipc->wordlen);\n");
+                       OUT("    fprintf(stderr,\"dstaddr:%08x srcaddr:%08x :%s\\n\",dstaddr,srcaddr,dstaddr==srcaddr ? \"BROKEN\":\"\");");
+                       OUT("    fprintf(stderr,\" A0:%08x D0:%08x A1:%08x D1:%08x \\n\\n\",ADDRREG(0),DATAREG(0),ADDRREG(1),DATAREG(1) );\n");
+                       OUT(" }\n");
+                    }
+                    #endif
+
+
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
+
+                    #ifdef XXXDEBUG
+                    gendbg=0;
+                    #endif 
+
                     break;
 
                 case i_MOVEA:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    ABORT_CHECK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    ABORT_CHECK(o);
                     if (iib->dtype != dt_Areg || iib->size != sz_word)
                         OUT("Error\n");
                     OUT("\n");
@@ -988,28 +1048,29 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVEPMR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
                     switch(iib->size) {
                         case sz_word:
-                            generate_outdata(output, iib,"0");
+                            generate_outdata(o, iib,"0");
                             OUT("b1=fetchbyte(srcaddr);  \n");
                             OUT("b2=fetchbyte(srcaddr+2);\n");
 
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
 
                             OUT("outdata=(b1<<8)+(b2);\n");
                             break;
 
                         case sz_long:
-                            generate_outdata(output, iib,"0");
+                            generate_outdata(o, iib,"0");
 
                             OUT("b1= fetchbyte(srcaddr)  ;\n");
                             OUT("b2= fetchbyte(srcaddr+2);\n");
                             OUT("b3= fetchbyte(srcaddr+4);\n");
                             OUT("b4= fetchbyte(srcaddr+6);\n");
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
 
                             OUT("outdata=((b1<<24)+(b2<<16)+(b3<<8)+b4);\n");
 
@@ -1020,16 +1081,17 @@ void generate(FILE *output, int topnibble)
                             break;
                     }
                     OUT("\n");
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     break;
 
                 case i_MOVEPRM:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
 
                     OUT("\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     // no need to for ABORT_CHECK after the following storebytes because the fn returns right after.
                     // so there's nothing to abort
                     switch(iib->size) {
@@ -1050,42 +1112,44 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVEFSR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_outdata(output, iib, NULL);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_outdata(o, iib, NULL);
                     OUT("\n");
                     OUT("  outdata = SR;\n");
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     break;
 
                 case i_MOVETSR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     OUT("  unsigned int sr = SFLAG;\n");
                     OUT("  int oim=IMASK;\n");                      // RA20050411
                     OUT("\n");
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     switch (iib->size) {
                         case sz_byte:
                             OUT("  SR = (SR & ~0xFF) | srcdata;\n");
                             break;
                         case sz_word:
                             //OUT("  if (!SFLAG)\n");
-                            //fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
+                            //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
                             //(iib->wordlen)*2);
 
                             OUT("  if (!SFLAG)\n");
-                            fprintf(output, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                            fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                                 (iib->wordlen)*2);
                             OUT("\n");
 
 
                             OUT("\n");
-                            ABORT_CHECK(output);      // added since this opcode doesn't call eastore
+                            ABORT_CHECK(o);      // added since this opcode doesn't call eastore
                             OUT("  SR = srcdata;\n");
                             break;
                         default:
@@ -1097,25 +1161,26 @@ void generate(FILE *output, int topnibble)
 
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     break;
 
                 case i_MOVEMRM:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 0);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 0);
 
                     if (iib->dtype == dt_Adec) {
                         OUT("  uint8 datamask = (srcdata & 0xFF00) >> 8;\n");
                         OUT("  uint8 addrmask = srcdata & 0xFF;");
                         OUT("\n");
-                        ABORT_CHECK(output);
+                        ABORT_CHECK(o);
                         switch(iib->size) {
                             case sz_word:
                                 OUT("  while (addrmask) {\n");
                                 OUT("    dstaddr-= 2;\n");
                                 OUT("    storeword(dstaddr, ADDRREG((7-movem_bit[addrmask])));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg A%d.W written to %08x<-%04x  SRC:\",7-movem_bit[addrmask],dstaddr,ADDRREG((7-movem_bit[addrmask])));\n")
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("  }\n");
@@ -1123,7 +1188,7 @@ void generate(FILE *output, int topnibble)
                                 OUT("    dstaddr-= 2;\n");
                                 OUT("    storeword(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
                                 OUT("    DEBUG_LOG(5,\"reg D%d.W written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
                                 break;
@@ -1131,7 +1196,7 @@ void generate(FILE *output, int topnibble)
                                 OUT("  while (addrmask) {\n");
                                 OUT("    dstaddr-= 4;\n");
                                 OUT("    storelong(dstaddr, ADDRREG((7-movem_bit[addrmask])));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg A%d.L written to %08x<-%08x  SRC:\",7-movem_bit[addrmask],dstaddr,ADDRREG((7-movem_bit[addrmask])));\n")
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("  }\n");
@@ -1139,7 +1204,7 @@ void generate(FILE *output, int topnibble)
                                 OUT("    dstaddr-= 4;\n");
                                 OUT("    storelong(dstaddr, ");
                                 OUT("DATAREG((7-movem_bit[datamask])));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
@@ -1153,12 +1218,12 @@ void generate(FILE *output, int topnibble)
                         OUT("  uint8 addrmask = (srcdata & 0xFF00) >> 8;\n");
                         OUT("  uint8 datamask = srcdata & 0xFF;");
                         OUT("\n");
-                        ABORT_CHECK(output);
+                        ABORT_CHECK(o);
                         switch(iib->size) {
                             case sz_word:
                                 OUT("  while (datamask) {\n");
                                 OUT("    storeword(dstaddr, DATAREG(movem_bit[datamask]));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg D%d.W written to (%08x)<-%04x  SRC:\",movem_bit[datamask],dstaddr,DATAREG(movem_bit[datamask]));\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("    dstaddr+= 2;\n");
@@ -1166,7 +1231,7 @@ void generate(FILE *output, int topnibble)
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storeword(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
                                 OUT("    DEBUG_LOG(5,\"reg A%d.W written to (%08x)<-%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 2;\n");
                                 OUT("  }\n");
@@ -1174,14 +1239,14 @@ void generate(FILE *output, int topnibble)
                             case sz_long:
                                 OUT("  while (datamask) {\n");
                                 OUT("    storelong(dstaddr, DATAREG(movem_bit[datamask]));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg D%d.L written to (%08x)<-%08x  SRC:\",movem_bit[datamask],dstaddr,DATAREG(movem_bit[datamask]));\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("    dstaddr+= 4;\n");
                                 OUT("  }\n");
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storelong(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
-                                ABORT_CHECK(output);
+                                ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg A%d.L written to (%08x)<-%08x  SRC:\",7-movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 4;\n");
@@ -1199,19 +1264,20 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVEMMR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 0);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 0);
                     OUT("  uint8 addrmask = (srcdata & 0xFF00) >> 8;\n");
                     OUT("  uint8 datamask = srcdata & 0xFF;");
                     OUT("\n");
-                    ABORT_CHECK(output);
+                    ABORT_CHECK(o);
                     switch(iib->size) {
                         case sz_word:
                             OUT("  while (datamask) {\n");
 
                             OUT("    w1=fetchword(dstaddr);");
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
                             OUT("    DATAREG(movem_bit[datamask]) = ");
                             OUT("(sint32)(sint16)w1;\n");
                             OUT("    DEBUG_LOG(5,\"reg D%d.W read from (%08x)->%04x  SRC:\",movem_bit[datamask],dstaddr,DATAREG(movem_bit[datamask]));\n")
@@ -1221,7 +1287,7 @@ void generate(FILE *output, int topnibble)
                             OUT("  while (addrmask) {\n");
                             OUT("    ADDRREG(movem_bit[addrmask]) = ");
                             OUT("(sint32)(sint16)fetchword(dstaddr);\n");
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
                             OUT("    DEBUG_LOG(5,\"reg A%d.W read from (%08x)->%04x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                             OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                             OUT("    dstaddr+= 2;\n");
@@ -1230,7 +1296,7 @@ void generate(FILE *output, int topnibble)
                         case sz_long:
                             OUT("  while (datamask) {\n");
                             OUT("    l1=fetchlong(dstaddr);");
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
                             OUT("    DATAREG(movem_bit[datamask]) = l1;\n");
                             OUT("    DEBUG_LOG(5,\"reg D%d.L read from (%08x)->%08x  SRC:\",movem_bit[datamask],dstaddr,DATAREG(movem_bit[datamask]));\n")
                             OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
@@ -1238,7 +1304,7 @@ void generate(FILE *output, int topnibble)
                             OUT("  }\n");
                             OUT("  while (addrmask) {\n");
                             OUT("    l1=fetchlong(dstaddr);");
-                            ABORT_CHECK(output);
+                            ABORT_CHECK(o);
                             OUT("    ADDRREG(movem_bit[addrmask]) = l1;\n");
                             OUT("    DEBUG_LOG(5,\"reg A%d.L read from (%08x)->%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                             OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
@@ -1258,17 +1324,18 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVETUSP:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    C_ABRT_CHK(o);
 
                     OUT("\n");
                     //OUT("  if (!SFLAG)\n");
-                    //fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
+                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
                     //(iib->wordlen)*2);
                     //OUT("\n");
                     OUT("  if (!SFLAG)\n");
-                    fprintf(output, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                    fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
                     OUT("\n");
 
@@ -1276,67 +1343,70 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_MOVEFUSP:
-                    generate_ea(output, iib, tp_src, 1);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
                     OUT("  uint32 outdata;\n");
                     OUT("\n");
                     //OUT("  if (!SFLAG)\n");
-                    //fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
+                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
                     //(iib->wordlen)*2);
                     //OUT("\n");
                     OUT("  if (!SFLAG)\n");
-                    fprintf(output, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                    fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
                     OUT("\n");
 
                     OUT("  outdata = SP;\n");
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     break;
 
                 case i_NEG:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    ABORT_CHECK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    ABORT_CHECK(o);
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "0 - (sint8)srcdata");
+                            generate_outdata(o, iib, "0 - (sint8)srcdata");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "0 - (sint16)srcdata");
+                            generate_outdata(o, iib, "0 - (sint16)srcdata");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "0 - (sint32)srcdata");
+                            generate_outdata(o, iib, "0 - (sint32)srcdata");
                             break;
                         default:
                             OUT("ERROR size\n");
                             break;
                     }
                     OUT("\n");
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_negflag_v(output, iib);
+                        generate_negflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_negflag_cx(output, iib);
+                        generate_negflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_NEGX:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
                     switch (iib->size) {
                         case sz_byte:
-                            generate_outdata(output, iib, "0 - (sint8)srcdata - XFLAG");
+                            generate_outdata(o, iib, "0 - (sint8)srcdata - XFLAG");
                             break;
                         case sz_word:
-                            generate_outdata(output, iib, "0 - (sint16)srcdata - XFLAG");
+                            generate_outdata(o, iib, "0 - (sint16)srcdata - XFLAG");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "0 - (sint32)srcdata - XFLAG");
+                            generate_outdata(o, iib, "0 - (sint32)srcdata - XFLAG");
                             break;
                         default:
                             OUT("ERROR size\n");
@@ -1344,58 +1414,60 @@ void generate(FILE *output, int topnibble)
                     }
                     OUT("\n");
 
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_negxflag_v(output, iib);
+                        generate_negxflag_v(o, iib);
                     if (flags && ((iib->flags.set & IIB_FLAG_C) ||
                             (iib->flags.set & IIB_FLAG_X)))
-                        generate_negxflag_cx(output, iib);
+                        generate_negxflag_cx(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdxflag_z(output, iib);
+                        generate_stdxflag_z(o, iib);
                     break;
 
                 case i_CLR:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src); /* read before write */
-                    generate_outdata(output, iib, "0");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src); /* read before write */
+                    generate_outdata(o, iib, "0");
                     OUT("\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_clrflag_n(output, iib);
+                        generate_clrflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_setflag_z(output, iib);
+                        generate_setflag_z(o, iib);
                     break;
 
                 case i_NOT:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src); /* read before write */
-                    generate_outdata(output, iib, "~srcdata");
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src); /* read before write */
+                    generate_outdata(o, iib, "~srcdata");
+                    C_ABRT_CHK(o);
                     OUT("\n");
 
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
 
@@ -1404,12 +1476,13 @@ void generate(FILE *output, int topnibble)
 
 
       case i_ABCD:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        C_ABRT_CHK(output);
-        generate_outdata(output, iib, NULL);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        C_ABRT_CHK(o);
+        generate_outdata(o, iib, NULL);
 
     //#ifdef BCD_NV_SAME                     //save NV
     //  OUT("int vflagcpy=VFLAG;\n");
@@ -1444,25 +1517,26 @@ void generate(FILE *output, int topnibble)
 
         #ifndef BCD_NV_SAME
         if (flags && iib->flags.set & IIB_FLAG_N)
-          generate_stdflag_n(output, iib);
+          generate_stdflag_n(o, iib);
         if (flags && iib->flags.set & IIB_FLAG_V)
           OUT("  VFLAG = ((precalc & 1<<7) == 0) && (outdata & 1<<7);\n");
         #endif
 
         OUT("  ALERT_LOG(0,\"BCD  @ %lx\", (long)PC);\n");  // 2018.03.10 RA
 
-        generate_eastore(output, iib, tp_dst);
+        generate_eastore(o, iib, tp_dst);
 
 
         break;
 
       case i_SBCD:
+        GENDBG("");
         /* on real 68000: 0x10 - 0x0b - 0 = 0xff */
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_ea(output, iib, tp_dst, 1);
-        generate_eaval(output, iib, tp_dst);
-        generate_outdata(output, iib, NULL);
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_ea(o, iib, tp_dst, 1);
+        generate_eaval(o, iib, tp_dst);
+        generate_outdata(o, iib, NULL);
 
      #ifdef BCD_NV_SAME                     //save NV
        OUT("int vflagcpy=VFLAG;\n");
@@ -1476,7 +1550,7 @@ void generate(FILE *output, int topnibble)
         OUT("  sint16 precalc = dstdata - srcdata - XFLAG;\n");
         OUT("  sint16 outdata_tmp = precalc;\n");
         OUT("\n");
-        C_ABRT_CHK(output);
+        C_ABRT_CHK(o);
         OUT("  if (outdata_tmp < 0) {\n");
         OUT("    outdata_tmp-= 0x60;\n");
         if (flags && iib->flags.set & IIB_FLAG_N)
@@ -1510,7 +1584,7 @@ void generate(FILE *output, int topnibble)
         if (flags && iib->flags.set & IIB_FLAG_V)
           OUT("  VFLAG = (precalc & 1<<7) && ((outdata & 1<<7) == 0);\n");
         #endif
-        generate_eastore(output, iib, tp_dst);
+        generate_eastore(o, iib, tp_dst);
 
          #ifdef BCD_NV_SAME                     //save NV
           OUT("VFLAG=vflagcpy;\n");
@@ -1523,15 +1597,16 @@ void generate(FILE *output, int topnibble)
         break;
 
       case i_NBCD:
-        generate_ea(output, iib, tp_src, 1);
-        generate_eaval(output, iib, tp_src);
-        generate_outdata(output, iib, NULL);
+        GENDBG("");
+        generate_ea(o, iib, tp_src, 1);
+        generate_eaval(o, iib, tp_src);
+        generate_outdata(o, iib, NULL);
         OUT("\n");
         OUT("  sint8 outdata_low = - (srcdata & 0xF) - XFLAG;\n");
         OUT("  sint16 precalc = - srcdata - XFLAG;\n");
         OUT("  sint16 outdata_tmp = precalc;\n");
         OUT("\n");
-        C_ABRT_CHK(output);
+        C_ABRT_CHK(o);
 
         /*  cbiere code */
         OUT("  if (outdata_low < 0)\n");
@@ -1554,11 +1629,11 @@ void generate(FILE *output, int topnibble)
 
     #ifndef BCD_NV_SAME
     if (flags && iib->flags.set & IIB_FLAG_N)
-          generate_stdflag_n(output, iib);
+          generate_stdflag_n(o, iib);
     if (flags && iib->flags.set & IIB_FLAG_V)
           OUT("  VFLAG = (precalc & 1<<7) && ((outdata & 1<<7) == 0);\n");
     #endif
-    generate_eastore(output, iib, tp_src);
+    generate_eastore(o, iib, tp_src);
 
     OUT("  ALERT_LOG(0,\"BCD  @ %lx\", (long)PC);\n");  // 2018.03.10 RA
 
@@ -1584,10 +1659,10 @@ void generate(FILE *output, int topnibble)
         if (flags && iib->flags.set & IIB_FLAG_Z)
           OUT("  if (outdata) ZFLAG = 0;\n");
         if (flags && iib->flags.set & IIB_FLAG_N)
-          generate_stdflag_n(output, iib);
+          generate_stdflag_n(o, iib);
         if (flags && iib->flags.set & IIB_FLAG_V)
           OUT("  VFLAG = (precalc & 1<<7) && ((outdata & 1<<7) == 0);\n");
-        generate_eastore(output, iib, tp_src);
+        generate_eastore(o, iib, tp_src);
 
         */
         break;
@@ -1598,81 +1673,86 @@ void generate(FILE *output, int topnibble)
 
 
                 case i_SWAP:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_outdata(output, iib, "(srcdata>>16) | (srcdata<<16)");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_outdata(o, iib, "(srcdata>>16) | (srcdata<<16)");
                     OUT("\n");
-                    C_ABRT_CHK(output);
-                    generate_eastore(output, iib, tp_src);
+                    C_ABRT_CHK(o);
+                    generate_eastore(o, iib, tp_src);
 
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_PEA:
-                    generate_ea(output, iib, tp_src, 1);
-                    ABORT_CHECK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    ABORT_CHECK(o);
 
                     OUT("\n");
                     OUT("  ADDRREG(7)-= 4;\n");
                     OUT("  storelong(ADDRREG(7), srcaddr);\n");
-                    ABORT_CHECK(output);      // added since this opcode doesn't call eastore
+                    ABORT_CHECK(o);      // added since this opcode doesn't call eastore
                     break;
 
                 case i_LEA:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_outdata(output, iib, "srcaddr");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_outdata(o, iib, "srcaddr");
                     OUT("\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     break;
 
                 case i_EXT:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
                     OUT("\n");
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     switch(iib->size) {
                         case sz_word:
-                            generate_outdata(output, iib, "(sint16)(sint8)(srcdata)");
+                            generate_outdata(o, iib, "(sint16)(sint8)(srcdata)");
                             break;
                         case sz_long:
-                            generate_outdata(output, iib, "(sint32)(sint16)(srcdata)");
+                            generate_outdata(o, iib, "(sint32)(sint16)(srcdata)");
                             break;
                         default:
-                            fprintf(output, "ERROR size\n");
+                            fprintf(o, "ERROR size\n");
                             break;
                     }
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
 
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_EXG:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    C_ABRT_CHK(o);
                     OUT("\n");
                     switch (iib->dtype) {
                         case dt_Dreg:
@@ -1699,42 +1779,44 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_TST:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_outdata(output, iib, "srcdata");
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_outdata(o, iib, "srcdata");
+                    C_ABRT_CHK(o);
                     if (flags)
                     {
                         OUT("\n");
-                        ABORT_CHECK(output);      // added since this opcode doesn't call eastore
+                        ABORT_CHECK(o);      // added since this opcode doesn't call eastore
                     }
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     break;
 
                 case i_TAS:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_outdata(output, iib, "srcdata");
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_outdata(o, iib, "srcdata");
+                    C_ABRT_CHK(o);
                     if (flags)
                         {
                              OUT("\n");
                         }
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_C)
-                        generate_clrflag_c(output, iib);
+                        generate_clrflag_c(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     switch(iib->size) {
                         case sz_byte:
                             OUT("  outdata|= 1<<7;\n");
@@ -1749,45 +1831,51 @@ void generate(FILE *output, int topnibble)
                             OUT("ERROR size\n");
                             break;
                     }
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     break;
 
                 case i_CHK:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    ABORT_CHECK(output);
-                    fprintf(output, "\n");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    ABORT_CHECK(o);
+                    fprintf(o, "\n");
                     if (iib->size != sz_word)
                         OUT("ERROR size\n");
-                    fprintf(output, "  if ((sint16)srcdata < 0) {\n");
+
+                    fprintf(o, "  ZFLAG=(!dstdata); //RA2020.07.12\n"); // != srcdata); //RA20200712\n");  // 2020.07.12 fix
+
+                    fprintf(o, "  if ((sint16)srcdata < 0) {\n");
                     if (flags)
                         OUT("    NFLAG = 1;\n");
-                    fprintf(output, "    reg68k_internal_vector(V_CHK, PC+%d,0);\n",
+                    fprintf(o, "    reg68k_internal_vector(V_CHK, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     OUT("  } else if (dstdata > srcdata) {\n");
                     if (flags)
                         OUT("    NFLAG = 0;\n");
-                    fprintf(output, "    reg68k_internal_vector(V_CHK, PC+%d,0);\n",
+                    fprintf(o, "    reg68k_internal_vector(V_CHK, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     OUT("  }\n");
                     break;
 
                 case i_TRAPV:
+                    GENDBG("");
                     OUT("  if (VFLAG) {\n");
-                    fprintf(output, "    reg68k_internal_vector(V_TRAPV, PC+%d,0);\n",
+                    fprintf(o, "    reg68k_internal_vector(V_TRAPV, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     OUT("  }\n");
                     break;
 
                 case i_TRAP:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    C_ABRT_CHK(o);
                     OUT("\n");
 
-                    fprintf(output, "  reg68k_internal_vector(V_TRAP+srcdata, PC+%d,0);\n",
+                    fprintf(o, "  reg68k_internal_vector(V_TRAP+srcdata, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     pcinc = 0;
                     break;
@@ -1796,7 +1884,7 @@ void generate(FILE *output, int topnibble)
                     OUT("  /* printf(\"RESET opcode executed @ %x\\n\", PC);*/ \n");
                     OUT("  if (!SFLAG)\n");
                     OUT("  {ALERT_LOG(0,\"RESET opcode executed @ %lx WITHOUT SUPERVISOR ON! Entering V_PRIVILEGE exception\\n\", (long)PC);\n");
-                    fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                    fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
                     OUT("\n");
                     OUT("  mc68k_reset();\n");  // this just flips the extern RESET wire to reset I/O
@@ -1804,20 +1892,21 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_NOP:
-    /* NOP */
+                      GENDBG("");
                     break;
 
                 case i_STOP:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    C_ABRT_CHK(o);
                     OUT("\n");
                     OUT("  if (regs.stop)\n");
                     OUT("    return;\n");
                     OUT("  if (!(SFLAG && (srcdata & 1<<13))) {\n");
-                    fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
+                    fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
                         (iib->wordlen)*2);
-                    fprintf(output, "    PC+= %d;\n", (iib->wordlen)*2);
+                    fprintf(o, "    PC+= %d;\n", (iib->wordlen)*2);
                     OUT("  } else {\n");
                     OUT("    SR = srcdata;\n");
                     OUT("    STOP = 1;\n");
@@ -1826,45 +1915,48 @@ void generate(FILE *output, int topnibble)
                     break;
 
                 case i_LINK:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    C_ABRT_CHK(output);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    C_ABRT_CHK(o);
                     if (iib->stype != dt_ImmW)
                         OUT("ERROR stype\n");
                     OUT("\n");
                     OUT("  ADDRREG(7)-= 4;\n");
                     OUT("  storelong(ADDRREG(7), dstdata);\n");
-                    ABORT_CHECK(output);      // added since this opcode doesn't call eastore
+                    ABORT_CHECK(o);      // added since this opcode doesn't call eastore
                     OUT("  ADDRREG(dstreg) = ADDRREG(7);\n");
                     OUT("  ADDRREG(7)+= (sint16)srcdata;\n");
                     break;
 
                 case i_UNLK:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
                     OUT("\n");
                     OUT("uint32 tmp=ADDRREG(srcreg);\n");
                     OUT("l1=fetchlong(srcdata);");
-                    ABORT_CHECK(output);
+                    ABORT_CHECK(o);
                     OUT("  ADDRREG(srcreg) =l1;\n");
                     OUT("  ADDRREG(7) = srcdata+4;\n");
                     break;
 
                 case i_RTE:
+                    GENDBG("");
                     ///// OUT("  uint16 FV=0; // addedd by RA for format/vector word\n");
                     if (DEBUG_RTE)
-                        fputs("  printf(\"RTE: 0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"RTE: 0x%X\\n\", PC);\n", o);
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     //    OUT("  if (!SFLAG)\n");
-                    //  fprintf(output, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
+                    //  fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
                     //  (iib->wordlen)*2);
                     //  OUT("\n");
                     OUT("  if (!SFLAG)\n");
-                    fprintf(output, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
+                    fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
                     OUT("\n");
 
@@ -1876,7 +1968,7 @@ void generate(FILE *output, int topnibble)
                     OUT("w3=IMASK;\n");                      // RA20050411
 
                     OUT("l1=fetchlong(ADDRREG(7)+2);");      // new PC
-                    ABORT_CHECK(output);
+                    ABORT_CHECK(o);
 
 
                     OUT("  ADDRREG(7)+= 6;\n");              // fix stack
@@ -1887,114 +1979,133 @@ void generate(FILE *output, int topnibble)
                     //OUT("  ADDRREG(7)+= 8;                 // \n\n");
 
                     //OUT("  if ((FV & 0xf000)>0x1000)       // \n");
-                    //fprintf(output, "    {reg68k_internal_vector(V_FORMAT, PC+%d,0);return;}\n\n",(iib->wordlen)*2);
+                    //fprintf(o, "    {reg68k_internal_vector(V_FORMAT, PC+%d,0);return;}\n\n",(iib->wordlen)*2);
 
                     OUT("  if (w2!=SFLAG) {SR_CHANGE();}\n");  // was SFLAG -- ra
                     OUT("  if (w3>IMASK)  {IRQMASKLOWER();}\n");            // RA20050411
 
                     OUT("fetchword(l1);");           //not sure about this 20060116
-                    ABORT_CHECK(output);            //not sure about this 20060116
+                    ABORT_CHECK(o);            //not sure about this 20060116
 
                     OUT("  PC = l1;\n");
 
 
                     if (DEBUG_RTE)
-                        fputs("  printf(\"RTE: ->0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"RTE: ->0x%X\\n\", PC);\n", o);
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     pcinc = 0;
                     break;
 
                 case i_RTS:
+                    GENDBG("");
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"RTS: 0x%X\\n\", PC);", output);
+                        fputs("  printf(\"RTS: 0x%X\\n\", PC);", o);
                     OUT("l1=fetchlong(ADDRREG(7));");
 
                     OUT("  ADDRREG(7)+= 4;\n");         //20060116
-                    ABORT_CHECK(output);
+                    ABORT_CHECK(o);
 
                     OUT("  PC = l1;\n");
 
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"RTS: ->0x%X\\n\", PC);", output);
+                        fputs("  printf(\"RTS: ->0x%X\\n\", PC);", o);
                     pcinc = 0;
                     break;
 
                 case i_RTR:
+                    GENDBG("");
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"RTR: 0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"RTR: 0x%X\\n\", PC);\n", o);
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
 
                     OUT("w1=fetchword(ADDRREG(7));");
                     OUT("l1=fetchlong(ADDRREG(7)+2);");
-                    ABORT_CHECK(output);
+                    ABORT_CHECK(o);
 
                     OUT("  SR = (SR & ~0xFF) | (w1 & 0xFF);\n");
                     OUT("  PC = l1;\n");
                     OUT("  ADDRREG(7)+= 6;\n");
 
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"RTR: ->0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"RTR: ->0x%X\\n\", PC);\n", o);
                     if (DEBUG_SR)
                         fputs("  printf(\"SR: %08X %04X\\n\", PC, SR);\n",
-                            output);
+                            o);
                     pcinc = 0;
                     break;
 
-                case i_JSR:
-                    generate_ea(output, iib, tp_src, 1);
+                case i_JSR: // todo check for JSR (A0)  vs PDIS off PC
+                    generate_ea(o, iib, tp_src, 1);
                     OUT("\n");
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"JSR: 0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"JSR: 0x%X\\n\", PC);\n", o);
                     OUT("  ADDRREG(7)-= 4;\n");
-                    fprintf(output, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
-                    ABORT_CHECK(output);
+                    fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
+                    ABORT_CHECK(o);
                   //OUT("  fetchword(srcaddr);"); //20060113
-                  //ABORT_CHECK(output);
-                    OUT("  PC = srcaddr;\n");
+                  //ABORT_CHECK(o);
+//                    if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+//                         {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+//                    else 
+                           OUT("  PC = srcaddr;\n");
+
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"JSR: ->0x%X\\n\", PC);", output);
+                        fputs("  printf(\"JSR: ->0x%X\\n\", PC);", o);
+
+
                     pcinc = 0;
                     break;
 
-                case i_JMP:
-                    generate_ea(output, iib, tp_src, 1);
+                case i_JMP:// todo check for JMP (A0) vs PDIS off PC
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
                     OUT("\n");
-                    if (DEBUG_BRANCH)
-                        fputs("  printf(\"JMP: 0x%X\\n\", PC);", output);
+//                    if (DEBUG_BRANCH)
+//                        fputs("  printf(\"JMP: 0x%X\\n\", PC);", o);
                   //OUT("  fetchword(srcaddr);\n"); //20060113
-                  //ABORT_CHECK(output);  // suspect there's an issue here **** 20180316 ****
-                    OUT("  PC = srcaddr;\n");
+                  //ABORT_CHECK(o);  // suspect there's an issue here **** 20180316 ****
+//         fputs("  fprintf(stderr,\"JMP: %08x->0x%08x\\n\", PC, srcaddr);\n", o);  //2020.07.24
+
+                  //if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+                  //     {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+                  //else 
+                         {OUT("  PC = srcaddr;\n");}
+
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", o);
+                    
                     pcinc = 0;
                     break;
 
                 case i_Scc:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_cc(output, iib);
-                    generate_outdata(output, iib, "cc ? (uint8)(-1) : 0");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_cc(o, iib);
+                    generate_outdata(o, iib, "cc ? (uint8)(-1) : 0");
                     OUT("\n");
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     break;
 
                 case i_SF:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_outdata(output, iib, "0");
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_outdata(o, iib, "0");
                     OUT("\n");
-                    generate_eastore(output, iib, tp_src);
+                    generate_eastore(o, iib, tp_src);
                     break;
 
                 case i_DBcc:
+                    GENDBG("");
     /* special case where ipc holds the already PC-relative value */
-                    fprintf(output, "  uint32 srcdata = ipc->src;\n");
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    generate_cc(output, iib);
-                    C_ABRT_CHK(output);
+                    fprintf(o, "  uint32 srcdata = ipc->src;\n");
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    generate_cc(o, iib);
+                    C_ABRT_CHK(o);
 
                     OUT("\n");
                     if (iib->size != sz_word) {
@@ -2007,19 +2118,20 @@ void generate(FILE *output, int topnibble)
                     OUT("    if ((sint16)dstdata != -1)\n");
                     OUT("      PC = srcdata;\n");
                     OUT("    else\n");
-                    fprintf(output, "     {PC+= %d; cpu68k_clocks+=2;}\n", (iib->wordlen)*2);
+                    fprintf(o, "     {PC+= %d; cpu68k_clocks+=2;}\n", (iib->wordlen)*2);
                     OUT("  } else\n");
-                    fprintf(output, "    PC+= %d;\n", (iib->wordlen)*2);
+                    fprintf(o, "    PC+= %d;\n", (iib->wordlen)*2);
                     pcinc = 0;
                     break;
 
                 case i_DBRA:
+                    GENDBG("");
     /* special case where ipc holds the already PC-relative value */
-                    fprintf(output, "  uint32 srcdata = ipc->src;\n");
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
+                    fprintf(o, "  uint32 srcdata = ipc->src;\n");
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
 
                     OUT("\n");
                     if (iib->size != sz_word) {
@@ -2031,61 +2143,67 @@ void generate(FILE *output, int topnibble)
                     OUT("  if ((sint16)dstdata != -1)\n");
                     OUT("    PC = srcdata;\n");
                     OUT("  else\n");
-                    fprintf(output, "   {PC+= %d; cpu68k_clocks+=4;}\n", (iib->wordlen)*2);
+                    fprintf(o, "   {PC+= %d; cpu68k_clocks+=4;}\n", (iib->wordlen)*2);
                     pcinc = 0;
                     break;
 
                 case i_Bcc:             // the -8's are reminders that the base case takes 8 cycles -  // RA2005.05.09
+                    GENDBG("");
     /* special case where ipc holds the already PC-relative value */
                     OUT("  uint32 srcdata = ipc->src;\n");
-                    generate_cc(output, iib);
+                    generate_cc(o, iib);
                     OUT("\n");
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"Bcc: 0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"Bcc: 0x%X\\n\", PC);\n", o);
                     OUT("  if (cc)\n");
-                    OUT("    {PC = srcdata; cpu68k_clocks+=(10-8);}\n");
+                  //OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
+                    OUT("    {  PC = srcdata; cpu68k_clocks+=(10-8);}\n");
                     OUT("  else\n");
-                    if (iib->size == sz_word)   fprintf(output, "    {PC+= %d;                   }\n", (iib->wordlen)*2);
-                    else                        fprintf(output, "    {PC+= %d; cpu68k_clocks+=(12-8);}\n", (iib->wordlen)*2);
+                    if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                   }\n", (iib->wordlen)*2);
+                    else                        fprintf(o, "    {PC+= %d; cpu68k_clocks+=(12-8);}\n", (iib->wordlen)*2);
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"Bcc: ->0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"Bcc: ->0x%X\\n\", PC);\n", o);
                     pcinc = 0;
                     break;
 
                 case i_BSR:
+                    GENDBG("");
     /* special case where ipc holds the already PC-relative value */
                     OUT("  uint32 srcdata = ipc->src;\n");
                     OUT("\n");
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"BSR: 0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"BSR: 0x%X\\n\", PC);\n", o);
                     OUT("  ADDRREG(7)-= 4;\n");
-                    fprintf(output, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
-                    ABORT_CHECK(output);
+                    fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
+                    ABORT_CHECK(o);
+                  //OUT("  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff);\n");
                     OUT("  PC = srcdata;\n");
+
                     if (DEBUG_BRANCH)
-                        fputs("  printf(\"BSR: ->0x%X\\n\", PC);\n", output);
+                        fputs("  printf(\"BSR: ->0x%X\\n\", PC);\n", o);
                     pcinc = 0;
                     break;
 
                 case i_DIVU:
+                   GENDBG("");
     /* DIVx is the only instruction that has different sizes for the
        source and destination! */
                     if (iib->dtype != dt_Dreg)
                         OUT("ERROR dtype\n");
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src); /* 16bit EA */
-                    generate_ea(output, iib, tp_dst, 1); /* 32bit Dn */
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src); /* 16bit EA */
+                    generate_ea(o, iib, tp_dst, 1); /* 32bit Dn */
                     OUT("  uint32 dstdata = DATAREG(dstreg);\n");
                     OUT("  uint32 quotient;\n");
 
                   //OUT("  ALERT_LOG(0,\"i_DIVU @ %08x src:%08x dest:%08x (dstreg:%d) abort_opcode:%d\",PC,srcdata,dstdata,dstreg,abort_opcode);\n" );
 
-                    C_ABRT_CHK(output);
+                    C_ABRT_CHK(o);
                     OUT("\n");
                     OUT("  if (srcdata == 0) {\n");
-                    OUT(            "    ALERT_LOG(0,\"DIVIDE_BY_ZERO @ %08lx src:%08lx dest:%08lx\",(long)PC,(long)srcdata,(long)dstdata);\n" );
+                  //OUT(            "    ALERT_LOG(0,\"DIVIDE_BY_ZERO @ %08lx src:%08lx dest:%08lx\",(long)PC,(long)srcdata,(long)dstdata);\n" );
                     OUT(            "    ZFLAG=0; NFLAG=0;");
-                    fprintf(output, "    reg68k_internal_vector(V_ZERO, PC+%d,0);\n",
+                    fprintf(o, "    reg68k_internal_vector(V_ZERO, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     OUT("    return;\n");
                     OUT("  }\n");
@@ -2099,6 +2217,8 @@ void generate(FILE *output, int topnibble)
                         OUT("    VFLAG = 0;\n");
 //68020             if (flags && iib->flags.set & IIB_FLAG_N)           // 2018.03.10 RA
 //68020                 OUT("    NFLAG = ((sint16)quotient) < 0;\n");
+
+
                     if (flags && iib->flags.set & IIB_FLAG_Z)
                         OUT("  ZFLAG = !((uint16)quotient);\n");
                     if (flags && (iib->flags.set & IIB_FLAG_V ||
@@ -2107,7 +2227,10 @@ void generate(FILE *output, int topnibble)
                         if (flags && iib->flags.set & IIB_FLAG_V)
                             OUT("    VFLAG = 1;\n");
 //                        if (flags && iib->flags.set & IIB_FLAG_N)  //2018.03.10
-//                          OUT("    NFLAG = 1;\n");                
+//                          OUT("    NFLAG = 1;\n");            
+
+                    OUT("  NFLAG = !!((quotient & 0x80000));\n");                            // 2020.07.28
+
                     }
                     OUT("  }\n");
                     if (flags && iib->flags.set & IIB_FLAG_C)
@@ -2119,16 +2242,17 @@ void generate(FILE *output, int topnibble)
 
                 case i_ROXR:
                 case i_ROXL:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    generate_bits(output, iib);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    generate_bits(o, iib);
                     OUT("  uint8 loop = srcdata & 63;\n");
                     OUT("  uint8 cflag = CFLAG;\n");
                     OUT("  uint8 xflag = XFLAG;\n");
-                    generate_outdata(output, iib, "dstdata");
-                    C_ABRT_CHK(output);
+                    generate_outdata(o, iib, "dstdata");
+                    C_ABRT_CHK(o);
                     OUT("\n");
 
                     //ROXL bit31->c, x->bit0, bit31->x
@@ -2152,7 +2276,7 @@ void generate(FILE *output, int topnibble)
                         OUT("    loop--;\n");
                         OUT("  }\n");
                     }
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_X)
@@ -2160,24 +2284,25 @@ void generate(FILE *output, int topnibble)
                     if (flags && iib->flags.set & IIB_FLAG_C)
                         OUT("  CFLAG = xflag;\n");
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     break;
 
                 case i_ROR:
                 case i_ROL:
-                    generate_ea(output, iib, tp_src, 1);
-                    generate_eaval(output, iib, tp_src);
-                    generate_ea(output, iib, tp_dst, 1);
-                    generate_eaval(output, iib, tp_dst);
-                    generate_bits(output, iib);
+                    GENDBG("");
+                    generate_ea(o, iib, tp_src, 1);
+                    generate_eaval(o, iib, tp_src);
+                    generate_ea(o, iib, tp_dst, 1);
+                    generate_eaval(o, iib, tp_dst);
+                    generate_bits(o, iib);
                     OUT("  uint8 loop = srcdata & 63;\n");
                     OUT("  uint8 cflag = 0;\n");
-                    generate_outdata(output, iib, "dstdata");
-                    C_ABRT_CHK(output);
+                    generate_outdata(o, iib, "dstdata");
+                    C_ABRT_CHK(o);
                     OUT("\n");
 
                     // ROL bit31->c only->bit 0
@@ -2200,48 +2325,51 @@ void generate(FILE *output, int topnibble)
                         OUT("    loop--;\n");
                         OUT("  }\n");
                     }
-                    generate_eastore(output, iib, tp_dst);
+                    generate_eastore(o, iib, tp_dst);
                     if (flags)
                         OUT("\n");
                     if (flags && iib->flags.set & IIB_FLAG_C)
                         OUT("  CFLAG = cflag;\n");
                     if (flags && iib->flags.set & IIB_FLAG_N)
-                        generate_stdflag_n(output, iib);
+                        generate_stdflag_n(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_Z)
-                        generate_stdflag_z(output, iib);
+                        generate_stdflag_z(o, iib);
                     if (flags && iib->flags.set & IIB_FLAG_V)
-                        generate_clrflag_v(output, iib);
+                        generate_clrflag_v(o, iib);
                     break;
 
                 case i_LINE10:
+                    GENDBG("");
                     OUT("\n");
-                    //fprintf(output, "  PC+=2;\n  reg68k_internal_vector(V_LINE10, PC,0);\n");        //20060116-RA
-                    fprintf(output, "reg68k_internal_vector(V_LINE10, PC,0);\n");
+                    //fprintf(o, "  PC+=2;\n  reg68k_internal_vector(V_LINE10, PC,0);\n");        //20060116-RA
+                    fprintf(o, "reg68k_internal_vector(V_LINE10, PC,0);\n");
 
                     pcinc = 0;
                     break;
 
                 case i_LINE15:
+                    GENDBG("");
                     OUT("\n");
-                    fprintf(output, "  reg68k_internal_vector(V_LINE15, PC,0);\n");
+                    fprintf(o, "  reg68k_internal_vector(V_LINE15, PC,0);\n");
                     pcinc = 0;
                     break;
 
                 case i_ILLG:
+                    GENDBG("");
                     OUT("  printf(\"Illegal instruction @ %x\\n\", PC);\n");
-                    fprintf(output, "  reg68k_internal_vector(4, PC,0);\n");  // RA2002.08.02
+                    fprintf(o, "  reg68k_internal_vector(4, PC,0);\n");  // RA2002.08.02
                     break;
 
             } /* switch */
 
             if (pcinc) {
                 // added to prevent bus error issues. -- RA 2003.12.04.
-                //20180318// ABORT_CHECK(output);
+                //20180318// ABORT_CHECK(o);
                 //
-                fprintf(output, "  PC+= %d;\n", (iib->wordlen)*2);
+                fprintf(o, "  PC+= %d;\n", (iib->wordlen)*2);
             }
 
-            UNFLAG_ACHK(output);              // RA
+            UNFLAG_ACHK(o);              // RA
             OUT("}\n\n");
         }
 
@@ -2253,7 +2381,32 @@ void generate_ea(FILE *o, t_iib *iib, t_type type, int update)
     t_datatype datatype = type ? iib->dtype : iib->stype;
 
   /* generate information about EA to be used in calculations */
+    
+    GENDBG(":");
+    fprintf(o,"//type:%d datatype: %d, iib->dtype:%d, iib->stype:%d\n",type,datatype,iib->dtype,iib->stype);
 
+    #ifdef DEBUG
+    switch(datatype) {
+        case dt_Dreg:  GENDBG("dt_Dreg");  break;
+        case dt_Areg:  GENDBG("dt_Areg");  break;
+        case dt_Aind:  GENDBG("dt_Aind");  break;
+        case dt_Ainc:  GENDBG("dt_Ainc");  break;
+        case dt_Adec:  GENDBG("dt_Adec");  break;
+        case dt_Adis:  GENDBG("dt_Adis");  break;
+        case dt_Aidx:  GENDBG("dt_Aidx");  break;
+        case dt_ImmB:  GENDBG("dt_ImmB");  break;
+        case dt_ImmW:  GENDBG("dt_ImmW");  break;
+        case dt_ImmL:  GENDBG("dt_ImmL");  break;
+        case dt_ImmS:  GENDBG("dt_ImmS");  break;
+        case dt_Imm3:  GENDBG("dt_Imm3");  break;
+        case dt_Imm4:  GENDBG("dt_Imm4");  break;
+        case dt_Imm8:  GENDBG("dt_Imm8");  break;
+        case dt_Imm8s: GENDBG("dt_Imm8s"); break;
+
+        default:      GENDBG("other"); break; 
+    }
+    #endif
+ 
     switch(datatype) {
         case dt_Dreg:
         case dt_Areg:
@@ -2409,54 +2562,56 @@ void generate_eaval(FILE *o, t_iib *iib, t_type type)
     t_datatype datatype = type ? iib->dtype : iib->stype;
 
   /* get value in EA */
+    GENDBG(":");
+    fprintf(o,"//type:%d datatype: %d, iib->dtype:%d, iib->stype:%d\n",type,datatype,iib->dtype,iib->stype);
 
     switch(datatype) {
         case dt_Dreg:
             switch(iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("byte");
                     if (type == tp_src)
                         fprintf(o, "  uint8 srcdata = DATAREG(srcreg);\n");
                     else
                         fprintf(o, "  uint8 dstdata = DATAREG(dstreg);\n");
                     break;
-                case sz_word:
+                case sz_word: GENDBG("word");
                     if (type == tp_src)
                         fprintf(o, "  uint16 srcdata = DATAREG(srcreg);\n");
                     else
                         fprintf(o, "  uint16 dstdata = DATAREG(dstreg);\n");
                     break;
-                case sz_long:
+                case sz_long: GENDBG("long");
                     if (type == tp_src)
                         fprintf(o, "  uint32 srcdata = DATAREG(srcreg);\n");
                     else
                         fprintf(o, "  uint32 dstdata = DATAREG(dstreg);\n");
                     break;
-                default:
+                default: GENDBG("");
                     fprintf(o, "ERROR size\n");
                     break;
             }
             break;
         case dt_Areg:
             switch(iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("");
                     if (type == tp_src)
                         fprintf(o, "  uint8 srcdata = ADDRREG(srcreg);\n");
                     else
                         fprintf(o, "  uint8 dstdata = ADDRREG(dstreg);\n");
                     break;
-                case sz_word:
+                case sz_word: GENDBG("");
                     if (type == tp_src)
                         fprintf(o, "  uint16 srcdata = ADDRREG(srcreg);\n");
                     else
                         fprintf(o, "  uint16 dstdata = ADDRREG(dstreg);\n");
                     break;
-                case sz_long:
+                case sz_long: GENDBG("");
                     if (type == tp_src)
                         fprintf(o, "  uint32 srcdata = ADDRREG(srcreg);\n");
                     else
                         fprintf(o, "  uint32 dstdata = ADDRREG(dstreg);\n");
                     break;
-                default:
+                default: GENDBG("");
                     fprintf(o, "ERROR size\n");
                     break;
             }
@@ -2471,7 +2626,7 @@ void generate_eaval(FILE *o, t_iib *iib, t_type type)
         case dt_Pdis:
         case dt_Pidx:
             switch(iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("byte");
                     if (type == tp_src)
 
                        fprintf(o, "  uint8 srcdata = fetchbyte(srcaddr);\n");
@@ -2479,44 +2634,44 @@ void generate_eaval(FILE *o, t_iib *iib, t_type type)
                         fprintf(o, "  uint8 dstdata = fetchbyte(dstaddr);\n");
                         FLAG_ACHK(o);
                     break;
-                case sz_word:
+                case sz_word: GENDBG("word");
                     if (type == tp_src)
                         fprintf(o, "  uint16 srcdata = fetchword(srcaddr);\n");
                     else
                         fprintf(o, "  uint16 dstdata = fetchword(dstaddr);\n");
                         FLAG_ACHK(o);
                     break;
-                case sz_long:
+                case sz_long: GENDBG("long");
                     if (type == tp_src)
                         fprintf(o, "  uint32 srcdata = fetchlong(srcaddr);\n");
                     else
                         fprintf(o, "  uint32 dstdata = fetchlong(dstaddr);\n");
                         FLAG_ACHK(o);
                     break;
-                default:
+                default: GENDBG("");
                     fprintf(o, "ERROR size\n");
                     break;
             }
             break;
-        case dt_ImmB:
+        case dt_ImmB: GENDBG("immB");
             if (type == tp_src)
                 fprintf(o, "  uint8 srcdata = ipc->src;\n");
             else
                 fprintf(o, "  uint8 dstdata = ipc->dst;\n");
             break;
-        case dt_ImmW:
+        case dt_ImmW: GENDBG("immW");
             if (type == tp_src)
                 fprintf(o, "  uint16 srcdata = ipc->src;\n");
             else
                 fprintf(o, "  uint16 dstdata = ipc->dst;\n");
             break;
-        case dt_ImmL:
+        case dt_ImmL: GENDBG("immL");
             if (type == tp_src)
                 fprintf(o, "  uint32 srcdata = ipc->src;\n");
             else
                 fprintf(o, "  uint32 dstdata = ipc->dst;\n");
             break;
-        case dt_ImmS:
+        case dt_ImmS: GENDBG("immS");
             if (type == tp_src)
                 fprintf(o, "  unsigned int srcdata = %d;\n", iib->immvalue);
             else
@@ -2524,13 +2679,13 @@ void generate_eaval(FILE *o, t_iib *iib, t_type type)
             break;
         case dt_Imm3:
         case dt_Imm4:
-        case dt_Imm8:
+        case dt_Imm8: GENDBG("imm3,4,8");
             if (type == tp_src)
                 fprintf(o, "  unsigned int srcdata = ipc->src;\n");
             else
                 fprintf(o, "  unsigned int dstdata = ipc->dst;\n");
             break;
-        case dt_Imm8s:
+        case dt_Imm8s: GENDBG("imm8S");
             if (type == tp_src)
                 fprintf(o, "  signed int srcdata = ipc->src;\n");
             else
@@ -2548,11 +2703,13 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
   fputs("ABORT_OPCODE_CHK();\n",o);
 
   /* get value in EA */
+    GENDBG(":");
+    fprintf(o,"//type:%d  iib->dtype:%d, iib->stype:%d\n",type,iib->dtype,iib->stype);
 
     switch(type == tp_dst ? iib->dtype : iib->stype) {
         case dt_Dreg:
             switch (iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("D-reg byte");
                     if (type == tp_src)
                         fprintf(o, "  DATAREG(srcreg) = (DATAREG(srcreg) & ~0xff) | "
                             "outdata;\n");
@@ -2560,7 +2717,7 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
                         fprintf(o, "  DATAREG(dstreg) = (DATAREG(dstreg) & ~0xff) | "
                             "outdata;\n");
                     break;
-                case sz_word:
+                case sz_word: GENDBG("D-reg word");
                     if (type == tp_src)
                         fprintf(o, "  DATAREG(srcreg) = (DATAREG(srcreg) & ~0xffff) | "
                             "outdata;\n");
@@ -2568,7 +2725,7 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
                         fprintf(o, "  DATAREG(dstreg) = (DATAREG(dstreg) & ~0xffff) | "
                             "outdata;\n");
                     break;
-                case sz_long:
+                case sz_long: GENDBG("D-reg long");
                     if (type == tp_src)
                         fprintf(o, "  DATAREG(srcreg) = outdata;\n");
                     else
@@ -2581,7 +2738,7 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
             break;
         case dt_Areg:
             switch(iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("A-reg-byte");
                     if (type == tp_src)
                         fprintf(o, "  ADDRREG(srcreg) = (ADDRREG(srcreg) & ~0xff) | "
                             "outdata;\n");
@@ -2589,7 +2746,7 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
                         fprintf(o, "  ADDRREG(dstreg) = (ADDRREG(dstreg) & ~0xff) | "
                             "outdata;\n");
                     break;
-                case sz_word:
+                case sz_word: GENDBG("A-reg-word");
                     if (type == tp_src)
                         fprintf(o, "  ADDRREG(srcreg) = (ADDRREG(srcreg) & ~0xffff) | "
                             "outdata;\n");
@@ -2597,7 +2754,7 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
                         fprintf(o, "  ADDRREG(dstreg) = (ADDRREG(dstreg) & ~0xffff) | "
                             "outdata;\n");
                     break;
-                case sz_long:
+                case sz_long: GENDBG("A-reg-long");
                     if (type == tp_src)
                         fprintf(o, "  ADDRREG(srcreg) = outdata;\n");
                     else
@@ -2618,26 +2775,26 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
         case dt_Pdis:
         case dt_Pidx:
             switch(iib->size) {
-                case sz_byte:
+                case sz_byte: GENDBG("byte");
                     if (type == tp_src)
                         fprintf(o, "  storebyte(srcaddr, outdata);\n");
                     else
                         fprintf(o, "  storebyte(dstaddr, outdata);\n");
 
                     break;
-                case sz_word:
+                case sz_word: GENDBG("word");
                     if (type == tp_src)
                         fprintf(o, "  storeword(srcaddr, outdata);\n");
                     else
                         fprintf(o, "  storeword(dstaddr, outdata);\n");
                     break;
-                case sz_long:
+                case sz_long: GENDBG("long");
                     if (type == tp_src)
                         fprintf(o, "  storelong(srcaddr, outdata);\n");
                     else
                         fprintf(o, "  storelong(dstaddr, outdata);\n");
                     break;
-                default:
+                default: GENDBG("");
                     fprintf(o, "ERROR size\n");
             }
             ABORT_CHECK(o);              // all of the above call store, so check for MMU error
@@ -2649,17 +2806,20 @@ void generate_eastore(FILE *o, t_iib *iib, t_type type)
 
 void generate_outdata(FILE *o, t_iib *iib, const char *init)
 {
+    GENDBG(":");
+    fprintf(o,"//iib->dtype:%d, iib->stype:%d init:%s\n",iib->dtype,iib->stype,init);
+
     switch(iib->size) {
-        case sz_byte:
+        case sz_byte: GENDBG("byte");
             fprintf(o, "  uint8 ");
             break;
-        case sz_word:
+        case sz_word: GENDBG("word");
             fprintf(o, "  uint16 ");
             break;
-        case sz_long:
+        case sz_long: GENDBG("long");
             fprintf(o, "  uint32 ");
             break;
-        default:
+        default: GENDBG("");
             fprintf(o, "ERROR size\n");
             break;
     }
@@ -2727,16 +2887,16 @@ void generate_cc(FILE *o, t_iib *iib)
 void generate_stdflag_n(FILE *o, t_iib *iib)
 {
     switch(iib->size) {
-        case sz_byte:
+        case sz_byte: GENDBG("");
             fprintf(o, "  NFLAG = ((sint8)outdata) < 0;\n");
             break;
-        case sz_word:
+        case sz_word: GENDBG("");
             fprintf(o, "  NFLAG = ((sint16)outdata) < 0;\n");
             break;
-        case sz_long:
+        case sz_long: GENDBG("");
             fprintf(o, "  NFLAG = ((sint32)outdata) < 0;\n");
             break;
-        default:
+        default: GENDBG("");
             fprintf(o, "ERROR size\n");
             break;
     }

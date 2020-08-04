@@ -186,7 +186,7 @@ function strip_and_compress() {
   if [[ -z "$WITHOUTUPX" ]]; then
      if [[ -n "$UPXCMD" ]]; then
         for app in $@; do
-          qjob "!!  UPX compress :        $app" "${TLD}/bashbuild/upxcmd.sh" "$UPXCMD" "${app}" "|| true"
+          qjob "!!  UPX compress :            $app" "${TLD}/bashbuild/upxcmd.sh" "$UPXCMD" "${app}" "|| true"
         done
       fi
   fi

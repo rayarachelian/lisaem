@@ -8,9 +8,66 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.08.03 - revert the pc24->pc32 changes as they caused an increase in RAM
+             requirements by an additional 640MB when not in used to accomodate
+             for the extra 256X increase in address space.
+           - MacWorks is no longer crashing in Hard Disk Initialize on return
+             to the Finder, however, it Sad Mac's out when trying to boot from
+             the hard disk, so there are other issues there.
+           - cleaning up the source code a bit to remove some dead code, and
+             unneeded debugging scaffolding.
+             
+2020.08.02 - fixed bug, Desktop menu, scrollbars, and linker now work.
+
+2020.07.28 - found the real bug, Aidx mode 6 i.e. MOVE.L (A0,D0,0),(A1,D1,0) 
+             only worked for the source, D0 is used on both source and dest,
+             and D1 is ignored.
+
+2020.07.21 - found JMP strips off high byte of PC, I thought I fixed this,
+             but there's more hiding.
+
+2020.07.15 - raising the memory to 2MB-128k works, was 1.5M before
+             other settings such as 2MB-32K or -64K will result in error 70
+             2MB will cause memory issues as well, not sure why this is
+
+2020.07.01 - running many CPU tests. Found issues with DIVU not clearing N flag,
+             and the CHK opcode.
+
+2020.06.26 - found an old IDEFileToDC42 that Natalia Portillo wrote, added it
+             to the tools, sorry should have included it back in 2008 :(
+           - working on supporting copies of X/Profile CF cards made with the
+             unix dd command via a xprofile-to-dc42 tool.
+
+2020.06.25 - updated blu-to-dc42 to better support Widgets, added a tool to
+             copy the boot sector + boot loader from one hard drive to another.
+             Sadly it doesn't allow for Widgets to boot in LisaEm, causes address
+             10726 error.
+
+2020.06.19 - found the bozo bit (DRM) flag for Lisa Tools. When enabled on a
+             tool on a 400k floppy, LOS will serialize it on the first copy to
+             the hard drive. Created tool to add the bozo bit and updated the
+             deserialize to remove it as well. Office tools no longer required
+             repeated deserialization when the disk is installed each time.
+           - firing up my old NeXT slab to test some more 68000 opcodes as it
+             would be useful to fix the LPW linker in order to help with the
+             Apple Lisa LOS source code project that AEK has going.
+
+2020.06.17 - blu-to-dc42 verified working for ProFile hard drives, *but not*
+             for Widgets as their transfer over BLU is somewhat different.
+
+
+2020.06.13 - fixed screenshots save dialog box file filter
+           - enabled proper floppy insert sound when power is off (so no motor
+             sound plays)
+
+2020.06.06 - looking at https://github.com/tfrikker/lisa_utils.git by Tom 
+             Frikker for fixes to my blu-to-dc42 code via an 68kmla thread
+             https://68kmla.org/forums/index.php?app=forums&module=forums&controller=topic&id=59686&do=findComment&comment=637973
+
 2020.06.03 - more automation for building macos x releases
 
-2020.06.02 - added libdc42 image tester
+2020.06.02 - added libdc42 image tester as I suspect file corruption is being
+             caused by something, but it's not libdc42.
 
 2020.05.27 - fixed most of the ui display bugs on macos x
            - RC1 release

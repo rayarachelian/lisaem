@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2020.07.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2020 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -36,7 +36,8 @@
 
 
 #ifdef CPU_CORE_TESTER
-#include <cpucoretester.c>
+//#include <cpucoretester.c>
+extern void record_access(uint32 address, int size, int write, uint32 value);
 #endif
 
 void printregs(FILE *buglog,char *tag);
@@ -418,7 +419,6 @@ uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
     return ret;
 }
 
-
 uint16 dmem68k_fetch_word(char *file, char *function, int line,uint32 addr)
 {
     HIGH_BYTE_FILTER();
@@ -580,10 +580,10 @@ void activate_parity_check(void)
 {
 
     lisa_diag2_on_mem();                         // hook memory function
-    if (mem_parity_bits2) return;                 // already allocated.
+    if (mem_parity_bits2) return;                // already allocated, don't do it again
 
 
-    DEBUG_LOG(100,"allocating %d bits",(2+(maxlisaram>>3)));
+    DEBUG_LOG(100,"allocating %d bits",(2+(maxlisaram>>3)));  // 1 parity bit for every 8 bits
     mem_parity_bits2=calloc(1,2+(maxlisaram>>3));
     if ( !mem_parity_bits2)
     {
@@ -2976,7 +2976,7 @@ void   lisa_wl_sio_rom(uint32 addr, uint32 data)   {CHECK_DIRTY_MMU(addr);  DEBU
 
 uint8  *lisa_mptr_sio_mrg(uint32 addr)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     //CHK_R_ODD_ADR(addr);
     //ui_log_verbose("*** lisa_mptr_sio_mrg got called! ****");
@@ -2988,7 +2988,7 @@ uint8  lisa_rb_sio_mrg(uint32 addr)
     uint16 r; uint8 r1, r2;
     uint32 a=GETSEG(addr);
     uint16 con=CXASEL;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     CHECK_DIRTY_MMU(addr);
 
@@ -3015,7 +3015,7 @@ uint16 lisa_rw_sio_mrg(uint32 addr)
     uint32 a=GETSEG(addr);
     uint16 con=CXASEL;
 
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     CHK_R_ODD_ADR(addr);
 
@@ -3046,7 +3046,7 @@ void   lisa_wb_sio_mrg(uint32 addr, uint8 data)
     uint32 a;
     uint16 r; uint8 r2; //r1
     uint16 con=CXASEL;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     CHECK_DIRTY_MMU(addr);
     a=GETSEG(addr);
@@ -3112,7 +3112,7 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
 {
     uint32 a=GETSEG(addr);
     uint16 con=CXASEL;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     CHK_W_ODD_ADR(addr);
 
@@ -3197,7 +3197,7 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
 
 void   lisa_wl_sio_mrg(uint32 addr, uint32 data)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     // cheat a little here, why not, it would get too gnarly otherwise...  Besides these should be very rare.
     CHK_W_ODD_ADR(addr);
@@ -3223,7 +3223,7 @@ uint8  *lisa_mptr_sio_mmu(uint32 addr)
     uint32 a17=GETSEG(addr);
     uint16 con=CXSEL;
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);
 
     GET_MMUS_DIRTY(x); if (mmudirty && context) mmuflush(0);
@@ -3248,7 +3248,7 @@ uint8  lisa_rb_sio_mmu(uint32 addr)
     uint32 a17=GETSEG(addr);
     uint16 con=CXSEL;
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     DEBUG_LOG(100,"@%08x",addr);
 
@@ -3297,7 +3297,7 @@ uint16 lisa_rw_sio_mmu(uint32 addr)
     uint32 a17=GETSEG(addr);
     uint16 con=CXSEL;
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     //DEBUG_LOG(100,"@%08x",addr);
     //
@@ -3345,7 +3345,7 @@ uint32 lisa_rl_sio_mmu(uint32 addr)
     uint16 con=CXSEL;
 
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     DEBUG_LOG(100,"@%08x",addr);
     CHK_R_ODD_ADR(addr);
@@ -3394,7 +3394,7 @@ void   lisa_wb_sio_mmu(uint32 addr, uint8 data)
     uint16 con=CXSEL;
     lisa_mem_t f;
 
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     DEBUG_LOG(100,"@%08x",addr);
 
@@ -3439,7 +3439,7 @@ void   lisa_ww_sio_mmu(uint32 addr, uint16 data)
     uint32 a17=GETSEG(addr);
     uint16 con=CXSEL;
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     DEBUG_LOG(100,"@%08x",addr);
 
     DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
@@ -3485,7 +3485,7 @@ void   lisa_wl_sio_mmu(uint32 addr, uint32 data)
     uint32 a17=GETSEG(addr);
     uint16 con=CXSEL;
     lisa_mem_t f;
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
 
     DEBUG_LOG(100,"@%08x",addr);
 
@@ -3532,7 +3532,7 @@ void   lisa_wl_sio_mmu(uint32 addr, uint32 data)
 
 uint8  *lisa_mptr_io(uint32 addr)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     //ui_log_verbose("****lisa_mptr_io got called!****"); //return NULL;
     return    mem68k_memptr[io_map[(addr &0xffff)>>9]](addr);
@@ -3540,42 +3540,42 @@ uint8  *lisa_mptr_io(uint32 addr)
 
 uint8  lisa_rb_io(uint32 addr)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     return    mem68k_fetch_byte[io_map[(addr &0xffff)>>9]](addr);
 }
 
 uint16 lisa_rw_io(uint32 addr)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     return    mem68k_fetch_word[io_map[(addr &0xffff)>>9]](addr);
 }
 
 uint32 lisa_rl_io(uint32 addr)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     return    mem68k_fetch_long[io_map[(addr &0xffff)>>9]](addr);
 }
 
 void   lisa_wb_io(uint32 addr, uint8 data)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     mem68k_store_byte[io_map[(addr &0xffff)>>9]](addr,data);
 }
 
 void   lisa_ww_io(uint32 addr, uint16 data)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     mem68k_store_word[io_map[(addr &0xffff)>>9]](addr,data);
 }
 
 void   lisa_wl_io(uint32 addr, uint32 data)
 {
-    addr &=0x00ffffff;
+    addr &=ADDRESSFILT;
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     DEBUG_LOG(100,": %08x<-%08x indx:%d iomap[]=%d",addr,data,(addr &0xffff)>>9,io_map[(addr &0xffff)>>9]);
 

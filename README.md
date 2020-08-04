@@ -32,6 +32,10 @@ so: lee·suh·em,  \ ˈlē·sə·em \
 
 Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
 
+## 2020.08.02
+
+This fixed "The Bug" which caused the LPW linker to fail, broken scrollbars, and the Desktop menu.
+There are other fixes, however I'm in the middle of a power outage and pushing this via cell phone hotspot while my laptop is running low, so don't have much time to push this so won't describe everything in here, though ChangeLog has more details.
 
 ## 2020.05.27
 

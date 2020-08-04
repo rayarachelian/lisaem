@@ -23,17 +23,26 @@ int main(int argc, char *argv[])
   char rawout[8192]; // filename buffers
   char rawtag[8192];
 
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "    DC42 To Raw Image v0.01                     http://lisaem.sunder.net");
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "          Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.");
+  puts(    "              Released under the GNU Public License, Version 2.0");
+  puts(    "    There is absolutely no warranty for this program. Use at your own risk.  ");
+  puts(    "  ---------------------------------------------------------------------------\n");
+
+
   for (i=1; i<argc; i++)
    {
      if (strcmp(argv[i],"-h")==0 || strcmp(argv[i],"--help")==0 )
         {
-            printf("Sector Dumper.\n\n"
+            printf("dc42-to-raw\n\n"
                 //  01234567890123456789012345678901234567890123456789012345678901234567890123456789
                 //  0         1         2         3         4         5         6         7         8
                    "Usage: dc42-to-raw Disk_Image.dc42\n\n"
 
-                   "This utility is used to dump the data and tags to two separate files.\n"
-                   "Does the opposite of raw2dc42.\n"
+                   "This utility is used to convert dc42 images to raw images\n"
+                   "does the opposite of raw-to-dc42.\n"
             );
 
             exit(0);

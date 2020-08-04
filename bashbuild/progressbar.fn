@@ -21,7 +21,7 @@
 ##############################################################################
 
 # save parameters to update progress bar to reapply on twirly
-___PERFECTBASE=""
+___PERCENTBASE=""
 ___PHASEPOSITION=""
 ___PHASETOTAL=""
 ___PERCENTCEILING=""
@@ -48,16 +48,28 @@ function update_progress_bar()
     # percent end phase
     local percentceiling="$4"
 
+    [[ -z "$percentbase" ]] && percentbase=0
+    [[ -z "$phaseposition" ]] && phaseposition=1
+    [[ -z "$phasetotal" ]] && phasetotal=$percentceiling
+
+
     if [[ -z "$4" ]]; then
        echo "$(/bin/pwd): update_progress_bar $@ Missing parameters" 1>&2
        set >/tmp/buildbash.set.out
        exit 9
     fi 
 
-    export ___PERFECTBASE="$1"
-    export ___PHASEPOSITION="$2"
-    export ___PHASETOTAL="$3"
-    export ___PERCENTCEILING="$4"
+#  (echo "1: $1"
+#   echo "2: $2"
+#   echo "3: $3"
+#   echo "4: $4"
+#   date
+#   echo) >>/tmp/buildbash.progressbar.txt
+
+    export ___PERCENTBASE="$percentbase"
+    export ___PHASEPOSITION="$phaseposition"
+    export ___PHASETOTAL="$phasetotal"
+    export ___PERCENTCEILING="$percentceiling"
 
     local elapsed=""
  
@@ -76,7 +88,8 @@ function update_progress_bar()
     #
     # base+  / (ceiling-base)
     #
-    totalpercent=$(( ( $percentbase + ( $phaseposition * ( $percentceiling - $percentbase ) / ( $phasetotal ) )  )  ))
+    # 4  seconds /home/ray/code/lisa/lisaem-1.2.7/bashbuild/progressbar.fn: line 79: ( 0 + ( 1 * ( 90 - 0 ) / (  ) )  )  : syntax error: operand expected (error token is ") )  )  ")
+    totalpercent=$(( ( $percentbase + ( $phaseposition * ( $percentceiling - $percentbase ) / ( $phasetotal ) )  )  )) 2>/dev/null
 
     ansi_fg_b_white; printf "%3d" $totalpercent 1>&2; ansi_fg_white; echo -n "%" 1>&2
 
@@ -114,7 +127,7 @@ function refresh_progress_bar()
 {
    [[ -n "$___PERCENTCEILING" ]] && \
      update_progress_bar            \
-           "$___PERFECTBASE"        \
+           "$___PERCENTBASE"        \
            "$___PHASEPOSITION"      \
            "$___PHASETOTAL"         \
            "$___PERCENTCEILING"

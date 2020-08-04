@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      RC2 2020.06.21                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -1593,13 +1593,6 @@ void deserialize(DC42ImageType *F)
 
          if (disk_sn != sn && disk_sn!=0)
                 {
-                  //char message[256];
-                  //snprintf(message,256,
-                  //         "This Master Lisa Office System Disk was signed by Lisa #%x"
-                  //         "Your virtual Lisa is #%x, which may prevent installation.  De-Serialize this disk?",
-                  //         disk_sn, sn);
-                  //         ALERT_LOG(0,message);
-                  //if (yesnomessagebox(message,"De-Serialize Master Office Disk?") )
                      {
                         uint8 buf[512];
                         memcpy(buf,mddfsec,512);
@@ -1652,7 +1645,7 @@ void deserialize(DC42ImageType *F)
                            {
                                 uint8 buf[512];
                                 memcpy(buf,fsec,512);
-                                buf[0x42]=buf[0x43]=buf[0x44]=buf[0x45]=0;
+                                buf[0x42]=buf[0x43]=buf[0x44]=buf[0x45]=buf[0x48]=buf[0x49]=0;
                                 dc42_write_sector_data(F,sec,buf);
                            }
                       }        

@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2020.08.02                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -247,7 +247,7 @@ int check_mmu0_chk(void)
 
 
 
-void init_start_mode_segment(uint16 i)
+void init_start_mode_segment(long i)
 {
  lisa_mem_t rfn;
  lisa_mem_t wfn;
@@ -303,7 +303,7 @@ void init_start_mode_segment(uint16 i)
 
 void init_start_mode(void)
 {
-    uint16 i;
+    long i;
     for ( i=0; i<32768; i++)
         init_start_mode_segment(i);
 }
@@ -313,7 +313,7 @@ void init_start_mode(void)
 
 void init_lisa_mmu(void)
 {
-    uint32 i,j;
+    long i,j;
 
     start=1; segment1=0; segment2=0; context=0;
     mmudirty=0;
@@ -322,16 +322,6 @@ void init_lisa_mmu(void)
     mmudirty_all[2]=0;
     mmudirty_all[3]=0;
     mmudirty_all[4]=0;
-
-
-DECLARE(t_ipc_table,*ipct_mallocs[MAX_IPCT_MALLOCS]);
-DECLARE(uint32,sipct_mallocs[MAX_IPCT_MALLOCS]);
-DECLARE(t_ipc_table,*ipct_mallocs[MAX_IPCT_MALLOCS]);
-DECLARE(uint32,sipct_mallocs[MAX_IPCT_MALLOCS]);
-DECLARE(viatype,via[10]);
-DECLARE(mmu_t,mmu_all[5][128]);
-DECLARE(mmu_trans_t,mmu_trans_all[5][32768]);
-
 
     DEBUG_LOG(0,"Initializing... mmu_trans_all: %p mmu_all: %p",mmu_trans_all,mmu_all);
 

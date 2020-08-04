@@ -19,6 +19,15 @@ int main(int argc, char *argv[])
   char *Image=NULL;
   uint8 *data, *tags;
 
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "    DC42 Sectors to files Dumper v0.01               http://lisaem.sunder.net");
+  puts(    "  ---------------------------------------------------------------------------");
+  puts(    "          Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.");
+  puts(    "              Released under the GNU Public License, Version 2.0");
+  puts(    "    There is absolutely no warranty for this program. Use at your own risk.  ");
+  puts(    "  ---------------------------------------------------------------------------\n");
+
+
   int do_patch=15;
   for (i=1; i<argc; i++)
    {
@@ -27,7 +36,7 @@ int main(int argc, char *argv[])
             printf("Sector Dumper.\n\n"
                 //  01234567890123456789012345678901234567890123456789012345678901234567890123456789
                 //  0         1         2         3         4         5         6         7         8
-                   "Usage: dumper Disk_Image.dc42\n\n"
+                   "Usage: dc42-dumper Disk_Image.dc42\n\n"
 
                    "This utility is used to dump each sector for a DC42 image out to a separate\n"
                    "file, along with the tags. File names are sector-0001.bin sector-0001-tag.bin\n"
