@@ -33,18 +33,13 @@ so: lee·suh·em,  \ ˈlē·sə·em \
 Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
 
 
-## 2020.05.27
+## 2020.08.21
 
-Fixed most (all?) of the display refresh issues for macos x which are caused by two issues: 
+Fixed "the bug" - Desktop menu, scrollbars, linker errors.
+Rebuilt the display refresh system so that the refresh rate is relative to host timing, not guest CPU.
+Added a checkbox to disable mouse scaling under the display menu (if the mouse is incorrect for your system, toggle this).
 
-  1. there were bugs in the rectangle calculations for the refreshes, 
-  2. a bug in wxWidgets dc.Refresh and dc.RefreshRect methods on macos x where the erase boolean parameter being set to false is completely ignored. 
-
-Because the region was wrong, the erased area was exposed and made visible because consequent refreshes filled in a different area.
-
-Worse, fixing the refreshes caused more issues. Normal movement of a mouse would clear the region and only paint the mouse icon, causing flashes when evnetually the full screen refresh happened. This is not supposed to happen when you consume the Erase events and disable propagation, and yet! So for now, macos x refreshes are full screen. Ironically swithich to DoubleBuffered or AutoDC causes it to be even slower.
-
-Mouse location bugs were fixed, many crashes caused by switching from say, skinless 2X3Y mode to skinned HQX are now also fixed.
+If you see weird behavior on startup, try deleting both the main preferences as well as the specific Lisa preferences.
 
 ------------------------------------------------------------------------------
 ## Special steps for Windows:
