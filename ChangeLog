@@ -8,6 +8,9 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.08.20 - reworked display system refreshes, added checkbox to disable
+             mouse scaling, added back refresh rate to status bar.
+
 2020.08.03 - revert the pc24->pc32 changes as they caused an increase in RAM
              requirements by an additional 640MB when not in used to accomodate
              for the extra 256X increase in address space.

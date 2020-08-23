@@ -772,7 +772,6 @@ DECLARE(int,skins_on);
 DECLARE(int,skins_on_next_run);
 DECLARE(int,skinless_center);
 DECLARE(int,lisa_ui_video_mode);
-DECLARE(uint32,refresh_rate);
 DECLARE(uint32,refresh_rate_used);
 
 
@@ -1964,50 +1963,50 @@ GLOBAL(int32,physaddr,0);
 
 // Regular (non-special) I/O address space.  Subject to MMU mapping.
 
-#define OxERROR           0     /* This should never be used - it indicates a bug in our code */
-#define OxUnused           1     /* unused I/O space address (only used in I/O space map) */
-#define Ox0000_slot1      2
-#define Ox2000_slot1      3
-#define Ox4000_slot2      4
-#define Ox6000_slot2      5
-#define Ox8000_slot3      6
-#define Oxa000_slot3      7
-#define Oxc000_flopmem      8
-#define Oxd000_ff_space   9
+#define OxERROR              0     /* This should never be used - it indicates a bug in our code */
+#define OxUnused             1     /* unused I/O space address (only used in I/O space map) */
+#define Ox0000_slot1         2
+#define Ox2000_slot1         3
+#define Ox4000_slot2         4
+#define Ox6000_slot2         5
+#define Ox8000_slot3         6
+#define Oxa000_slot3         7
+#define Oxc000_flopmem       8
+#define Oxd000_ff_space      9
 #define Oxd200_sccz8530     10
 #define Oxd800_par_via2     11
-#define Oxdc00_cops_via1 12
-#define Oxe000_latches     13
-#define Oxe800_videlatch 14
-#define Oxf000_memerror  15
-#define Oxf800_statreg     16
+#define Oxdc00_cops_via1    12
+#define Oxe000_latches      13
+#define Oxe800_videlatch    14
+#define Oxf000_memerror     15
+#define Oxf800_statreg      16
 
 // Real Lisa memory
 #define ram                 17     /* Plain old RAM, or stack access.                                   */
-#define vidram           18     /* same as ram, but flag on write that screen needs refreshing       */
-#define ro_violn         19     /* Read only violation - what trap should I call? See schematic      */
-#define bad_page         20     /* Bad page or unallocated segment - what trap here?                 */
+#define vidram              18     /* same as ram, but flag on write that screen needs refreshing       */
+#define ro_violn            19     /* Read only violation - what trap should I call? See schematic      */
+#define bad_page            20     /* Bad page or unallocated segment - what trap here?                 */
 
 // Special I/O space
-#define sio_rom          21     /* access to ROM via sio mode                                        */
-#define sio_mrg          22     /* mmu register being accessed.  Which depends on bit 3 of addr      */
+#define sio_rom             21     /* access to ROM via sio mode                                        */
+#define sio_mrg             22     /* mmu register being accessed.  Which depends on bit 3 of addr      */
 
-#define sio_mmu          23     /* access ram or other spaces via the mmu (bit14=1 in address)       */
+#define sio_mmu             23     /* access ram or other spaces via the mmu (bit14=1 in address)       */
 
 
 // Disparcher to I/O space (dispatcher to the Ox????_ fn's list above)
-#define io               24     /* This is a dispatcher for I/O space when we don't know the address */
+#define io                  24     /* This is a dispatcher for I/O space when we don't know the address */
 
-#define Oxd400_amd9512   25
+#define Oxd400_amd9512      25
 
-#define OxVoid           26     /* Reserved mem fn's that do nothing, and return junk                */
+#define OxVoid              26     /* Reserved mem fn's that do nothing, and return junk                */
 
 // 27-31 unused.
 
-#define MAX_LISA_MFN     27     /* The last Lisa Memory function type we have                        */
+#define MAX_LISA_MFN        27     /* The last Lisa Memory function type we have                        */
 
 
-#define DEBUG_MFN_TRACE  32     // trap/trace fn's.
+#define DEBUG_MFN_TRACE     32     // trap/trace fn's.
 
 
 // I/O Address Maps.  These are used to initialize the fn pointers on the OUTPUT side of the mmu.
@@ -2762,9 +2761,9 @@ GLOBAL(uint32,minlisaram,0);
 #define CHK_RAM_LIMITS(addr)                                                                                                 \
 {       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
         if (physaddr<(signed)minlisaram)                                                                                     \
-           {ALERT_LOG(0,"physram underflow, addr:%08x min:%08x translated:%10x",addr,minlisaram,physaddr); physaddr=-2;}     \
+           {DEBUG_LOG(100,"physram underflow, addr:%08x min:%08x translated:%10x",addr,minlisaram,physaddr); physaddr=-2;}     \
         else if (physaddr>(signed)maxlisaram)                                                                                \
-           {ALERT_LOG(0,"physram overflow, addr:%08x max:%08x translated:%10x",addr,maxlisaram,physaddr); physaddr=-2;}      \
+           {DEBUG_LOG(100,"physram overflow, addr:%08x max:%08x translated:%10x",addr,maxlisaram,physaddr); physaddr=-2;}      \
 }
 
 #define CHK_RAM_A_LIMITS(c,addr)                                                                                             \

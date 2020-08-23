@@ -2,8 +2,8 @@
 #define __BUILTBY_H__
 
 
-#define BUILTBY "Compiled on Mon 03 Aug 2020 10:44:58 PM EDT by ray@predator  (#55-Ubuntu SMP Fri Jun 19 11:16:34 UTC 2020)  \n options:     \nusing:gcc (Ubuntu 9.2.1-9ubuntu2) 9.2.1 20191008"
-#define VERSION "1.2.7-RC1_2020.05.27"
+#define BUILTBY "Compiled on Sat Aug 22 23:54:20 EDT 2020 by ray@sierra.local  (Darwin Kernel Version 16.1.0: Wed Oct 19 20:31:56 PDT 2016; root:xnu-3789.21.4~4/RELEASE_X86_64)  \n options:-DUSE_RAW_BITMAP_ACCESS     \nusing:Apple LLVM version 9.0.0 (clang-900.0.39.2)"
+#define VERSION "1.2.7-RC3_2020.08.21"
 #define LICENSE "Apple Lisa Emulator (and supporting software, documentation, etc.)\n"      \
 "Copyright (C) MMVIXX by Ray A. Arachelian, All Rights Reserved.\n"      \
 "see: http://lisaem.sunder.net for updates and other information.\n"      \

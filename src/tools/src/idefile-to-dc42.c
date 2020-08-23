@@ -47,7 +47,7 @@
 
 //#define DEBUG 1
 
-void usage()
+void usage(void)
 {
 	printf("IDEFile to Disk Copy 4.2 image converter, version 1.0.\n"
 		   "(C) 2011 Natalia Portillo, All Rights Reserved.\n"
@@ -71,10 +71,11 @@ long get_idefile_offset(int sector)
 
 int main(int argc, char *argv[])
 {
-	int i;
+	
+	uint32 i;
 	int dc42_errno;
 	int fd;
-	uint sectors;
+	uint32 sectors;
 	struct stat file_stat;
 	DC42ImageType f_dc42;
 	FILE* f_idefile;

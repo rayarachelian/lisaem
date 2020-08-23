@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      RC2 2020.06.13                   *
+*              The Lisa Emulator Project  V1.2.7      RC2 2020.08.15                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) MCMXCVIII, MMXX Ray A. Arachelian                     *
@@ -309,6 +309,8 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static int set_window_size_already=0;
+
 
 static int on_start_poweron=0,
            on_start_fullscreen=0,
@@ -401,6 +403,7 @@ public:
       int dirtyscreen;      // indicated dirty lisa vidram
       int doubley; 
       uint8 brightness;
+      int ppix, ppiy;
 
       int clear_skinless;
 
@@ -586,12 +589,17 @@ enum
     // reinstated as per request by Kallikak
     ID_REFRESH_SUB,
     ID_REFRESH_60Hz,
+    ID_REFRESH_30Hz,
+    ID_REFRESH_24Hz,
     ID_REFRESH_20Hz,
     ID_REFRESH_12Hz,
     ID_REFRESH_8Hz,
     ID_REFRESH_4Hz,
 
+    ID_FORCE_REFRESH,
+
     ID_HIDE_HOST_MOUSE,
+    ID_USE_MOUSE_SCALE,
 
     ID_VID_SKINS,
     ID_VID_SKINLESSCENTER,
@@ -637,7 +645,10 @@ class LisaEmFrame : public wxFrame
 public:
 
     int running;          // is the Lisa running?  0=off, 1=running, 10=paused/locked.
-
+    int force_display_refresh;
+    int update_display_now;
+    long screen_paint_update;
+    int use_mouse_scale;
     // Constructor
     LisaEmFrame(const wxString& title);
 
@@ -772,10 +783,13 @@ public:
     void OnSkinlessCenter(wxCommandEvent& event);
 
     void OnRefresh60(wxCommandEvent& event);
+    void OnRefresh30(wxCommandEvent& event);
+    void OnRefresh24(wxCommandEvent& event);
     void OnRefresh20(wxCommandEvent& event);
     void OnRefresh12(wxCommandEvent& event);
     void OnRefresh8(wxCommandEvent& event);
     void OnRefresh4(wxCommandEvent& event);
+    void OnForceRefresh(wxCommandEvent& event);
 
     void OnScale25(wxCommandEvent& event);
     void OnScale50(wxCommandEvent& event);
@@ -799,6 +813,7 @@ public:
 
     void OnFlushPrint(wxCommandEvent &event);
     void OnHideHostMouse(wxCommandEvent& event);
+    void OnUseMouseScale(wxCommandEvent& event);
 
     void OnFullScreen(wxCommandEvent& event);
     
@@ -814,6 +829,7 @@ public:
 
     uint16 lastt2;
     long    last_runtime_sample;
+    long    last_display_sample;
     long    last_decisecond;
     XTIMER clx;
     XTIMER lastclk;
@@ -828,7 +844,6 @@ public:
     wxString floppy_to_insert;
     long lastcrtrefresh;
     long hostrefresh;
-    long screen_paint_update;
     long onidle_calls;
     XTIMER cycles_wanted;
 
@@ -980,19 +995,22 @@ BEGIN_EVENT_TABLE(LisaEmFrame, wxFrame)
 
   // reinstated as per request by Kallikak, added 4Hz to help with really slow machines
     EVT_MENU(ID_REFRESH_60Hz,    LisaEmFrame::OnRefresh60)
+    EVT_MENU(ID_REFRESH_30Hz,    LisaEmFrame::OnRefresh30)
+    EVT_MENU(ID_REFRESH_24Hz,    LisaEmFrame::OnRefresh24)
     EVT_MENU(ID_REFRESH_20Hz,    LisaEmFrame::OnRefresh20)
     EVT_MENU(ID_REFRESH_12Hz,    LisaEmFrame::OnRefresh12)
     EVT_MENU(ID_REFRESH_8Hz,     LisaEmFrame::OnRefresh8)
     EVT_MENU(ID_REFRESH_4Hz,     LisaEmFrame::OnRefresh4)
+    EVT_MENU(ID_FORCE_REFRESH,   LisaEmFrame::OnForceRefresh)
 
     EVT_MENU(ID_HIDE_HOST_MOUSE, LisaEmFrame::OnHideHostMouse)
+    EVT_MENU(ID_USE_MOUSE_SCALE, LisaEmFrame::OnUseMouseScale)
 
     EVT_MENU(ID_PAUSE,           LisaEmFrame::OnPause)
 
 
     //EVT_IDLE(LisaEmFrame::OnIdleEvent)
     EVT_TIMER(ID_EMULATION_TIMER,LisaEmFrame::OnEmulationTimer)
-
     EVT_MENU(wxID_EXIT,          LisaEmFrame::OnQuit)
 
 END_EVENT_TABLE()
@@ -1122,33 +1140,9 @@ void setup_hidpi(void)
 
   if (last_hidpi != hidpi_scale) // || normal_to_hidpi==NULL || hidpi_to_normal==NULL )
   {
-    // float scale=hidpi_scale;
-    //int x,y,i; //,count;
 
     ALERT_LOG(0,"\n\n**** Changing scale from %f to %f ****\n\n",last_hidpi,hidpi_scale);
     my_lisawin->clear_skinless=1;
-//    if (!!normal_to_hidpi) free(normal_to_hidpi);
-//    if (!!hidpi_to_normal) free(hidpi_to_normal);
-
-   // wxDisplaySize(&x,&y);
-    //wxDisplay display(0);
-    ////const wxSize p=display.GetPPI();
-    //const wxRect r=display.GetClientArea();
-    //x=r.GetWidth();
-    //y=r.GetHeight();
-
-//    count=MAX(x,y)+1;
-//    max_h=count;
-//    hidpi_to_normal=(int*)calloc(count,sizeof(int));
-//    for (i=0; i<count; i++) {hidpi_to_normal[i]=(int) ( (double)(i)/(double)(scale) );}
-//
-//    if (skin.width_size && skin.height_size)
-//      count=MAX(skin.width_size,skin.height_size)+1;
-//    else
-//      count=MAX(ISKINSIZEX,ISKINSIZEY);
-//    normal_to_hidpi=(int*)calloc(count,sizeof(int));
-//    max_n=count;
-//    for (i=0; i<count; i++) {normal_to_hidpi[i]=(int) ( (double)(i)*(double)(scale) );}
   }
   last_hidpi=hidpi_scale;
 }
@@ -1467,14 +1461,6 @@ void LisaWin::SetVideoMode(int mode)
               DEBUG_LOG(0,"** Reset max window size to %d,%d at hidpi:%f ***",
                               _H(skin.width_size), _H(skin.height_size), hidpi_scale            );
             }
-        else
-            {  
-              //20200128//SetSize(wxSize(ISKINSIZE)); 
-              //20200128//SetMaxSize(wxSize(ISKINSIZE));
-              //20200128//my_lisaframe->SetSize(wxSize(ISKINSIZE)); 
-              //20200128//my_lisaframe->SetMaxSize(wxSize(ISKINSIZE));
-              //20200128//DEBUG_LOG(0,"Reset max window size to ISKINSIZE");
-            }
           // this was enabled because on older machines, the display is too small to show the whole screen and we want to
           // allow the user to scroll down to the power button and be able to press it.
           // As noted here: https://github.com/kuroneko/lisaem/commit/6503ed11341c8d94ea4d0d62e51bee13ee209088 GTK doesn't like that.
@@ -1548,29 +1534,21 @@ void LisaEmFrame::FloppyAnimation(void)
 
 void LisaEmFrame::VidRefresh(long now)
 {
-    // 2020.04.24 - this is the mofo that's causing the flashing rectangle on macos x
-    // the "false" parameter is supposed to prevent the original space from being erased, but it
-    // does it anyway! looking at the comment from 2.8.x, I switched from RefreshRect to this older version
-    // because it was doing the same thing before. Son of a motherfucker!
-    //
+    if (!my_lisawin) return;
+
+    int static x; x=(x+1) & 63; // force a refresh every so often even if force_display_refresh isn't on.
+    //int static y; y=(y+1) & 127;
+    if (force_display_refresh || (!x)) videoramdirty=32768;
 
     if (videoramdirty)
     {
-        //wxRect* rect=NULL;
-
         my_lisawin->dirtyscreen=2;
-        // suspect that RefreshRect(rect,false) erases the background anyway on wxMac 2.8.x
-        //rect=new wxRect(skin.screen_origin_x,           skin.screen_origin_y,
-        //                o_effective_lisa_vid_size_x, o_effective_lisa_vid_size_y);
-
-
-        // ::TODO:: test other OS's and see which need them defined(__WXMSW__) || defined(__WXGTK__)
-        #if defined(__WXOSX__)
-        if (my_lisawin) my_lisawin->Refresh(false,NULL);
-        #endif
+        my_lisawin->Refresh(false,NULL);
         lastcrtrefresh=now;                                      // and how long ago the last refresh happened
                                                                  // cheating a bit here to smooth out mouse movement.
     }
+    if ( force_display_refresh ) Update(); // || (!y)) Update();
+
 
     screen_paint_update++;                                       // used to figure out effective host refresh rate
     lastrefresh=cpu68k_clocks;
@@ -1584,47 +1562,44 @@ int LisaEmFrame::EmulateLoop(long idleentry)
     long now=runtime.Time();
 
     if (my_lisaframe->soundsw.Time()>1000 && sound_effects_on) // OH WOW! When sound is looping it fails to stop here and we're stuck in a loop! 
-       {my_lisaframe->soundplaying=0; wxSound::Stop();}       // silence floppy motor if it hasn't been accessed in 500ms
+       {my_lisaframe->soundplaying=0; wxSound::Stop();}        // silence floppy motor if it hasn't been accessed in 500ms
 
-    while (now-idleentry<emulation_time && running)          // don't stay in OnIdleEvent for too long, else UI gets unresponsive
+    while (now-idleentry<emulation_time && running)            // don't stay in OnIdleEvent for too long, else UI gets unresponsive
     {
         long cpuexecms=(long)((float)(cpu68k_clocks-cpu68k_reference)*clockfactor); //68K CPU Execution in MS
+        seek_mouse_event();
 
-        if ( cpuexecms<=now  )                               // balance 68K CPU execution vs host time to honor throttle
+        if ( cpuexecms<=now  )                                // balance 68K CPU execution vs host time to honor throttle
         {
             if (!cycles_wanted) cycles_wanted=(XTIMER)(float)(emulation_time/clockfactor);
-            clx=clx+cycles_wanted;                           // add in any leftover cycles we didn't execute.
-                                                             // but prevent it falling behind or jumping ahead
-                                                             // too far.
+            clx=clx+cycles_wanted;                            // add in any leftover cycles we didn't execute.
+                                                              // but prevent it falling behind or jumping ahead
+                                                              // too far.
             clx=MIN(clx,2*cycles_wanted  );
             clx=MAX(clx,  cycles_wanted/2);
+            clx=reg68k_external_execute(clx);                 // execute some 68K code
 
-            clx=reg68k_external_execute(clx);                // execute some 68K code
-            // clx=reg68k_external_execute(clx);
+            now=runtime.Time();                               // find out how long we took
 
-            now=runtime.Time();                              // find out how long we took
-
-            if (pc24 & 1)                                    // lisa rebooted or just odd addr error?
-            {                                                // moved here to avoid stack leak
-                ALERT_LOG(0,"ODD PC!")
-                if (lisa_ram_safe_getlong(context,12) & 1)   // oddaddr vector is odd as well?
+            if (pc24 & 1)                                     // lisa rebooted or just odd addr error?
+            {                                                 // moved here to avoid stack leak
+                ALERT_LOG(0,"ODD PC!");
+                if (lisa_ram_safe_getlong(context,12) & 1)    // oddaddr vector is odd as well?
                 {
-                    save_pram();                             // lisa has rebooted.
+                    save_pram();                              // lisa has rebooted.
                     profile_unmount();
                     return 1;
                 }
             }
 
-            get_next_timer_event();                          // handle any pending IRQ's/timer prep work
-            
-                                                             // if we need to, refresh the display
-#ifdef __WXOSX__
-        VidRefresh(now);                                     // OS X, esp slower PPC's suffer if we use the if statement
-#else
-        if (now-lastcrtrefresh>hostrefresh) VidRefresh(now); // but if we don't, Linux under X11 gets too slow.
-        else seek_mouse_event();
-        
+            get_next_timer_event();                           // handle any pending IRQ's/timer prep work            
+                                                              // if we need to, refresh the display
+#ifndef __WXOSX__
+            if (now-lastcrtrefresh>refresh_rate_used)                                      // OS X, esp slower PPC's suffer if we use the if statement
 #endif
+               {   VidRefresh(now); }  // but if we don't, Linux under X11 gets too slow.  
+
+            seek_mouse_event();
         }                                                    // loop if we didn't go over our time quota
         else
             break;                                           // else force exit, time quota is up
@@ -1655,21 +1630,31 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     static int counter;
     wxString text;
     float hosttime=(float)(elapsed - last_runtime_sample);
-    mhzactual= 0.001 *
+    mhzactual=
         ( (float)(cpu68k_clocks-last_runtime_cpu68k_clx))  / hosttime;
 
     if (running) check_running_lisa_os(); // moved here from LisaEmFrame::VidRefresh so we don't do this as often.
 
-  //text.Printf("%1.2fMHz  %x%x:%x%x:%x%x.%x @%d/%08x vid:%1.2fHz%c  loop:%1.2fHz, mouse:%1.2fHz slice:%ldms, 68K:%lldcycles (%3.2f ms), %lld left, %lld wanted (%lld%%)",
-    text.Printf(_T("%1.2fMHz  %x%x:%x%x:%x%x.%x @%d/%08x (cpu_clk:%lld"),
-                mhzactual,
+    char *c="KHz";
+    if (mhzactual>1000) {mhzactual/=1000.0; c="MHz";}
+    if (mhzactual>1000) {mhzactual/=1000.0; c="GHz";}
+ 
+    char *s="Hz";
+    float vidhz=(float)screen_paint_update;
+    if (vidhz>1000) {vidhz=vidhz/1000.0; s="KHz";}
+    if (vidhz>1000) {vidhz=vidhz/1000.0; s="MHz";}
+  
+    text.Printf(_T("CPU: %1.2f%s, video refresh:%1.2f%s %c  %x%x:%x%x:%x%x.%x @%d/%08x (cpu_cycles:%lld"),
+                mhzactual,c,
+                vidhz,s,  (videoramdirty ? 'd':' '),
                 lisa_clock.hours_h,lisa_clock.hours_l,
                 lisa_clock.mins_h,lisa_clock.mins_l,
                 lisa_clock.secs_h,lisa_clock.secs_l,
                 lisa_clock.tenths,
-                context,pc24,cpu68k_clocks); //,
+                context,pc24,cpu68k_clocks);
 
     SetStatusBarText(text);
+    screen_paint_update=0;
 
     // only issue is that this is called only on startup
     if ( !(counter) ) update_menu_checkmarks(); // meh, there's some bugs in wxWidgets 3.1.1 and earlier on GTK where Radio buttons don't get updated, i.e. scale menu
@@ -1716,7 +1701,6 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
   #endif
 
 }
-
 
 
 #if wxUSE_DRAG_AND_DROP
@@ -1835,10 +1819,8 @@ bool DnDFile::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames)
 #endif // wxUSE_DRAG_AND_DROP
 
 
-
-void LisaEmFrame::OnEmulationTimer(wxTimerEvent& WXUNUSED(event))
+void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
 {
-
   long now=runtime.Time();
   long idleentry=now;
 
@@ -1860,7 +1842,6 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& WXUNUSED(event))
           ALERT_LOG(0,"on_start_poweron");
       }
 
-
   if ((my_lisawin->floppystate & FLOPPY_ANIM_MASK) != FLOPPY_PRESENT &&
       (my_lisawin->floppystate & FLOPPY_ANIM_MASK) != FLOPPY_EMPTY )      FloppyAnimation();
 
@@ -1879,7 +1860,7 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& WXUNUSED(event))
             }
 
 
-        if  (cpu68k_clocks<10 && floppy_to_insert.Len())         // deferred floppy insert.
+        if  (cpu68k_clocks<10 && floppy_to_insert.Len())            // deferred floppy insert.
             {
               const wxCharBuffer s = CSTR(floppy_to_insert);
               int i=floppy_insert((char *)(const char *)s);
@@ -1891,22 +1872,22 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& WXUNUSED(event))
         clktest = cpu68k_clocks;
         clx     = cpu68k_clocks;
 
-        long ticks=( now - last_decisecond );                    // update COPS 1/10th second clock.
+        long ticks=( now - last_decisecond );                        // update COPS 1/10th second clock.
         while (ticks>100) {ticks-=100; decisecond_clk_tick(); last_decisecond=now;}
 
+        seek_mouse_event();
 
-        if  (EmulateLoop(now) )                                   // 68K execution
+        if  (EmulateLoop(now) )                                      // 68K execution
             {            
                 ALERT_LOG(0,"REBOOTED?");                            // Did we reboot?
                 lisa_rebooted();
                 barrier=0;
                 return;
             }
+        seek_mouse_event();
+        elapsed=runtime.Time();                                     // get time after exist of execution loop
 
-        elapsed=runtime.Time();                                  // get time after exist of execution loop
-
-
-        if  ( (elapsed - last_runtime_sample) > 1000  && running) // update status bar every 1000ms, and check print jobs too
+        if  ( (elapsed - last_runtime_sample) > 1000  && running)   // update status bar every 1000ms, and check print jobs too
             {
                 static int ctr;
                 Update_Status(elapsed,idleentry);
@@ -1930,19 +1911,7 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& WXUNUSED(event))
         lastcrtrefresh=0;
       }
 
-//  #ifndef __WXOSX__
-  {   // force an extra full display refresh every 15 cycles on OS X
-      static unsigned int x;
-      x++; x=x&15;
-      if (!x) {
-                  videoramdirty=32768; 
-                  Refresh(false,NULL);
-                }
-  }
-//  #endif
-
-
-barrier=0;
+  barrier=0;
 }
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -2011,12 +1980,28 @@ LisaWin::LisaWin(wxWindow *parent)
     int screensizex,screensizey;   // my_lisaframe is still null.
     //wxDisplaySize(&screensizex,&screensizey);
     wxDisplay display(wxDisplay::GetFromWindow(parent));
+    ALERT_LOG(0,"========================================================================");
     
+    ALERT_LOG(0,"wxWidgets version aggregate:%d", ((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) )
     #if (((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) >311)
     const wxSize p=display.GetPPI();
     ALERT_LOG(0,"PPI:%d,%d",p.GetWidth(),p.GetHeight());
+    ppix=p.GetWidth();ppiy=p.GetHeight();
+    #else
+    ppix=0; ppiy=0;
     #endif
+
     // ^- not sure this is useful, returns 256x256 on 4k display, but resolution is reported at 1080p even though it's really 4k
+    // src/host/wxui/lisaem_wx.cpp:LisaEmFrame:6866:Got (1920,1080) screen size from wxDisplaySize| 00:00:00.0 0
+
+    wxRect geo=display.GetGeometry();
+    ALERT_LOG(0,"Got Display Geometry size(%d,%d)",geo.GetWidth(),geo.GetHeight());
+    ALERT_LOG(0,"========================================================================");
+    if  (screensizex< 0 || screensizex>8192 || screensizey<0 || screensizey>8192)
+        {ALERT_LOG(0,"Got Garbage screen size: %d,%d",screensizex,screensizey);
+          screensizex=1024; screensizey=768;}
+
+
 
     const wxRect r=display.GetClientArea();
     screensizex=r.GetWidth();
@@ -2046,10 +2031,13 @@ LisaWin::LisaWin(wxWindow *parent)
 
     if  (skins_on)
         {
-            DEBUG_LOG(0,"Setting widnow sizes");
+            DEBUG_LOG(0,"Setting window sizes");
             set_hidpi_scale();
-            SetMinSize(wxSize(_H(720),_H(500)) ); //IWINSIZE previously
-            SetSize(wxSize(IWINSIZE));
+            if (!set_window_size_already) {
+                 SetMinSize(wxSize(_H(720),_H(500)) ); //IWINSIZE previously
+                 SetSize(wxSize(IWINSIZE));
+                 set_window_size_already=1;
+            }
             //SetMaxSize(wxSize(ISKINSIZE)); // not this guy
             DEBUG_LOG(0,"Setting scrollbars");
             SetScrollbars(ISKINSIZEX/(_H(100)), ISKINSIZEY/_H(100),  _H(100),_H(100),  0,0,  true);
@@ -2522,28 +2510,34 @@ void LisaEmFrame::OnFullScreen(   wxCommandEvent& WXUNUSED(event))
     save_global_prefs();
 }
 
-// should look into making these C++ templates instead
-#define OnRefresh(XHertzX)                                              \
-void LisaEmFrame::OnRefresh##XHertzX(  wxCommandEvent& WXUNUSED(event)) \
-{                                                                       \
-     hostrefresh=1000/XHertzX; refresh_rate=1*REFRESHRATE;              \
-     refresh_rate_used=refresh_rate;                                    \
-     save_global_prefs();update_menu_checkmarks();                      \
+// should look into making these C++ templates instead - REFRESHRATE=1s/60Hz
+#define OnRefresh(XHertzX)                                                 \
+void LisaEmFrame::OnRefresh##XHertzX(  wxCommandEvent& WXUNUSED(event))    \
+{                                                                          \
+     refresh_rate_used=hostrefresh=1000/XHertzX;                           \
+     save_global_prefs();update_menu_checkmarks();                         \
+     ALERT_LOG(0,"Set Refresh Rate to: %dHz",XHertzX);                     \
 }
 
 OnRefresh(60);
+OnRefresh(30);
+OnRefresh(24);
 OnRefresh(20);
 OnRefresh(12);
 OnRefresh(8);
 OnRefresh(4);
 
-void LisaEmFrame::OnHideHostMouse(wxCommandEvent& WXUNUSED(event)) 
-{ hide_host_mouse=!hide_host_mouse;   save_global_prefs();}
 
+void LisaEmFrame::OnForceRefresh(wxCommandEvent & WXUNUSED(event))
+{ force_display_refresh=!force_display_refresh; save_global_prefs(); update_menu_checkmarks(); ALERT_LOG(0,"force_display_refresh:%d",force_display_refresh);}
+
+void LisaEmFrame::OnHideHostMouse(wxCommandEvent& WXUNUSED(event)) 
+{ hide_host_mouse=!hide_host_mouse;   save_global_prefs(); update_menu_checkmarks();}
+
+void LisaEmFrame::OnUseMouseScale(wxCommandEvent& WXUNUSED(event))
+{ use_mouse_scale=!use_mouse_scale; save_global_prefs(); update_menu_checkmarks(); ALERT_LOG(0,"use_mouse_scale:%d",use_mouse_scale);}
 
 extern "C" long get_wx_millis(void) { return my_lisaframe->runtime.Time();}
-
-
 
 void set_hidpi_scale(void)
 {
@@ -2552,7 +2546,7 @@ void set_hidpi_scale(void)
     long hdpiscale;
     if  (hidpi_scale==0.0)
         {
-          long hdpiscale = myConfig->Read(_T("/hidpi_scale"), (int)(hidpi_scale*100));
+          long hdpiscale = myConfig->Read(_T("/hidpi_scale"), (int)(100));
           hidpi_scale=hdpiscale / 100.0;
         }
 
@@ -2643,7 +2637,6 @@ switch(hdpiscale) {
 
     if  (!!DisplayScaleSub && !!my_lisaframe && !!my_lisaframe && last_hidpi!=hidpi_scale)
         {
-            // 20191105 try to fix skinless crashes when changing scale
             if (my_lisabitmap) {delete(my_lisabitmap); my_lisabitmap=NULL;}
 
             update_menu_checkmarks();
@@ -2656,11 +2649,7 @@ switch(hdpiscale) {
             last_hidpi=hidpi_scale;
 
             if (skins_on) {ALERT_LOG(0,"Reloading skins");turn_skins_off(); turn_skins_on();}
-
-          //my_lisawin->EnableScrolling(false, false);
-          //my_lisawin->SetScrollbars(ISKINSIZEX / _H(100), ISKINSIZEY / _H(100), 100, 100, 0, 0, true);
-          //my_lisawin->EnableScrolling(true, true);
-          force_refresh();
+            force_refresh();
         }
 
 }
@@ -2686,8 +2675,10 @@ void save_global_prefs(void)
 
     myConfig->Write(_T("/emutime"),(long)emulation_time);
     myConfig->Write(_T("/emutick"),(long)emulation_tick);
-
-    myConfig->Write(_T("/refreshrate"),(long)refresh_rate);
+ 
+    myConfig->Write(_T("/hostrefreshrate"),(long)my_lisaframe->hostrefresh);
+    myConfig->Write(_T("/forcerefresh"),(long)my_lisaframe->force_display_refresh);
+    myConfig->Write(_T("/use_mouse_scale"),(long)my_lisaframe->use_mouse_scale);
     myConfig->Write(_T("/hidehostmouse"),(long)hide_host_mouse);
 
     my_lisawin->GetClientSize(&x,&y);
@@ -2702,11 +2693,6 @@ void save_global_prefs(void)
 
     myConfig->Flush(); //valgrind==24726== Conditional jump or move depends on uninitialised value(s)
 
-    if  ( refresh_rate!=9*REFRESHRATE  && refresh_rate!=7*REFRESHRATE  &&
-          refresh_rate!=5*REFRESHRATE  && refresh_rate!=3*REFRESHRATE  &&
-          refresh_rate!=  REFRESHRATE                                    ) refresh_rate =  REFRESHRATE;
-
-    my_lisaframe->hostrefresh=1000/60;
     update_menu_checkmarks();
 }
 
@@ -2782,9 +2768,8 @@ bool LisaEmApp::OnInit()
     if (on_start_center==wxCMD_SWITCH_ON)  {skinless_center=1; on_start_center=0;}
     if (on_start_center==wxCMD_SWITCH_OFF) {skinless_center=1; on_start_center=0;}
 
-    refresh_rate      = (long)myConfig->Read(_T("/refreshrate"),(long)REFRESHRATE);
+
     hide_host_mouse   = (int) myConfig->Read(_T("/hidehostmouse"),(long)0);
-    refresh_rate_used = refresh_rate;
     sound_effects_on  = (int)myConfig->Read(_T("/soundeffects"),(long)1);
     lisa_ui_video_mode= (int)myConfig->Read(_T("/displaymode"), (long)0);
     asciikeyboard     = (int)myConfig->Read(_T("/asciikeyboard"),(long)1);
@@ -2792,7 +2777,7 @@ bool LisaEmApp::OnInit()
     emulation_time    = (long)myConfig->Read(_T("/emutime"),(long)100);
     emulation_tick    = (long)myConfig->Read(_T("/emutick"),(long)75);
 
-    long hdpiscale = myConfig->Read(_T("/hidpi_scale"),    (int)(hidpi_scale * 100));
+    long hdpiscale = myConfig->Read(_T("/hidpi_scale"),    (int)(100));
     ALERT_LOG(0, "read /hidpi_scale %ld from preferences", (long)hdpiscale)
 
     // should I get rid of this switch block and allow the user to pass whatever they like?
@@ -2858,7 +2843,16 @@ bool LisaEmApp::OnInit()
         }  
 
     my_lisaframe->running=emulation_off;     // CPU isn't yet turned on
-    my_lisaframe->throttle=(float)(myConfig->Read(_T("/throttle"),(long)5));
+    my_lisaframe->throttle          =(float)(myConfig->Read(_T("/throttle"),(long)5));
+    my_lisaframe->force_display_refresh=(int)myConfig->Read(_T("/forcerefresh"),(long)0);
+    my_lisaframe->hostrefresh        = (long)myConfig->Read(_T("/hostrefreshrate"),(long)1000/60);
+
+    #ifdef __WXGTK__
+    // hacky way to figure out if we're on a (relatively) hidpi/retina display, if not default to turn off mouse scaling for GTK
+    my_lisaframe->use_mouse_scale=(int)myConfig->Read(_T("/use_mouse_scale"),(int)(!!(my_lisawin->ppix>200 && my_lisawin->ppiy>200)));
+    #else
+    my_lisaframe->use_mouse_scale=(int)myConfig->Read(_T("/use_mouse_scale"),(int)1);
+    #endif
 
     my_lisawin->repaintall = REPAINT_INVALID_WINDOW;
     my_lisaframe->Show(true);                // Light it up
@@ -4759,6 +4753,8 @@ void LisaWin::OnPaint(wxPaintEvent& event )
   DoPrepareDC(dc);
   dc.SetUserScale(hidpi_scale,hidpi_scale);
 
+//  screen_paint_update++;
+
   if (!my_lisaframe || !my_lisawin) return; // not fully running yet, return so we don't crash
 
   if (!my_lisaframe->running)   repaintall |= REPAINT_INVALID_WINDOW;
@@ -4785,7 +4781,6 @@ void LisaWin::OnPaint(wxPaintEvent& event )
 
     if ( rect.Intersects(display) )  repaintall |= REPAINT_INVALID_WINDOW | REPAINT_VIDEO_TO_SKIN;
 
-    //if ( skins_on ? OnPaint_skins(rect, dc) : OnPaint_skinless(rect, dc) )  break;
     if ( skins_on) r=OnPaint_skins(rect, dc); else r=OnPaint_skinless(rect, dc);
     #ifndef __WXGTK__
     if (r) break;
@@ -5291,7 +5286,7 @@ void handle_powerbutton(void)
 
             if  (running_lisa_os==LISA_OFFICE_RUNNING)
                 {
-                   refresh_rate_used=5*REFRESHRATE;       // speed up contrast ramp by lowering the refresh rate
+                   my_lisaframe->hostrefresh=1000/120;
                    my_lisaframe->clockfactor=0;           // speed up shutdown to compensane for printing slowdown
                 }
 
@@ -5379,6 +5374,7 @@ extern "C" void lisa_powered_off(void)
   setstatusbar("The Lisa has powered off");         // status
   flushscreen();
   iw_enddocuments();
+  my_lisaframe->hostrefresh=refresh_rate_used;
 
   if (on_start_quit_on_poweroff) quit_lisaem();
 }
@@ -5445,8 +5441,11 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
     last_mouse_pos_x=pos.x; last_mouse_pos_y=pos.y;  // not hidpi corrected - used for full screen menu pop-up
 
     // correct for hidpi - these are relative to the wxWindow
-    long xh=  pos.x * mouse_scale;
-    long yh=  pos.y * mouse_scale;
+    long xh;
+    long yh;
+
+    if (!my_lisaframe->use_mouse_scale) { xh=pos.x;               yh=pos.y;               }
+    else                                { xh=pos.x * mouse_scale; yh=pos.y * mouse_scale; }
 
     // correct for Lisa display on CRT screen - relative to where the Lisa display should be.
     long y = yh; long x = xh;
@@ -5939,8 +5938,9 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
     EXTERMINATE(my_poweronDC           );
     EXTERMINATE(my_poweroffDC          );
 
+    my_lisaframe->m_emulation_timer->Stop();     // stop the timer
+
     #ifdef __WXOSX__
-     my_lisaframe->m_emulation_timer->Stop();     // stop the timer
      wxMilliSleep(emulation_time*2);              // ensure that any pending timer events are allowed to finish
      delete my_lisaframe->m_emulation_timer;      // delete the timer
      if (my_LisaConfigFrame) // close any ConfigFrame 
@@ -5951,7 +5951,6 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
         }  
      Close();                                      // and bye bye we go.
     #else
-     my_lisaframe->m_emulation_timer->Stop();      // stop the timer
      if (my_LisaConfigFrame)                       // close any ConfigFrame 
         {
           my_LisaConfigFrame->Hide();
@@ -5986,7 +5985,10 @@ void LisaEmFrame::OnConfig(wxCommandEvent& WXUNUSED(event))
 
           GetSize(&x, &y);
           x+=WINXDIFF; y+=WINYDIFF;
-          SetSize(wxDefaultCoord, wxDefaultCoord,x,y);
+          if (!set_window_size_already) {
+              SetSize(wxDefaultCoord, wxDefaultCoord,x,y);
+              set_window_size_already=1;
+          }
           #endif
 
           my_LisaConfigFrame->Show();
@@ -6150,6 +6152,7 @@ void LisaEmFrame::reset_throttle_clock(void)
    cycles_wanted=(XTIMER)(float)(emulation_time/clockfactor);
 }
 
+// maybe get rid of this entirely and have it run a signle frame or 1/60s per timer?
 
 void LisaEmFrame::OnET100_75(wxCommandEvent& WXUNUSED(event))   {emulation_time=100; emulation_tick=75; reset_throttle_clock(); save_global_prefs();}
 void LisaEmFrame::OnET50_30( wxCommandEvent& WXUNUSED(event))   {emulation_time= 50; emulation_tick=30; reset_throttle_clock(); save_global_prefs();}
@@ -6227,9 +6230,12 @@ void update_menu_checkmarks(void)
         {
             fileMenu->Check(ID_PAUSE, (my_lisaframe->running == emulation_paused) );
             DisplayMenu->Check(ID_HIDE_HOST_MOUSE,!!hide_host_mouse);
+            DisplayMenu->Check(ID_USE_MOUSE_SCALE,my_lisaframe->use_mouse_scale);
+
             #ifndef __WXOSX__
             DisplayMenu->Check(ID_VID_FULLSCREEN, (my_lisaframe->IsFullScreen()));
             #endif
+            //DisplayMenu->Check(ID_FORCE_REFRESH, !!(my_lisaframe->force_display_refresh));
         }
 
         if (!!DisplayScaleSub)
@@ -6251,13 +6257,16 @@ void update_menu_checkmarks(void)
 
         }
 
-      if (!!DisplayRefreshSub && !!my_lisaframe)
-      {
-          DisplayRefreshSub->Check(ID_REFRESH_4Hz, refresh_rate==9*REFRESHRATE);  if (refresh_rate==9*REFRESHRATE) my_lisaframe->hostrefresh=1000/ 4;
-          DisplayRefreshSub->Check(ID_REFRESH_8Hz, refresh_rate==7*REFRESHRATE);  if (refresh_rate==7*REFRESHRATE) my_lisaframe->hostrefresh=1000/ 8;
-          DisplayRefreshSub->Check(ID_REFRESH_12Hz,refresh_rate==5*REFRESHRATE);  if (refresh_rate==5*REFRESHRATE) my_lisaframe->hostrefresh=1000/12;
-          DisplayRefreshSub->Check(ID_REFRESH_20Hz,refresh_rate==3*REFRESHRATE);  if (refresh_rate==3*REFRESHRATE) my_lisaframe->hostrefresh=1000/20;
-          DisplayRefreshSub->Check(ID_REFRESH_60Hz,refresh_rate==1*REFRESHRATE);  if (refresh_rate==1*REFRESHRATE) my_lisaframe->hostrefresh=1000/60;
+      if (!!DisplayRefreshSub && !!my_lisaframe)  {   
+
+          DisplayRefreshSub->Check(ID_REFRESH_4Hz,   ( my_lisaframe->hostrefresh == 1000/   4  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_8Hz,   ( my_lisaframe->hostrefresh == 1000/   8  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_12Hz,  ( my_lisaframe->hostrefresh == 1000/  12  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_20Hz,  ( my_lisaframe->hostrefresh == 1000/  20  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_24Hz,  ( my_lisaframe->hostrefresh == 1000/  24  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_30Hz,  ( my_lisaframe->hostrefresh == 1000/  30  )  );    
+          DisplayRefreshSub->Check(ID_REFRESH_60Hz,  ( my_lisaframe->hostrefresh == 1000/  60  )  );    
+
       }
 
       #ifdef DEBUG
@@ -6709,6 +6718,8 @@ void LisaEmFrame::LoadImages(void)
  * smaller too since we can use PNGs.
  * On Linux/Win32 use embedded XPM strings/BMP resources.
  */
+ force_display_refresh=0;
+ 
 ALERT_LOG(0,"In LoadImages");
 if (skins_on)
 {
@@ -6830,13 +6841,12 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     if (x<=0 || y<=0) { ALERT_LOG(0,"** Reset LisaEmFrame config Size because x,y=(%d,%d) ***\n\n",x,y); x=IWINSIZEX;y=IWINSIZEY;}
    //wxScreenDC theScreen;
    //theScreen.GetSize(&screensizex,&screensizey);
+    ALERT_LOG(0,"========================================================================");
 
+    ALERT_LOG(0,"wxWidgets version aggregate:%d", ((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) )
     ALERT_LOG(0,"Getting display size")
     wxDisplaySize(&screensizex,&screensizey);
     ALERT_LOG(0,"Got (%d,%d) screen size from wxDisplaySize",screensizex, screensizey);
-    if  (screensizex< 0 || screensizex>8192 || screensizey<0 || screensizey>8192)
-        {ALERT_LOG(0,"Got Garbage screen size: %d,%d",screensizex,screensizey);
-          screensizex=1024; screensizey=768;}
 
    if   (x>screensizex || y>screensizey)  // make sure we don't get too big
         {
@@ -6951,29 +6961,31 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
                                                                                                                         
     editMenu->Append(wxID_PASTE, wxT("Paste") ,       wxT("Paste clipboard text to keyboard.") ); 
 
-    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_60Hz,wxT("60Hz Refresh"),wxT("60Hz Display Refresh - skip no frames - for fast machines"));
-    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_20Hz,wxT("20Hz Refresh"),wxT("20Hz Display Refresh - display every 2nd frame"));
-    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_12Hz,wxT("12Hz Refresh"),wxT("12Hz Display Refresh - display every 5th frame - for slow machines"));
-    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_8Hz, wxT(" 8Hz Refresh"),wxT("8Hz Display Refresh - display every 7th frame - for slow machines"));
-    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_4Hz, wxT(" 4Hz Refresh"),wxT("4Hz Display Refresh - display every 9th frame - for super slow machines"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_60Hz,  wxT("60Hz Refresh"),  wxT("60Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_30Hz,  wxT("30Hz Refresh"),  wxT("30Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_24Hz,  wxT("24Hz Refresh"),  wxT("24Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_20Hz,  wxT("20Hz Refresh"),  wxT("20Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_12Hz,  wxT("12Hz Refresh"),  wxT("12Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_8Hz,   wxT(" 8Hz Refresh"),  wxT("8Hz Display Refresh"));
+    DisplayRefreshSub->AppendRadioItem(ID_REFRESH_4Hz,   wxT(" 4Hz Refresh"),  wxT("4Hz Display Refresh"));
 
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_25,   wxT("0.25x"), wxT("Set Video Magnification Size 0.25x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_50,   wxT("0.50x"), wxT("Set Video Magnification Size 0.50x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_75,   wxT("0.75x"), wxT("Set Video Magnification Size 0.75x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_100,  wxT("1.00x"), wxT("Set Video Magnification Size 1.00x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_125,  wxT("1.25x"), wxT("Set Video Magnification Size 1.25x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_150,  wxT("1.50x"), wxT("Set Video Magnification Size 1.50x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_175,  wxT("1.75x"), wxT("Set Video Magnification Size 1.75x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_200,  wxT("2.00x"), wxT("Set Video Magnification Size 2.00x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_25,    wxT("0.25x"),         wxT("Set Video Magnification Size 0.25x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_50,    wxT("0.50x"),         wxT("Set Video Magnification Size 0.50x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_75,    wxT("0.75x"),         wxT("Set Video Magnification Size 0.75x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_100,   wxT("1.00x"),         wxT("Set Video Magnification Size 1.00x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_125,   wxT("1.25x"),         wxT("Set Video Magnification Size 1.25x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_150,   wxT("1.50x"),         wxT("Set Video Magnification Size 1.50x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_175,   wxT("1.75x"),         wxT("Set Video Magnification Size 1.75x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_200,   wxT("2.00x"),         wxT("Set Video Magnification Size 2.00x") );
     #ifndef __WXOSX__
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_225,  wxT("2.25x"), wxT("Set Video Magnification Size 2.25x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_250,  wxT("2.50x"), wxT("Set Video Magnification Size 2.50x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_275,  wxT("2.75x"), wxT("Set Video Magnification Size 2.75x") );
-    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_300,  wxT("3.00x"), wxT("Set Video Magnification Size 3.00x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_225,   wxT("2.25x"),         wxT("Set Video Magnification Size 2.25x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_250,   wxT("2.50x"),         wxT("Set Video Magnification Size 2.50x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_275,   wxT("2.75x"),         wxT("Set Video Magnification Size 2.75x") );
+    DisplayScaleSub->AppendRadioItem(ID_VID_SCALE_300,   wxT("3.00x"),         wxT("Set Video Magnification Size 3.00x") );
     #endif
     DisplayScaleSub->AppendSeparator();
-    DisplayScaleSub->Append(ID_VID_SCALE_ZOOMIN,    wxT("Zoom In \tCtrl-+"),   wxT("Zoom In") );
-    DisplayScaleSub->Append(ID_VID_SCALE_ZOOMOUT,   wxT("Zoom Out \tCtrl--"),  wxT("Zoom Out") );
+    DisplayScaleSub->Append(ID_VID_SCALE_ZOOMIN,         wxT("Zoom In \tCtrl-+"),   wxT("Zoom In") );
+    DisplayScaleSub->Append(ID_VID_SCALE_ZOOMOUT,        wxT("Zoom Out \tCtrl--"),  wxT("Zoom Out") );
 
     DisplayMenu->AppendRadioItem(ID_VID_HQ35X ,       wxT("HQX Upscaler")          ,  wxT("Aspect Corrected High Quality Magnification Filer hq3.5x") );
     DisplayMenu->AppendRadioItem(ID_VID_AA  ,         wxT("AntiAliased")           ,  wxT("Aspect Corrected with Anti Aliasing") );
@@ -6988,8 +7000,8 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     DisplayMenu->Append(         ID_VID_SKINSELECT,   wxT("Change Skin"),             wxT("Skin Select") );
     DisplayMenu->AppendSeparator();
 
-
     DisplayMenu->Append(ID_REFRESH_SUB,wxT("Refresh Rate"), DisplayRefreshSub );
+    //DisplayMenu->AppendCheckItem(ID_FORCE_REFRESH, wxT("Refresh always"), wxT("Refresh video even when not necessary"));
     DisplayMenu->AppendSeparator();
 
 
@@ -6998,6 +7010,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     DisplayMenu->AppendSeparator();
 
     DisplayMenu->AppendCheckItem(ID_HIDE_HOST_MOUSE,wxT("Hide Host Mouse Pointer"),wxT("Hides the host mouse pointer - may cause lag"));
+    DisplayMenu->AppendCheckItem(ID_USE_MOUSE_SCALE,wxT("Use Mouse Scaling"),wxT("Enab;e/Disable this if mouse tracking doesn't work"));
 
     #ifndef __WXOSX__
     DisplayMenu->AppendSeparator();
@@ -7198,9 +7211,10 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     my_lisawin->Show(true);
     fileMenu->Check(ID_PAUSE,false);
 
-
     m_emulation_timer = new wxTimer(this, ID_EMULATION_TIMER);
     m_emulation_timer->Start(emulation_tick, wxTIMER_CONTINUOUS);
+
+    if (!hostrefresh) hostrefresh=1000/20;
 
     #if wxUSE_DRAG_AND_DROP    // associate drop targets with the controls
       SetDropTarget(new DnDText());
@@ -8057,7 +8071,6 @@ int initialize_all_subsystems(void)
   ALERT_LOG(0,"done initializing...");
 
   setstatusbar("Executing Lisa Boot ROM");
-  refresh_rate_used=refresh_rate;       // powering (back) on, so use the user selected refresh rate.
   my_lisaframe->reset_throttle_clock();
   flushscreen();
      // needs to be at the end since romless_boot sets up registers which get whacked by the cpu initialization
@@ -8145,6 +8158,7 @@ wxString get_config_filename(void)  { return myconfigfile;}
 
 void turn_skins_on(void)
 {
+  if (!skins_on) set_window_size_already=0;
   skins_on_next_run=1;
   skins_on=1;
   my_lisawin->clear_skinless=1;
@@ -8245,8 +8259,6 @@ void uninit_gui(void);
 unsigned int gen_quit = 0;
 unsigned int gen_debugmode = 1;
 
-
-
 void    dumpvia(void);
 
 /////------------------------------------------------------------------------------------------------------------------------
@@ -8277,10 +8289,8 @@ uint8 evenparity(uint8 data)            // from http://graphics.stanford.edu/~se
 uint8 oddparity(uint8 data)            // from BitTwiddling hacks.
 {
   uint32 v=data;
-
   v ^= v >> 4;
   v &= 0xf;
-
   return (  (0x6996 >> v) & 1  );
 }
 

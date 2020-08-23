@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
   for (i=1; i<argc; i++)
   {
     memset(serialnum240,0,32);
-    for (j=0; (j<strlen(argv[i]) && j<32); j++)
+    for (j=0; ((size_t)j<strlen(argv[i]) && j<32); j++)
     {
       temp[2]='0';
       temp[3]=argv[i][j];

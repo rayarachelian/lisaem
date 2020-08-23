@@ -37,8 +37,8 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="RC2"                       # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.08.03"                # release date.  must be YYYY.MM.DD
+    STABILITY="RC3"                       # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2020.08.21"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -67,7 +67,9 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
-#VERSION="1.2.7-RC2_2020.05.27"
+#VERSION="1.2.7-RC3_2020.08.19"
+#VERSION="1.2.7-RC2_2020.08.03"
+#VERSION="1.2.7-RC1_2020.05.27"
 #VERSION="1.2.7-BETA_2019.03.31"
 #VERSION="1.2.7-BETA_2019.03.24"
 #VERSION="1.2.7-BETA_2019.03.14"
@@ -830,17 +832,8 @@ if  [[ -f "$LISANAME" ]]; then
 
            [[ -n "$ARCHOVERRIDE" ]] && MACHINE="$ARCHOVERRIDE"
 
-           #    xprofile-to-dc42                     
-           mv                                       \
-               blu-to-dc42                          \
-               dc42-resize-to-400k                  \
-               dumper                               \
-               lisadiskinfo                         \
-               lisafsh-tool                         \
-               losdeserialize                       \
-               patchxenix                           \
-               rraw-to-dc42                         \
-                   "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
+           TOOLLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
+           mv ${TOOLLIST} "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
 
            pkgbuild --root pkg --install-location / \
                     --identifier net.sunder.lisaem-cli-tools --version "${VER}" \
