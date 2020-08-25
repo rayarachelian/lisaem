@@ -3,23 +3,46 @@
 
 #include <machine.h>
 
-/*-------------------- 2003.07.08 17:23 ------------------------
- * hack to fix endianness under CygWin.  Might not be an
- * actuall issue with cygwin, but rather with the configure
- * scripts that I use... :(  This is a bad, bad hack,
- * it needs to go away!
- * ----------------------------------------------------------*/
-#ifdef __CYGWIN__
 
- #undef WORDS_BIGENDIAN
- #undef BIG_ENDIAN
- #ifndef LITTLE_ENDIAN
-  #define LITTLE_ENDIAN 1
- #endif
-
+#ifdef PROCESSOR_INTEL
+  #undef WORDS_BIGENDIAN
+  #undef BIG_ENDIAN
+  #ifndef LITTLE_ENDIAN
+    #define LITTLE_ENDIAN 1
+  #endif
+  #undef BYTESHIGHFIRST
 #endif
 
+#ifdef  PROCESSOR_SPARC
+  #define WORDS_BIGENDIAN 1
+  #ifndef BIG_ENDIAN
+    #define BIG_ENDIAN 1
+  #endif
+  #undef  LITTLE_ENDIAN
+  #define BYTESHIGHFIRST 1
+#endif
 
+#ifdef  __POWERPC__
+#define BYTES_HIGHFIRST  1
+#define WORDS_BIGENDIAN  1
+#endif
+#ifdef __sparc__
+#define BYTES_HIGHFIRST  1
+#define WORDS_BIGENDIAN
+#endif
+#ifdef sparc
+#define BYTES_HIGHFIRST  1
+#define WORDS_BIGENDIAN  1
+#endif
+
+#ifdef __CYGWIN__
+  #undef WORDS_BIGENDIAN
+  #undef BIG_ENDIAN
+  #ifndef LITTLE_ENDIAN
+    #define LITTLE_ENDIAN 1
+  #endif
+  #undef BYTESHIGHFIRST
+#endif
 
 #define VERSTRING VERSION
 #define PROGNAME LisaEmulator

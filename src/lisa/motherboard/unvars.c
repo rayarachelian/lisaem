@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-RC2_2020.08.03                    *
+*              The Lisa Emulator Project  1.2.7-RC3a_2020.08.24                    *
 *                  Copyright (C) 2020 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *

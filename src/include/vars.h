@@ -354,8 +354,6 @@
 #define WORDS_BIGENDIAN  1
 #endif
 
-
-
 #ifdef __CYGWIN__
   #undef WORDS_BIGENDIAN
   #undef BIG_ENDIAN

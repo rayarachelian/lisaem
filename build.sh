@@ -37,8 +37,8 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="RC3"                       # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.08.21"                # release date.  must be YYYY.MM.DD
+    STABILITY="RC3a"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2020.08.24"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -801,7 +801,6 @@ if  [[ -f "$LISANAME" ]]; then
             echo "Launching debugger:"
             [[ -n "$( echo $GDB | grep gdb )"  ]] && $GDB -x gdb-run     "$LISANAME"
             [[ -n "$( echo $GDB | grep lldb )" ]] && $GDB -o "run -p" -f "$LISANAME"
-            fi
         fi
         #if we turned on profiling, process the results
         if [[ -n "$(echo $WITHDEBUG | grep p >/dev/null 2>/dev/null)" ]];then

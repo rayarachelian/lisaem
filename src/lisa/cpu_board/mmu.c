@@ -1094,8 +1094,7 @@ void check_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, 
          {
            for (i=0; i<256; i++)                                             // All others handled here
            {
-             uint mrfn, mwfn;
-             //uint16 sor=mmu_all[cx][segment].sor & 0xfff;
+             lisa_mem_t mrfn, mwfn;
              int32 mxea;
 
              mt=&mmu_trans_all[cx][segment8+i];

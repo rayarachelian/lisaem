@@ -1452,12 +1452,12 @@ void LisaWin::SetVideoMode(int mode)
         SetMinSize(  wxSize(_H(720),_H(500) )  );
         if  (skin.width_size>0 && skin.height_size>0)
             {
-              SetClientSize(              wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
-              SetMaxSize(                 wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
-
-              my_lisaframe->SetClientSize(wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
-              //my_lisaframe->SetMaxSize(   wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
-
+              if  (!set_window_size_already) {
+                  SetClientSize(              wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
+                  SetMaxSize(                 wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
+                  my_lisaframe->SetClientSize(wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
+                  //my_lisaframe->SetMaxSize(   wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
+                  }
               DEBUG_LOG(0,"** Reset max window size to %d,%d at hidpi:%f ***",
                               _H(skin.width_size), _H(skin.height_size), hidpi_scale            );
             }
@@ -1630,12 +1630,12 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     static int counter;
     wxString text;
     float hosttime=(float)(elapsed - last_runtime_sample);
-    mhzactual=
-        ( (float)(cpu68k_clocks-last_runtime_cpu68k_clx))  / hosttime;
+    mhzactual=( ((float)(cpu68k_clocks-last_runtime_cpu68k_clx)) * 1000.0)  / hosttime;
 
     if (running) check_running_lisa_os(); // moved here from LisaEmFrame::VidRefresh so we don't do this as often.
 
-    char *c="KHz";
+    char *c="Hz";
+    if (mhzactual>1000) {mhzactual/=1000.0; c="KHz";}
     if (mhzactual>1000) {mhzactual/=1000.0; c="MHz";}
     if (mhzactual>1000) {mhzactual/=1000.0; c="GHz";}
  
@@ -6691,7 +6691,8 @@ void LisaEmFrame::UnloadImages(void)
 
     int x,y;
     if (my_lisawin)
-    {   my_lisawin->SetClientSize(wxSize(effective_lisa_vid_size_x,effective_lisa_vid_size_y));     // LisaWin //
+    {
+       if  (!set_window_size_already) my_lisawin->SetClientSize(wxSize(effective_lisa_vid_size_x,effective_lisa_vid_size_y));
         my_lisawin->GetClientSize(&x,&y);                                                           // LisaWin //
         my_lisawin->GetSize(&x,&y);                                                                 // LisaWin //
         skin.screen_origin_x=( _N(x)  - effective_lisa_vid_size_x)>>1;                              // center display
@@ -6786,9 +6787,11 @@ if (skins_on)
     my_poweronDC->SelectObject(*my_poweron);
     my_poweroffDC->SelectObject(*my_poweroff);
 
-    my_lisawin->SetMinSize(wxSize(IWINSIZE));
-    my_lisawin->SetClientSize(wxSize(IWINSIZE));                                                     // Lisawin   //
-    my_lisawin->SetMaxSize(wxSize(ISKINSIZE));                                                       // Lisawin   //
+    if  (!set_window_size_already) {
+         my_lisawin->SetMinSize(wxSize(IWINSIZE));
+         my_lisawin->SetClientSize(wxSize(IWINSIZE));                                                     // Lisawin   //
+         my_lisawin->SetMaxSize(wxSize(ISKINSIZE));                                                       // Lisawin   //
+    }
     ALERT_LOG(0,"SetScrollbars");
     my_lisawin->SetScrollbars(ISKINSIZEX/_H(100), ISKINSIZEY/_H(100),  _H(100),_H(100),  0,0,  true);                // Lisawin   //
     ALERT_LOG(0,"Enabled Scrollbars");
@@ -7192,11 +7195,11 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
                 {x=effective_lisa_vid_size_x;   y=effective_lisa_vid_size_y;}
 //             ALERT_LOG(0,"Setting frame size to:%d,%d",x,y);
 
-           SetClientSize(wxSize(x,y));                                                           // Frame    //
+           if (!set_window_size_already)SetClientSize(wxSize(x,y));                                                           // Frame    //
            GetClientSize(&x,&y);                                                                 // Frame    //
            SetMinSize( wxSize( _H(720),_H(364) ) );
            x+=WINXDIFF; y+=WINYDIFF;                                                             // LisaWin  //
-           my_lisawin->SetClientSize(wxSize(x,y));
+           if (!set_window_size_already) my_lisawin->SetClientSize(wxSize(x,y));
            my_lisawin->GetSize(&x,&y);                                                           // LisaWin  //
            // X11, Windows return too small a value for getsize
            x+=WINXDIFF; y+=WINYDIFF;                                                             // LisaWin  //

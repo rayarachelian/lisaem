@@ -180,8 +180,8 @@ static uint8  romless_loram[0x560]=
 
 void romless_setvia_and_flopram(int profileboot)
 {
+  
     if (profileboot )  //0=profile, 1=floppy
-
     {
     // booted from floppy ////////////
 
@@ -313,6 +313,9 @@ void romless_setvia_and_flopram(int profileboot)
     } // above - booted from floppy
     else
     {  // profile --------------
+
+    if (!via[2].ProFile) return;
+    if ( via[2].ProFile->DC42.fd<3 || via[2].ProFile->DC42.fh==NULL) return;
 
     via[1].active=0x01;
     via[1].vianum=0x01;
@@ -521,7 +524,6 @@ regs.sp=                        0x00000000;
 regs.sr.sr_int=reg68k_sr.sr_int=0x2704; 
 reg68k_regs = regs.regs;
 
-
 romless_setvia_and_flopram(profileboot);
 
 if (profileboot==0)
@@ -530,19 +532,26 @@ if (profileboot==0)
   
 //  lisaram[0x80183]=0;
 
+  if  (!P) {
+      messagebox("Can't boot from non-existant ProFile. Create a ProFile, boot from an OS instal disk, and install an operating system on the ProFile.", "No ProFile Hard Drive");
+      cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
+      lisa_powered_off();
+      return 1;
+      }
+
+
   reg68k_regs[  1]=deinterleave5(0);
   reg68k_regs[8+1]=0x0001ffec;
   reg68k_regs[8+2]=0x00020000;
 
 
   romless_proread();
-  if (lisa_ram_safe_getword(1,0x1ffec+4)!=0xaaaa)
-     {
-         messagebox("This ProFile is not bootable!", "OS BOOT Aborted");
-         cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
-         lisa_powered_off();
-         return 1;
-     }
+  if  (lisa_ram_safe_getword(1,0x1ffec+4)!=0xaaaa)  {
+      messagebox("Try booting from an OS installation diskette.", "No bootable OS found on ProFile Hard Drive");
+      cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
+      lisa_powered_off();
+      return 1;
+      }
 
   reg68k_regs[ 0]=0x0000aaaa;
   reg68k_regs[ 1]=0x00000000;
@@ -727,15 +736,19 @@ void romless_proread(void)
 
   if (!P) {ALERT_LOG(0,"Can't access profile!"); return;}
 
-    reg68k_regs[8+0]=0xfcd901;
+  P->DataBlock[512+4]=0xff;
+  P->DataBlock[512+5]=0xff;
+
+  if (P->DC42.fd<3 || P->DC42.fh==NULL) return;
+
+  reg68k_regs[8+0]=0xfcd901;
 
 //  if (sectornumber<50)   ALERT_LOG(0,"Slot 1 ID:%04x, Slot 2 ID:%04x, Slot 3 ID:%04x",
 //           lisa_ram_safe_getword(1,0x298), lisa_ram_safe_getword(1,0x29a), lisa_ram_safe_getword(1,0x29c) ) 
    
-  
+
+
   if (sectornumber<0x00f00000)   sectornumber=deinterleave5(sectornumber);
-
-
 
   if (sectornumber>0x00fffff0)  
     {
@@ -743,7 +756,6 @@ void romless_proread(void)
                                       get_profile_spare_table(P);
   //    ALERT_LOG(0,"Slot 1 ID:%04x, Slot 2 ID:%04x, Slot 3 ID:%04x",
   //           lisa_ram_safe_getword(1,0x298), lisa_ram_safe_getword(1,0x29a), lisa_ram_safe_getword(1,0x29c) ) 
-
 
     }
   else

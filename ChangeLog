@@ -8,6 +8,14 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2020.08.23 - fixed lisaem.sh CPU name on PowerPC
+           - fixed crash on ROMless boot when user selects ProFile but cancels
+             ProFile creation.
+           - fixed build.sh misplaced fi breaking windows installs
+           - verified 10.5 PPC vs i386 machine.h match for crosscompiling
+           - fixed bug: 10.5 i386 crosscompiling PPC did not set BIG_ENDIAN
+             PPC builds
+
 2020.08.20 - reworked display system refreshes, added checkbox to disable
              mouse scaling, added back refresh rate to status bar.
 

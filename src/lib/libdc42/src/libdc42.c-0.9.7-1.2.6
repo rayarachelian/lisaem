@@ -814,7 +814,7 @@ int dc42_is_valid_image(char *filename)
 
 
 
-    if (filesizetotal>4294967296) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
+    if (filesizetotal>4294967290) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
 
     if (F->fd>2)
        {
