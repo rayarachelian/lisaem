@@ -54,7 +54,9 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size idefile-to-dc42 rraw-to-dc42 dc42-to-raw raw-to-dc42 dc42-to-tar"
+
+
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 
@@ -85,7 +87,7 @@ CHECKFILES libdc42-gpl-license.txt $(for i in $SRCLIST; do echo src/$i.c; done)
 [[ -n "$MACOSX_MAJOR_VER" ]] && mkdir -pm 755 "${XTLD}/bin/$MACOSX_MAJOR_VER/"
 
 for i in $@; do
-
+ i=`echo "$i" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
  case "$i" in
 
   estimate) cd ${XTLD}/src
@@ -155,17 +157,17 @@ for i in $@; do
                                [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                export ARCH="-m32" ; export SARCH="-m32"  ;;
 
- --without-debug)              WITHDEBUG=""
+ --no-debug)                   WITHDEBUG=""
                                WARNINGS=""                               ;;
 
- --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
+ --debug)                      WITHDEBUG="$WITHDEBUG -g"
                                WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
 
 -D*)                           EXTRADEFINES="${EXTRADEFINES} ${i}";;
 
- --with-profile)               WITHDEBUG="$WITHDEBUG -p"                 ;;
+ --profile)                    WITHDEBUG="$WITHDEBUG -p"                 ;;
 
- --with-tracelog)              WITHTRACE="-DDEBUG -DTRACE"
+ --tracelog)                   WITHTRACE="-DDEBUG -DTRACE"
                                WARNINGS="-Wall"                          ;;
  --no-banner)                  NOBANNER="1";                             ;;
 

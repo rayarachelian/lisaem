@@ -57,10 +57,10 @@ void debug_on(char *reason)
     char filename[1024];
     FILE *loglist=NULL;
 
-    if (!lisaram) return;
+    //if (!lisaram) {ALERT_LOG(0,"Cannot open log, no LisaRAM yet"); sleep(10); return; }
 
-    if (buglog==NULL) buglog=stderr;                    // never set up properly
-    if (buglog!=stderr) return;                         // already enabled?
+    if (buglog==NULL) buglog=stderr;          
+    if (buglog!=stderr) {ALERT_LOG(0,"Not enabling tracelog - already enabled"); return;}
 
 #ifdef __WXMSW__
      return;
@@ -333,8 +333,17 @@ int check_running_lisa_os(void)
             running_lisa_os=LISA_TEST_RUNNING;
            // ALERT_LOG(0,"Lisa Test Running: v1=%08x v2=%08x",v1,v2);
             return running_lisa_os;}
-   else
-   if ((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500)            // Monitor OS (No mouse used)
+   else                   // 000ff000                          000fff00
+   if ( ((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500) ||         // Monitor OS (No mouse used)
+        ((v1 & 0x00fff000) ==0x001c2000  && (v2 & 0x00ffff00)==0x001c2500)   )  // this is a clue - address has changed!!!! maybe that's why LOS crashes!
+      {
+           //if (lisa_os_mouse_x_ptr!=0x00000fec) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to fec",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
+            lisa_os_mouse_x_ptr=0x00000fec;   lisa_os_mouse_y_ptr=0x000000fee;
+            running_lisa_os=LISA_MONITOR_RUNNING;
+            //ALERT_LOG(0,"Lisa Monitor Running: v1=%08x v2=%08x",v1,v2);
+            return running_lisa_os;}
+   else                    //00fff000                          00fff000
+   if ((v1 & 0x00fff000) ==0x00142000  && (v2 & 0x00fff000)==0x00142000)            // Monitor OS - after bus error?(No mouse used)
       {
            //if (lisa_os_mouse_x_ptr!=0x00000fec) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to fec",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000fec;   lisa_os_mouse_y_ptr=0x000000fee;
@@ -342,8 +351,10 @@ int check_running_lisa_os(void)
             //ALERT_LOG(0,"Lisa Monitor Running: v1=%08x v2=%08x",v1,v2);
             return running_lisa_os;}
    else
-   if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||           // Macworks XL 3.0
-        ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) )            // 2020.08.03 did this move due to extra RAM?
+   if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||       // Macworks XL 3.0
+        ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) ||       // 2020.08.03 did this move due to extra RAM?
+        ((v1 & 0x00fff000) ==0x001b6000  && (v2 & 0x00fff000)==0x001b6000) ||
+        ((v1 & 0x00fff000) ==0x001c4000  && (v2 & 0x00fff000)==0x001c4000)   )
       {
            //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;
@@ -360,7 +371,14 @@ int check_running_lisa_os(void)
             //ALERT_LOG(0,"MicroSoft Xenix Running: v1=%08x v2=%08x",v1,v2);
             return running_lisa_os;
       }
-
+   else
+   if ((v1 & 0x00ffffff) ==0x0001c26c  && (v2 & 0x00ffffff)==0x0001c270)            // UniPlus
+      {
+            lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;      // Unknown mouse handler locations for now, will revisit after getting it working
+            running_lisa_os=LISA_UNIPLUS_RUNNING;
+            //ALERT_LOG(0,"MicroSoft Xenix Running: v1=%08x v2=%08x",v1,v2);
+            return running_lisa_os;
+      }
    running_lisa_os=UNKNOWN_OS_RUNNING;
    ALERT_LOG(0,"Unknown OS Running: v1=%08x v2=%08x",v1,v2);
    return running_lisa_os;
@@ -441,9 +459,6 @@ void debugger(void)
     uint32 oldcx=context;
     uint32 dcx=context, mdcx=context;
     uint i;
-
-
-
 
  //         .........1.........2.........3.........4.........5.........6.........7
  //         123456789012345678901234567890123456789012345678901234567890123456789012345678

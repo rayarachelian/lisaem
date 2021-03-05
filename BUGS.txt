@@ -3,6 +3,16 @@ Here's a list of some of the current known issues, there are likely many others.
 * Various sound generation issues across several platforms, but works on 
 GTK if SDL is enabled, so turning on SDL for build wx scripts. 
 
+* Mouse tracking fails to work under high load throttle- noticed on GTK.
+On my system when using a debug compiled binary and throttle set to 100MHz,
+Lisa Office System does not recognize mouse movement except for clicks.
+Seems to be a wxWidgets related issues where mouse movements are treated
+as lower priority without clicks and are not sent. Lowering the CPU throttle
+to 48MHz fixes this, YMMV. The OnMouseMove method is no longer called by the
+event handler.
+The symptom appears to ignore mouse up events in LOS, and every click is
+a drag.
+
 * Install both Xcode and command line tools on macos x.
 to properly build wxWidgets on macos x, it's highly recommended to install the
 right version of Xcode for your os as well as the right version of the Command
@@ -25,3 +35,5 @@ such as lisafsh-tool.
 This code does not work well enough to convert Widget or Profile dumped via BLU
 to be bootable, nor mountable in LisaEm, although lisafsh-tool can get a 
 directory of the resulting image, not yet sure what's wrong.
+
+* dc42-to-tar not yet complete - contains bugs

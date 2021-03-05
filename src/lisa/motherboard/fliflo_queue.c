@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2020.10.15                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                Copyright (C) MCMXCVIII, MMXX Ray A. Arachelian                       *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -23,8 +23,12 @@
 *                   or visit: http://www.gnu.org/licenses/gpl.html                     *
 *                                                                                      *
 *                                                                                      *
-*                      FLIFLO Queue Structures for various                             *
-*                           Lisa emulator usage                                        *
+*  FLIFLO Queue Structures for various LisaEm usage. The name is a merging of FIFO     *
+*  and LIFO queues, and is implemented as a circular buffer. If you use push/pop, it   *
+*  acts as a LIFO or stack. If you use add/get, it acts as a FILE.                     *
+*                                                                                      *
+*  FIFO=a First In, First Out queue. LIFO=Last In, First Out (also known as a stack)   *
+*                                                                                      *
 \**************************************************************************************/
 
 
@@ -43,11 +47,13 @@
 
 //typedef struct
 //{
-//  uint32 size;
-//  uint8 *buffer;
-//  uint32 start;
+//  uint32 size;     // this is the total size of entries in the queue
+//  uint8 *buffer;   // buffer calloc'ed with size
+//  uint32 start;    // start/end indeces for add/remove/push/pop
 //  uint32 end;
 //} FLIFLO_QUEUE_t;
+
+// todo - add item size here and move mouse to fliflo but need backwards compatibility with keyboard/serial
 
 
 
@@ -76,9 +82,7 @@ static inline int previous_idx(FLIFLO_QUEUE_t *b, int index)
 {
   if ( !b) return 0;
   if ( !b->size) return 0;
-
   if (!index) return b->size-1;
-
   return (index-1) % b->size;
 }
 
@@ -92,9 +96,9 @@ int fliflo_buff_has_data(FLIFLO_QUEUE_t *b) {if (!b)         return 0; \
                                              return( b->start!=b->end);}
 
 
-int fliflo_buff_is_empty(FLIFLO_QUEUE_t *b) {if (!b)         return -1; \
-                                             if (!b->buffer) return -2; \
-                                             if (!b->size)   return -3; \
+int fliflo_buff_is_empty(FLIFLO_QUEUE_t *b) {if (!b)         {ALERT_LOG(0,"NULL queue");return -1;}
+                                             if (!b->buffer) {ALERT_LOG(0,"QUEUE has no buffer");return -2;}
+                                             if (!b->size)   {ALERT_LOG(0,"QUEUE is empty");return -3;}
                                              return( b->start==b->end);}
 
 uint32 fliflo_buff_size(FLIFLO_QUEUE_t *b)
@@ -121,27 +125,52 @@ int fliflo_buff_add(FLIFLO_QUEUE_t *b,uint8 data)  // checked
 {
    if (!b->size) return -4;
 
-   if ( !b)                     {DEBUG_LOG(0,"null queue!");        return -2;}
-   if (!b->buffer)              {DEBUG_LOG(0,"buffer is missing!"); return -3;}
-   if ( fliflo_buff_is_full(b)) {DEBUG_LOG(0,"buffer is full");     return -1;}
+   if ( !b)                     {ALERT_LOG(0,"null queue!");        return -2;}
+   if ( !b->buffer )            {ALERT_LOG(0,"buffer is missing!"); return -3;}
+   if ( fliflo_buff_is_full(b)) {ALERT_LOG(0,"buffer is full");     return -1;}
 
    #ifdef DEBUG
-    if ((b->end)  > (b->size)) {EXITR(178,0,"ERROR! end:%d pointer>size! %d",b->end,b->size);}
-    if ((b->start)> (b->size)) {EXITR(179,0,"ERROR! start:%d pointer>size! %d",b->start,b->size);}
+    if ((b->end)  > (b->size))  {EXITR(178,0,"ERROR! end:%d pointer>size! %d",b->end,b->size);}
+    if ((b->start)> (b->size))  {EXITR(179,0,"ERROR! start:%d pointer>size! %d",b->start,b->size);}
    #endif
 
-   DEBUG_LOG(0,"adding %d to buffer at index:%d",data,b->end);
-   b->buffer[b->start]=data;
+   ALERT_LOG(0,"adding %d to buffer at index:%d",data,b->end);
+   //BUG://b->buffer[b->start]=data; // this will be replaced because start will not change! should add to the end?
+   b->buffer[b->end]=data; // this will be replaced because start will not change! should add to the end?
+
    b->end=next_idx(b,b->end);
    return 0;
 }
 
-void fliflo_dump(FLIFLO_QUEUE_t *b,char *s)
+extern char niceascii(char c); // in ./src/lib/libGenerator/generator/reg68k.c
+/* code for converting binary into readable ascii, converts high bit and control chars back to text.
+char niceascii(char c)
+{ c &=127;
+ if (c<31) c|=32;
+ if (c==127) c='.';
+ return c;
+}
+*/
+
+void fliflo_dump(FILE *log, FLIFLO_QUEUE_t *b,char *s)
 {
  uint32 i;
- fprintf(buglog,"FLIFLO QUEUE DUMP OF %s start,end,size:%d,%d,%d::",s,b->start,b->end,b->size);
- for (i=0; i<b->size; i++) fprintf(buglog,"%02x ",b->buffer[i]);
- fprintf(buglog,"\n\n");
+ fprintf(log,"FLIFLO queue dump of %s @%p start-end:size:%d-%d:%d::\n  ",s,b,b->start,b->end,b->size);
+ 
+ i=b->start;
+ while(i!=b->end) {
+    fprintf(log,"%02x ",b->buffer[i]);
+    i=next_idx(b,i);
+ }
+ fprintf(log," | ");
+
+ i=b->start;
+ while(i!=b->end) {
+    fprintf(log,"%c",niceascii(b->buffer[i]) );
+    i=next_idx(b,i);
+ }
+ 
+ fprintf(log,"\n\n");
 }
 
 
@@ -161,13 +190,14 @@ uint8 fliflo_buff_pop(FLIFLO_QUEUE_t *b)  // checked
 uint8 fliflo_buff_get(FLIFLO_QUEUE_t *b) // checked.
 {
     uint8 data;
-    if ( !b) return 0;
-    if ( fliflo_buff_is_empty(b)) return 0;
-    if (!b->buffer) return 0;
-    data=b->buffer[b->start];
+    if ( !b) { ALERT_LOG(0,"NULL queue"); return 0;}
+    if ( fliflo_buff_is_empty(b)) {ALERT_LOG(0,"empty"); return 0;}
+    if (!b->buffer) {ALERT_LOG(0,"QUEUE has no buffer"); return 0;}
+    data=b->buffer[b->start];           // read a value off the start;
+    ALERT_LOG(0,"Read %02x at start index:%d",data,b->start);
     b->buffer[b->start]=0;              // clobber it to make sure
     b->start=next_idx(b,b->start);
-
+    ALERT_LOG(0,"next start index is now: %d",b->start);
     return data;
 }
 
@@ -175,9 +205,9 @@ uint8 fliflo_buff_get(FLIFLO_QUEUE_t *b) // checked.
 uint8 fliflo_buff_peek(FLIFLO_QUEUE_t *b)
 {
     uint8 data;
-    if ( !b) return 0;
-    if ( fliflo_buff_is_empty(b)) return 0;
-    if (!b->buffer) return 0;
+    if ( !b) { ALERT_LOG(0,"NULL QUEUE"); return 0;}
+    if ( fliflo_buff_is_empty(b)) {ALERT_LOG(0,"QUEUE is empty"); return 0;}
+    if (!b->buffer)               {ALERT_LOG(0,"QUEUE HAS NO BUFFER"); return 0;}
     data=b->buffer[b->start];
     return data;
 }
@@ -201,7 +231,6 @@ int fliflo_buff_create(FLIFLO_QUEUE_t *b, uint32 size)
   size++;
   b->buffer=calloc(1,size);
   if ( !b->buffer) return -1;
-  //memset(b->buffer,0,size-1);
   b->start=0;
   b->end=0;
   b->size=size;

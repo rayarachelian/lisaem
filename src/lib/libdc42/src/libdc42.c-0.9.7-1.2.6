@@ -933,18 +933,12 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
     F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
 
-
+    // be more lenient for larger file sizes
     if ((DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
-             {
-              if (F->fd>2) { close(F->fd); F->fd=0;    }
-              if (F->fh  ) {fclose(F->fh); F->fh=NULL; }
+       { filesizetotal=DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal; }
 
-
-              DC42_RET_CODE(F,89,"File size does not match headers",return F->retval);
-             }
-
-    F->datasize=512;
-	F->sectorsize=512;
+    F->datasize=512;   // we don't support other sizes
+	 F->sectorsize=512;
 
     //F->numblocks=F->datasizetotal/F->sectorsize;   // for 400k disks=800 blocks, 800k disks=1600 - but get this from the image.  This is in bytes 1st
     F->numblocks=F->datasizetotal/F->sectorsize;

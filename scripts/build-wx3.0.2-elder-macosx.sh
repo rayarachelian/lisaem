@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-OSVER="$( sw_vers -productVersion | cut -f1,2 -d'.' )"
+export OSVER="macOS-$(A=$(sw_vers -productVersion); MAJOR=$(echo ${A} | cut -f1 -d '.'); MID=$(echo ${A} | cut -f2 -d'.'); printf "%02d.%02d" ${MAJOR} ${MID} )"
 
 export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$( basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$OSVER"
-
-OSVER="macOS-$( sw_vers -productVersion | cut -f1,2 -d'.' )"
 
 echo "MIN_MACOSX_VERSION: $MIN_MACOSX_VERSION"
 

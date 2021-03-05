@@ -37,6 +37,7 @@ char *getvector(int v)
      case 8:      sprintf(vectxt,"0x%x (%d) priviledge violation",v,v); return vectxt;
      case 9:      sprintf(vectxt,"0x%x (%d) trace",v,v); return vectxt;
      case 10:     sprintf(vectxt,"0x%x (%d) A-line trap",v,v); return vectxt;
+     
      case 11:     sprintf(vectxt,"0x%x (%d) F-line trap",v,v); return vectxt;
 
      case 14:     sprintf(vectxt,"0x%x (%d) format error (RTE/TRAP?)",v,v); return vectxt;

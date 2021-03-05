@@ -3,7 +3,7 @@
 *              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2020 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -28,13 +28,23 @@
 *                            Lisa serial ports                                         *
 \**************************************************************************************/
 
-/*
+/*--------------------------------------------------------------------------------------
  * only basic functionality exists here because this is a very complex chip.
  *
  * Only async serial is used, most things are virtualized and won't necessarily behave
  * as a real serial port.  Sync-serial, SDLC options, ESCC support, not enabled.
+ * CRC function is for future use by SDLC, etc.
+ *--------------------------------------------------------------------------------------
+ * NOTES:
  *
- */
+ * WR2, WR9 are identical on both port A and port B.
+ * port=0 is serial port B, port=1 is serial port A/
+ * 
+ * RR8=receive buffer, RR0,1,10,15=status, 12,13=baud rate generator
+ * RR3 is always 0 in CHB/port=0, so only valid in channel A/port=1
+ * 
+ * 
+ *-------------------------------------------------------------------------------------*/
 
 #define LISAEMSCCZ8530 1
 #include <vars.h>
@@ -63,13 +73,17 @@ sccfunc_t scc_fn[2];
 static int scc_fifos_allocated=0;
 
 uint8 scc_bits_per_char_mask[2];
-FLIFLO_QUEUE_t SCC_READ[2], SCC_WRITE[2];
+FLIFLO_QUEUE_t SCC_READ[16], SCC_WRITE[16];  // if changing this also change the extern in z8530-terminal.cpp!
 
+int xoffflag[2];
 
 int scc_interrupts_enabled=0;
 
 int irq_on_next_rx_char[2];
 
+#define IMSK (reg68k_sr.sr_struct.i0 | (reg68k_sr.sr_struct.i1<<1) | (reg68k_sr.sr_struct.i2<<2) )
+static  int sentbytes[2];
+static  XTIMER sentbytes_start[2];
 
 
 // Defines for the above -- hmmm, not really using these...
@@ -102,34 +116,48 @@ int irq_on_next_rx_char[2];
 #define TX_BUFF_EMPTY(port)                                                                                      \
       { if  (scc_w[port].s.wr1.r.txintenable)                                                                    \
             {                                                                                                    \
-              if (port) {scc_r[0].r[3] = (scc_r[0].r[3]&0xf0) | RR3_IP_B_TX;    z8530_last_irq_status_bits=8;}   \
-              else      {scc_r[0].r[3] = (scc_r[0].r[3]&0x0f) | RR3_IP_A_TX;    z8530_last_irq_status_bits=128;} \
+              if (port) {scc_r[1].r[3] = (scc_r[1].r[3]&0x38) | RR3_IP_B_TX;    z8530_last_irq_status_bits=8;}   \
+              else      {scc_r[1].r[3] = (scc_r[1].r[3]&0x07) | RR3_IP_A_TX;    z8530_last_irq_status_bits=128;} \
             }                                                                                                    \
       }
 
 #define EXT_STATUS_CHANGE(port)                                                                                  \
       { if  (scc_w[port].s.wr1.r.extintenable)                                                                   \
             {                                                                                                    \
-              if (port) {scc_r[0].r[3] = (scc_r[0].r[3]&0xf0) | RR3_IP_B_STAT; z8530_last_irq_status_bits=10;}   \
-              else      {scc_r[0].r[3] = (scc_r[0].r[3]&0x0f) | RR3_IP_A_STAT; z8530_last_irq_status_bits=2;}    \
+              if (port) {scc_r[1].r[3] = (scc_r[1].r[3]&0x38) | RR3_IP_B_STAT; z8530_last_irq_status_bits=10;}   \
+              else      {scc_r[1].r[3] = (scc_r[1].r[3]&0x07) | RR3_IP_A_STAT; z8530_last_irq_status_bits=2;}    \
             }                                                                                                    \
       }
 
 #define RX_CHAR_AVAILABLE(port)                                                                                  \
       { if  (scc_w[port].s.wr1.r.rxintmode && scc_w[port].s.wr1.r.rxintmode!=3)                                  \
             {                                                                                                    \
-              if (port) {scc_r[0].r[3] = (scc_r[0].r[3]&0xf0) | RR3_IP_B_RX;    z8530_last_irq_status_bits=12;}  \
-              else      {scc_r[0].r[3] = (scc_r[0].r[3]&0x0f) | RR3_IP_A_RX;    z8530_last_irq_status_bits=4;}   \
+              if (port) {scc_r[1].r[3] = (scc_r[1].r[3]&0x38) | RR3_IP_B_RX;    z8530_last_irq_status_bits=12;}  \
+              else      {scc_r[1].r[3] = (scc_r[1].r[3]&0x07) | RR3_IP_A_RX;    z8530_last_irq_status_bits=4;}   \
             }                                                                                                    \
       }
+
+#define RX_CHAR_NOT_AVAILABLE(port)                                                                              \
+      { if  (scc_w[port].s.wr1.r.rxintmode && scc_w[port].s.wr1.r.rxintmode!=3)                                  \
+            {                                                                                                    \
+              if (port) {scc_r[1].r[3] = (scc_r[1].r[3]&0x38);                  z8530_last_irq_status_bits=12;}  \
+              else      {scc_r[1].r[3] = (scc_r[1].r[3]&0x07);                  z8530_last_irq_status_bits=4;}   \
+            }                                                                                                    \
+      }
+
 
 #define SPECIAL_RECV_COND(port)                                                                                  \
       { if  (scc_w[port].s.wr1.r.rxintmode==3)                                                                   \
             {                                                                                                    \
-              if (port) {scc_r[0].r[3] = (scc_r[0].r[3]&0xf0) | RR3_IP_B_STAT;  z8530_last_irq_status_bits=14;}  \
-              else      {scc_r[0].r[3] = (scc_r[0].r[3]&0x0f) | RR3_IP_A_STAT;  z8530_last_irq_status_bits=6;}   \
+              if (port) {scc_r[1].r[3] = (scc_r[1].r[3]&0xf0) | RR3_IP_B_STAT;  z8530_last_irq_status_bits=14;}  \
+              else      {scc_r[1].r[3] = (scc_r[1].r[3]&0x0f) | RR3_IP_A_STAT;  z8530_last_irq_status_bits=6;}   \
             }                                                                                                    \
       }
+
+
+// wrapper around fliflo_buff_has_data when software handshaking is enabled
+#define HAS_DATA(port) ( (xonenabled[port] && xoffflag[port]) ? 0 : fliflo_buff_has_data(&SCC_READ[port]) )
+
 
 // Protos for link to host devices - or emulation of ports
 
@@ -153,7 +181,7 @@ char read_serial_port(unsigned int port);
 void write_serial_port(unsigned int port, char data);
 void scc_hardware_reset_port(unsigned int port);
 void scc_channel_reset_port(unsigned int port);
-void initialize_scc(void);
+void initialize_scc(int actual);
 void  lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);
 uint8 lisa_rb_Oxd200_sccz8530(uint32 address);
 void scc_control_loop(void);
@@ -164,21 +192,36 @@ char read_serial_port_nothing(unsigned int port);
 char read_serial_port_imagewriter(unsigned int port);
 char read_serial_port_loopbackplug(unsigned int port);
 char read_serial_port_localport(unsigned int port);
-#ifndef __MSVCRT__
-char read_serial_port_telnetd(unsigned int port);
-#endif
 
 void write_serial_port_nothing(unsigned int port, char data);
 void write_serial_port_loopbackplug(unsigned int port, char data);
 void write_serial_port_localport(unsigned int port, char data);
 void write_serial_port_imagewriter(unsigned int port, char data);
-#ifndef __MSVCRT__
-void write_serial_port_telnetd(unsigned int port, char c);
-#endif
 
 uint32 get_baud_rate(unsigned int port);
 void set_baud_rate(int port, uint32 baud);
 
+//::TODO:: find a way to implement a windows version of telnetd and pty/tty
+#ifndef __MSVCRT__
+
+extern char read_serial_port_telnetd(unsigned int port);
+extern void write_serial_port_telnetd(unsigned int port, char c);
+extern void init_telnet_serial_port(int portnum);
+extern int  poll_telnet_serial_read(int portnum);
+
+extern char read_serial_port_pty(unsigned int port);
+extern void write_serial_port_pty(unsigned int port, char c);
+extern void init_pty_serial_port(int portnum);
+
+extern int  read_serial_port_tty(unsigned int port);
+extern void write_serial_port_tty(unsigned int port, char c);
+extern void init_tty_serial_port(int portnum);
+extern void set_port_baud_tty(int port, int baud);
+
+#endif
+
+void write_serial_port_terminal(int port, uint8 data);
+char read_serial_port_terminal(int port);
 
 static inline void on_read_irq_handle(int port);
 
@@ -222,7 +265,33 @@ uint16 crc16(uint16 crc, uint8 data)
     return crc^(((crc & 0x00ff)<<4)<<1);
 }
 
-
+int verifybaud(int baud) {
+  switch(baud)
+  {
+         case 50:     break;
+         case 75:     break;
+         case 110:    break;
+         case 134:    break;
+         case 150:    break;
+         case 200:    break;
+         case 300:    break;
+         case 600:    break;
+         case 1200:   break;
+         case 1800:   break;
+//       case 2000:   break;
+         case 2400:   break;
+//       case 3600:   break;
+         case 4800:   break;
+         case 9600:   break;
+         case 19200:  break;
+         case 38400:  break;
+         case 57600:  break;
+//       case 76800:  break;
+         case 115200: break;
+    default: baud=0;
+  }
+ return baud;
+}
 
 void scc_hardware_reset_port(unsigned int port)
 {
@@ -302,12 +371,80 @@ void scc_channel_reset_port(unsigned int port)
 }
 
 
-void initialize_scc(void)
+extern char read_serial_port_terminal(int port);
+extern void write_serial_port_terminal(int port, uint8 data);
+
+void read_port_if_ready_nothing(unsigned int port) { return; }
+
+void rx_char_available(int port) {RX_CHAR_AVAILABLE(port);}
+
+void read_port_if_ready_pty(unsigned int port)
+{ 
+    int data=read_serial_port_pty(port);
+    if (data>-1) {
+              //ALERT_LOG(0,"---vvv---------------------------------------------------------------------------------------------------------------");
+              //fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
+              fliflo_buff_add(&SCC_READ[port],(uint8)(data) & scc_bits_per_char_mask[port]);
+              RX_CHAR_AVAILABLE(port);
+              DEBUG_LOG(0,"Received 0x%02x (%d) %c from scc port:%d (mask:%02x) serial_b fliflo size is:%d",
+                            (uint8)(data),data,
+                            ((data >31) ? ((uint8)(data)):'.'),
+                            port, scc_bits_per_char_mask[0],
+                            fliflo_buff_size(&SCC_READ[0]));
+              //fliflo_dump(stderr,&SCC_READ[0],"AFTER buff_add to queue");
+              //ALERT_LOG(0,"----^^^-------------------------------------------------------------------------------------------------------------");
+    }
+}
+
+void read_port_if_ready_terminal(unsigned int port) {
+         if  (fliflo_buff_has_data(&SCC_READ[port])) RX_CHAR_AVAILABLE(port);
+}
+
+void read_port_if_ready_tty(unsigned int port)
+{ 
+    int data=read_serial_port_tty(port);
+    if (data>-1) {
+              fliflo_buff_add(&SCC_READ[port],(uint8)(data) & scc_bits_per_char_mask[port]);
+              RX_CHAR_AVAILABLE(port);
+              ALERT_LOG(0,"Received 0x%02x (%d) %c from scc port:%d (mask:%02x) serial_b fliflo size is:%d",
+                            (uint8)(data),data,
+                            ((data >31) ? ((uint8)(data)):'.'),
+                            port, scc_bits_per_char_mask[0],
+                            fliflo_buff_size(&SCC_READ[0]));
+              ALERT_LOG(0,"----^^^-------------------------------------------------------------------------------------------------------------");
+    }
+}
+
+
+
+void read_port_if_ready_telnetd(unsigned int port)
+{
+    int data=poll_telnet_serial_read(port);
+    if (data>-1) { fliflo_buff_add(&SCC_READ[port],(uint8)(data) & scc_bits_per_char_mask[port]);
+              RX_CHAR_AVAILABLE(port);
+              DEBUG_LOG(0,"Received %02x %c from scc port:%d (mask:%02x) serial fliflo size is:%d",
+                            (uint8)(data), 
+                            ((data >31) ? ((uint8)(data)):'.'), 
+                            port, scc_bits_per_char_mask[0],
+                            fliflo_buff_size(&SCC_READ[0]));
+              //fliflo_dump(stderr,&SCC_READ[0],"added to queue");
+              //ALERT_LOG(0,"-----------------------------------------------");
+    }
+}
+
+// can't allow actual scc connection to a live device such as pty which might send output
+// as that will cause BOOT ROM error 56 for the I/O card as input comes in, so we need to
+// do it twice. (Not necessary for to ROMless boot though)
+void initialize_scc(int actual)
 {
   int i;
 
+
   if ( !scc_fifos_allocated )
   {
+    xoffflag[0]=0; xoffflag[1]=0;
+    //xonenabled[0]=0; xonenabled[1]=0;
+
     DEBUG_LOG(0,"Allocating FIFO's");
     if (fliflo_buff_create(&SCC_READ[0] ,SCC_BUFFER_SIZE)) {EXIT(404,0,"Out of memory!");}
     if (fliflo_buff_create(&SCC_WRITE[0],SCC_BUFFER_SIZE)) {EXIT(405,0,"Out of memory!");}
@@ -316,127 +453,110 @@ void initialize_scc(void)
     scc_fifos_allocated=1;
 
     for (i=0; i<18; i++) {scc_w[0].w[i]=0;scc_w[1].w[i]=0;scc_r[0].r[i]=0;scc_r[0].r[i]=0;}
+
+    sentbytes[0]=0;sentbytes_start[0]=cpu68k_clocks;
+    sentbytes[1]=0;sentbytes_start[1]=cpu68k_clocks;
+  
+    // set handlers to default methods
+    scc_fn[0].set_dtr                  = set_dtr;                       //   void (*set_dtr)(unsigned int port, uint8 value);
+    scc_fn[0].send_break               = send_break;                    //   void (*send_break)(unsigned int port);
+    scc_fn[0].set_rts                  = set_rts;                       //   void (*set_rts)(unsigned int port, uint8 value);
+    scc_fn[0].get_dcd                  = get_dcd;                       //   int  (*get_dcd)(unsigned int port);
+    scc_fn[0].get_cts                  = get_cts;                       //   int  (*get_cts)(unsigned int port);
+    scc_fn[0].get_break                = get_break;                     //   int  (*get_break)(unsigned int port);
+    scc_fn[0].signal_parity_error      = signal_parity_error;           //   void (*signal_parity_error)(unsigned int port);
+    scc_fn[0].signal_crc_error         = signal_crc_error;              //   void (*signal_crc_error)(unsigned int port);
+    scc_fn[0].set_even_parity          = set_even_parity;               //   void (*set_even_parity)(unsigned int port);
+    scc_fn[0].set_odd_parity           = set_odd_parity;                //   void (*set_odd_parity)(unsigned int port);
+    scc_fn[0].set_no_parity            = set_no_parity;                 //   void (*set_no_parity)(unsigned int port);
+    scc_fn[0].set_bits_per_char        = set_bits_per_char;             //   void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
+    scc_fn[0].set_stop_bits            = set_stop_bits;                 //   void (*set_stop_bits)(unsigned int port,uint8 stopbits);
+    scc_fn[0].read_serial_port         = read_serial_port;              //   char (*read_serial_port)(unsigned int port);
+    scc_fn[0].read_port_if_ready       = read_port_if_ready_nothing;
+    scc_fn[0].write_serial_port        = write_serial_port;             //   void (*write_serial_port)(unsigned int port, char data);
+    scc_fn[0].scc_hardware_reset_port  = scc_hardware_reset_port;       //   void (*scc_hardware_reset_port)(unsigned int port);
+    scc_fn[0].scc_channel_reset_port   = scc_channel_reset_port;        //   void (*scc_channel_reset_port)(unsigned int port);
+    scc_fn[0].set_baud_rate            = set_baud_rate;
+  
+    scc_fn[1].send_break               = send_break;
+    scc_fn[1].set_dtr                  = set_dtr;
+    scc_fn[1].set_rts                  = set_rts;
+    scc_fn[1].get_dcd                  = get_dcd;
+    scc_fn[1].get_cts                  = get_cts;
+    scc_fn[1].get_break                = get_break;
+    scc_fn[1].signal_parity_error      = signal_parity_error;
+    scc_fn[1].signal_crc_error         = signal_crc_error;
+    scc_fn[1].set_even_parity          = set_even_parity;
+    scc_fn[1].set_odd_parity           = set_odd_parity;
+    scc_fn[1].set_no_parity            = set_no_parity;
+    scc_fn[1].set_bits_per_char        = set_bits_per_char;
+    scc_fn[1].set_stop_bits            = set_stop_bits;
+    scc_fn[1].read_serial_port         = read_serial_port;
+    scc_fn[1].read_port_if_ready       = read_port_if_ready_nothing;
+    scc_fn[1].write_serial_port        = write_serial_port;
+    scc_fn[1].scc_hardware_reset_port  = scc_hardware_reset_port;
+    scc_fn[1].scc_channel_reset_port   = scc_channel_reset_port;
+    scc_fn[1].set_baud_rate            = set_baud_rate;
+  
+    scc_fn[0].scc_hardware_reset_port(0);
+    scc_fn[1].scc_hardware_reset_port(1);
+
+    irq_on_next_rx_char[0]=0; irq_on_next_rx_char[1]=0; scc_interrupts_enabled=0; scc_bits_per_char_mask[0]=255; 
+    scc_bits_per_char_mask[1]=255;
   }
 
-  // set handlers to default methods
-  scc_fn[0].set_dtr                  = set_dtr;                       //   void (*set_dtr)(unsigned int port, uint8 value);
-  scc_fn[0].send_break               = send_break;                    //   void (*send_break)(unsigned int port);
-  scc_fn[0].set_rts                  = set_rts;                       //   void (*set_rts)(unsigned int port, uint8 value);
-  scc_fn[0].get_dcd                  = get_dcd;                       //   int  (*get_dcd)(unsigned int port);
-  scc_fn[0].get_cts                  = get_cts;                       //   int  (*get_cts)(unsigned int port);
-  scc_fn[0].get_break                = get_break;                     //   int  (*get_break)(unsigned int port);
-  scc_fn[0].signal_parity_error      = signal_parity_error;           //   void (*signal_parity_error)(unsigned int port);
-  scc_fn[0].signal_crc_error         = signal_crc_error;              //   void (*signal_crc_error)(unsigned int port);
-  scc_fn[0].set_even_parity          = set_even_parity;               //   void (*set_even_parity)(unsigned int port);
-  scc_fn[0].set_odd_parity           = set_odd_parity;                //   void (*set_odd_parity)(unsigned int port);
-  scc_fn[0].set_no_parity            = set_no_parity;                 //   void (*set_no_parity)(unsigned int port);
-  scc_fn[0].set_bits_per_char        = set_bits_per_char;             //   void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
-  scc_fn[0].set_stop_bits            = set_stop_bits;                 //   void (*set_stop_bits)(unsigned int port,uint8 stopbits);
-  scc_fn[0].read_serial_port         = read_serial_port;              //   char (*read_serial_port)(unsigned int port);
-  scc_fn[0].write_serial_port        = write_serial_port;             //   void (*write_serial_port)(unsigned int port, char data);
-  scc_fn[0].scc_hardware_reset_port  = scc_hardware_reset_port;       //   void (*scc_hardware_reset_port)(unsigned int port);
-  scc_fn[0].scc_channel_reset_port   = scc_channel_reset_port;        //   void (*scc_channel_reset_port)(unsigned int port);
-  scc_fn[0].set_baud_rate            = set_baud_rate;
+  int port, portkind[2];
+  portkind[1]=actual ? serial_a : SCC_NOTHING;
+  portkind[0]=actual ? serial_b : SCC_NOTHING;
 
+  ALERT_LOG(0,"actual: %d",actual);
+  ALERT_LOG(0,"serial a: %d",portkind[1]);
+  ALERT_LOG(0,"serial b: %d",portkind[0]);
 
+  for (port=0; port<2; port++)
+      switch (portkind[port])
+      {
+      case SCC_LOCALPORT:     scc_fn[port].read_serial_port=read_serial_port_localport;
+                              scc_fn[port].write_serial_port=write_serial_port_localport;    break;
+      case SCC_IMAGEWRITER_PS:
+      case SCC_IMAGEWRITER_PCL:
+      case SCC_IMAGEWRITER:   scc_fn[port].read_serial_port=read_serial_port_imagewriter;
+                              scc_fn[port].write_serial_port=write_serial_port_imagewriter;  break;
+      case SCC_LOOPBACKPLUG:  scc_fn[port].read_serial_port=read_serial_port_loopbackplug;
+                              scc_fn[port].write_serial_port=write_serial_port_loopbackplug;
+                              scc_fn[port].set_dtr=set_dtr_loopbackplug;
+                              scc_fn[port].set_rts=set_rts_loopbackplug;                     break;
+      #ifndef __MSVCRT__
+      case SCC_TELNETD:       scc_fn[port].read_serial_port=read_serial_port_telnetd;
+                              scc_fn[port].write_serial_port=write_serial_port_telnetd;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_telnetd;
+                              break;
 
+      case SCC_PTY:           scc_fn[port].read_serial_port=read_serial_port_pty;
+                              scc_fn[port].write_serial_port=write_serial_port_pty;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_pty;
+                              break;
 
-  scc_fn[1].send_break               = send_break;
-  scc_fn[1].set_dtr                  = set_dtr;
-  scc_fn[1].set_rts                  = set_rts;
-  scc_fn[1].get_dcd                  = get_dcd;
-  scc_fn[1].get_cts                  = get_cts;
-  scc_fn[1].get_break                = get_break;
-  scc_fn[1].signal_parity_error      = signal_parity_error;
-  scc_fn[1].signal_crc_error         = signal_crc_error;
-  scc_fn[1].set_even_parity          = set_even_parity;
-  scc_fn[1].set_odd_parity           = set_odd_parity;
-  scc_fn[1].set_no_parity            = set_no_parity;
-  scc_fn[1].set_bits_per_char        = set_bits_per_char;
-  scc_fn[1].set_stop_bits            = set_stop_bits;
-  scc_fn[1].read_serial_port         = read_serial_port;
-  scc_fn[1].write_serial_port        = write_serial_port;
-  scc_fn[1].scc_hardware_reset_port  = scc_hardware_reset_port;
-  scc_fn[1].scc_channel_reset_port   = scc_channel_reset_port;
-  scc_fn[1].set_baud_rate            = set_baud_rate;
+      case SCC_TTY:           scc_fn[port].read_serial_port=read_serial_port_tty;
+                              scc_fn[port].write_serial_port=write_serial_port_tty;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_tty;
+                              scc_fn[port].set_baud_rate=set_port_baud_tty;
+                              break;
+      case SCC_TERMINAL:      scc_fn[port].read_serial_port=read_serial_port_terminal;
+                              scc_fn[port].write_serial_port=write_serial_port_terminal;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_terminal;
+                              break;
 
-  scc_fn[0].scc_hardware_reset_port(0);
-  scc_fn[1].scc_hardware_reset_port(1);
-
-  irq_on_next_rx_char[0]=0;
-  irq_on_next_rx_char[1]=0;
-  scc_interrupts_enabled=0;
-  scc_bits_per_char_mask[0]=255;
-  scc_bits_per_char_mask[1]=255;
-
-
-
-  switch (serial_a)
-  {
-  case SCC_LOCALPORT:     scc_fn[1].read_serial_port=read_serial_port_localport;
-                          scc_fn[1].write_serial_port=write_serial_port_localport;    break;
-
-  case SCC_IMAGEWRITER_PS:
-  case SCC_IMAGEWRITER_PCL:
-  case SCC_IMAGEWRITER:   scc_fn[1].read_serial_port=read_serial_port_imagewriter;
-                          scc_fn[1].write_serial_port=write_serial_port_imagewriter;  break;
-
-  case SCC_LOOPBACKPLUG:  scc_fn[1].read_serial_port=read_serial_port_loopbackplug;
-                          scc_fn[1].write_serial_port=write_serial_port_loopbackplug;
-                          scc_fn[1].set_dtr=set_dtr_loopbackplug;
-                          scc_fn[1].set_rts=set_rts_loopbackplug;                     break;
-
-#ifndef __MSVCRT__
-
-  case SCC_TELNETD:       scc_fn[1].read_serial_port=read_serial_port_telnetd;
-                          scc_fn[1].write_serial_port=write_serial_port_telnetd;
-                          break;
-#else
-  case SCC_TELNETD:      //ALERT_LOG(0,"TELNETD does not work on Win32");
-#endif
-
-  default:
-                         // ALERT_LOG(0,"Not sure what to connect to this port");
-  case SCC_NOTHING:
-                          scc_fn[1].read_serial_port=read_serial_port_nothing;
-                          scc_fn[1].write_serial_port=write_serial_port_nothing;
-                          break;
-  }
-
-  switch (serial_b)
-  {
-  case SCC_LOCALPORT:     scc_fn[0].read_serial_port=read_serial_port_localport;
-                          scc_fn[0].write_serial_port=write_serial_port_localport;    break;
-
-
-  case SCC_IMAGEWRITER_PS:
-  case SCC_IMAGEWRITER_PCL:
-  case SCC_IMAGEWRITER:   scc_fn[0].read_serial_port=read_serial_port_imagewriter;
-                          scc_fn[0].write_serial_port=write_serial_port_imagewriter;  break;
-
-  case SCC_LOOPBACKPLUG:  scc_fn[0].read_serial_port=read_serial_port_loopbackplug;
-                          scc_fn[0].write_serial_port=write_serial_port_loopbackplug;
-                          scc_fn[0].set_dtr=set_dtr_loopbackplug;
-                          scc_fn[0].set_rts=set_rts_loopbackplug;                     break;
-
-#ifndef __MSVCRT__
-
-  case SCC_TELNETD:       scc_fn[0].read_serial_port=read_serial_port_telnetd;
-                          scc_fn[0].write_serial_port=write_serial_port_telnetd;    break;
-#else
-  case SCC_TELNETD:       //ALERT_LOG(0,"TELNETD does not work on Win32");
-#endif
-  default:
-                          //ALERT_LOG(0,"oops, not sure what to connect the SCC to.");
-
-  case SCC_NOTHING:
-                          scc_fn[0].read_serial_port=read_serial_port_nothing;
-                          scc_fn[0].write_serial_port=write_serial_port_nothing;    break;
-  }
-
-
-
-
+      #else
+                              // fallthrough to default for unsupported on windows
+      #endif
+      default:                // fallthrough, includes SCC_NOTHING.
+                              // ALERT_LOG(0,"Not sure what to connect to this port");
+                              scc_fn[port].read_serial_port=read_serial_port_nothing;
+                              scc_fn[port].write_serial_port=write_serial_port_nothing;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_nothing;
+                              break;
+      }
 
   DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
 }
@@ -449,14 +569,11 @@ void scc_control_loop(void)
      // if ( !port) scc_r[port].r[3]=0;
      // IRQ pending.  These must be set by loop IRQ routine!
     scc_running=1;
-    if ( fliflo_buff_has_data(&SCC_READ[0]) || fliflo_buff_has_data(&SCC_READ[1]))  scc_running=2;
+    if ( HAS_DATA(0) || HAS_DATA(1) )  scc_running=2;
     if ( fliflo_buff_is_full(&SCC_READ[0])  || fliflo_buff_is_full(&SCC_READ[1]))  scc_running=3;
 
     DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
-
     // need to insert code in here that allows other fn's to handle their respective devices - i.e. read from ports, and fill buffers, etc.
-
-
 }
 
 
@@ -467,23 +584,24 @@ void dump_scc(void)
  int i;
 
   if (!debug_log_enabled) return;
+  if (!buglog) buglog=stdout;
 
- fprintf(buglog,"\n\nSRC: scc read b: "); for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_r[0].r[i]);
- fprintf(buglog,"SCR: scc write b:");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_w[0].w[i]);
- fprintf(buglog,"\n");
- fprintf(buglog,"SRC: scc read a: ");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_r[1].r[i]);
- fprintf(buglog,"SRC: scc write a:");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_w[1].w[i]);
- fprintf(buglog,"\n");
- fprintf(buglog,"SRC: size of port b rx queue:%d, port a:%d\n",fliflo_buff_size(&SCC_READ[0]), fliflo_buff_size(&SCC_READ[1]));
- fprintf(buglog,"SRC: size of port b tx queue:%d, port a:%d\n",fliflo_buff_size(&SCC_WRITE[0]),fliflo_buff_size(&SCC_WRITE[1]));
- fprintf(buglog,"SRC: port b rx data available:%d , port a:%d\n",scc_r[0].s.rr0.r.rx_char_available,scc_r[1].s.rr0.r.rx_char_available);
- fprintf(buglog,"SRC: internalloopback port b:%d port a:%d\n",scc_w[0].s.wr14.r.localloopback,scc_w[1].s.wr14.r.localloopback);
- fprintf(buglog,"SRC: autoecho port b:%d port a:%d\n",scc_w[0].s.wr14.r.auto_echo,scc_w[1].s.wr14.r.auto_echo);
+  fprintf(buglog,"\n\nSRC: scc read b: "); for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_r[0].r[i]);
+  fprintf(buglog,"SCR: scc write b:");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_w[0].w[i]);
+  fprintf(buglog,"\n");
+  fprintf(buglog,"SRC: scc read a: ");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_r[1].r[i]);
+  fprintf(buglog,"SRC: scc write a:");     for (i=0; i<16; i++)  fprintf(buglog,"%d:%02x ",i,scc_w[1].w[i]);
+  fprintf(buglog,"\n");
+  fprintf(buglog,"SRC: size of port b rx queue:%d, port a:%d\n",fliflo_buff_size(&SCC_READ[0]), fliflo_buff_size(&SCC_READ[1]));
+  fprintf(buglog,"SRC: size of port b tx queue:%d, port a:%d\n",fliflo_buff_size(&SCC_WRITE[0]),fliflo_buff_size(&SCC_WRITE[1]));
+  fprintf(buglog,"SRC: port b rx data available:%d , port a:%d\n",scc_r[0].s.rr0.r.rx_char_available,scc_r[1].s.rr0.r.rx_char_available);
+  fprintf(buglog,"SRC: internalloopback port b:%d port a:%d\n",scc_w[0].s.wr14.r.localloopback,scc_w[1].s.wr14.r.localloopback);
+  fprintf(buglog,"SRC: autoecho port b:%d port a:%d\n",scc_w[0].s.wr14.r.auto_echo,scc_w[1].s.wr14.r.auto_echo);
 
- DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
+  DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
 
 
- DEBUG_LOG(0,"RR5[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d",
+ DEBUG_LOG(0,"RR0[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d xonenabled:%d xoffflag:%d fliflo_hasdata:%d",
             0,
             scc_r[0].s.rr0.r.rx_char_available,
             scc_r[0].s.rr0.r.tx_buffer_empty,
@@ -492,9 +610,10 @@ void dump_scc(void)
             scc_r[0].s.rr0.r.break_abort,
             scc_r[0].s.rr0.r.sync_hunt,
             scc_r[0].s.rr0.r.tx_underrun_eom,
-            scc_r[0].s.rr0.r.zero_count);
+            scc_r[0].s.rr0.r.zero_count,
+            xonenabled[0],xoffflag[0],fliflo_buff_has_data(&SCC_READ[0]) );
 
- DEBUG_LOG(0,"RR5[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d\n\n",
+ DEBUG_LOG(0,"RR0[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d  xonenabled:%d xoffflag:%d fliflo_hasdata:%d\n\n",
             1,
             scc_r[1].s.rr0.r.rx_char_available,
             scc_r[1].s.rr0.r.tx_buffer_empty,
@@ -503,7 +622,9 @@ void dump_scc(void)
             scc_r[1].s.rr0.r.break_abort,
             scc_r[1].s.rr0.r.sync_hunt,
             scc_r[1].s.rr0.r.tx_underrun_eom,
-            scc_r[1].s.rr0.r.zero_count);
+            scc_r[1].s.rr0.r.zero_count,
+            xonenabled[1],xoffflag[1],fliflo_buff_has_data(&SCC_READ[1]) );
+
 }
 #else
 void dump_scc(void) {}
@@ -584,6 +705,7 @@ uint32 get_baud_rate(unsigned int port)
                               scc_fn[port].set_baud_rate(port,baud); }  // yup, use it's method
 
                 lastbaud[port]=baud;
+
                 break;
    default:
                 DEBUG_LOG(0,"Weird Baud Rate:%d requested by Lisa or buggy code in emulation",baud);
@@ -637,7 +759,7 @@ static inline uint8 z8530_find_highest_ius(uint8 value, int clear_value)
 static inline void on_read_irq_handle(int port)
 {
   // if Master IRQ Enable is off, nothing to do
-  if (!scc_w[port].s.wr9.r.MIE) return;
+  if (!scc_w[0].s.wr9.r.MIE) return;
 
   switch(scc_w[port].s.wr1.r.rxintmode)
   {   case 1 : scc_w[port].s.wr1.r.rxintmode=0;                            // clear mode, then 
@@ -659,65 +781,77 @@ static inline void on_special_irq_handle(int port)
       case 3 : if (!port) scc_r[1].s.rr3.r.ch_b_ext_status_irq_pending=1;  // set IRQ for the port
                else       scc_r[1].s.rr3.r.ch_a_ext_status_irq_pending=1;
   }
+
+   scc_r[1].s.rr0.r.rx_char_available=HAS_DATA(1);
+   scc_r[0].s.rr0.r.rx_char_available=HAS_DATA(0);
+}
+
+extern void connect_serial_devices(void);
+
+
+static int lastpc24test=-1;
+static inline void avoid_rom_scc_tests(void)
+{
+   int test=((pc24 & 0x00ff0000)==0x00fe0000) && context==1;
+
+    scc_r[1].s.rr0.r.rx_char_available=HAS_DATA(1);
+    scc_r[0].s.rr0.r.rx_char_available=HAS_DATA(0);
+
+    if (test!=lastpc24test) ALERT_LOG(0,"test:%d last:%d",test,lastpc24test);
+
+    if (lastpc24test!=test) {
+       if ( (pc24 & 0x00ff0000)==0x00fe0000) { ALERT_LOG(0,"disconnecting for ROM test"); initialize_scc(0);                            } // reconnect fn's to nothing
+       else {                                  ALERT_LOG(0,"Connecting to backend port"); connect_serial_devices(); initialize_scc(1);  } // reconnect to actual ports
+    }
+
+    lastpc24test=test;
 }
 
 
-
-int poll_telnet_serial_read(int portnum);
+// want to set scc_r[port].s.rr0.r.rx_char_available=HAS_DATA, scc_r[port].s.rr0.r.tx_buffer_empty=1, scc_r[port].s.rr0.r.dcd=1, scc_r[port].s.rr0.r.cts=1
 
 
 int get_scc_pending_irq(void)
 {
     int data;
 
-    if (!scc_w[1].s.wr9.r.MIE) {DEBUG_LOG(0,"MIE is off"); return 0;}  // Master IRQ Enable bit - if not set, no IRQ's to return.
+    if (!scc_w[0].s.wr9.r.MIE) {DEBUG_LOG(0,"MIE is off"); return 0;}  // Master IRQ Enable bit - if not set, no IRQ's to return.
+    // prevent sending too many bytes in one shot for LisaTerminal
+    if  (running_lisa_os == LISA_OFFICE_RUNNING) {
+        // LisaTerminal or perhaps LOS drops bytes if more than 64 are sent in a single chunk. Keep track so we can slow it down.
+        // another issue is that any ANSI/vt100 seq it receives that it doesn't recognize causes it to abort all output until the next
+        // line or something like that.
+        //if (IMSK!=6) {sentbytes[0]=0; sentbytes[1]=0; sentbytes_start[0]=cpu68k_clocks; sentbytes_start[1]=cpu68k_clocks;}
 
-#ifndef __MSVCRT__
-    if (serial_b==SCC_TELNETD)
-     { data=poll_telnet_serial_read(0);
-       if (data>-1) { fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
-                      RX_CHAR_AVAILABLE(0);
+        #define CHARSLIM 16
+        #define CLKCYLIM 9500
 
-                      ALERT_LOG(0,"Received %02x %c from scc port:%d serial_b fliflo size is:%d",
-                                    (uint8)(data),
-                                    ((data >31) ? ((uint8)(data)):'.'),
-                                    0,
-                                    fliflo_buff_size(&SCC_READ[0]));
-                    }
-     }
+        if (sentbytes[0]>CHARSLIM || sentbytes[1]>CHARSLIM) { // 12,15000 from seq 100 200 we get upto 111 + 2 bytes before it cuts off so 43 bytes (with nl's)
+            // if we still lose bytes, change this threshhold of 1500 , or lower number of bytes
+            if (cpu68k_clocks-sentbytes_start[0]<CLKCYLIM || cpu68k_clocks-sentbytes_start[1]<CLKCYLIM ) 
+              { ALERT_LOG(0,"\n\nlimiting scc input"); return 0;}
+          ALERT_LOG(0,"\n\nresuming scc input");
+          sentbytes[0]=0; sentbytes[1]=0;
+        }
+    } else {sentbytes[0]=0; sentbytes[1]=0;}
 
-    if (serial_a==SCC_TELNETD)
-     {
-       data=poll_telnet_serial_read(1);
-       if (data>-1) {
-                      fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
-                      RX_CHAR_AVAILABLE(1);
+    if (sentbytes[0]<CHARSLIM) {scc_fn[0].read_port_if_ready(0);}
+    if (sentbytes[1]<CHARSLIM) {scc_fn[1].read_port_if_ready(1);}
 
-                      ALERT_LOG(0,"Received %02x %c from scc port:%d serial_a fliflo size is:%d",
-                                    (uint8)(data),
-                                    ((data >31) ? ((uint8)(data)):'.'),
-                                    1,
-                                    fliflo_buff_size(&SCC_READ[1])
-                                    );
-
-                    }
-     }
-#endif
                                              // if IRQ on next char is enabled and the fliflo has data, flag IRQ
-    if ( (irq_on_next_rx_char[0] && fliflo_buff_has_data(&SCC_READ[0])) ||
-            ((scc_w[0].s.wr1.r.rxintmode) && fliflo_buff_has_data(&SCC_READ[0] ))     )
+    if ( (irq_on_next_rx_char[0] && HAS_DATA(0) && sentbytes[0]<CHARSLIM  ) ||
+            ((scc_w[0].s.wr1.r.rxintmode) && HAS_DATA(0) )     )
             {
                 DEBUG_LOG(0,"chb has data");
                 on_read_irq_handle(0);
                 scc_r[1].s.rr3.r.ch_b_ext_status_irq_pending=1;
                 RX_CHAR_AVAILABLE(0);
-
             }
     else        scc_r[1].s.rr3.r.ch_b_ext_status_irq_pending=0;        //20051111
 
-    if ( (irq_on_next_rx_char[1] && fliflo_buff_has_data(&SCC_READ[1])) ||
-          ((scc_w[1].s.wr1.r.rxintmode) && fliflo_buff_has_data(&SCC_READ[1] ))     )
-            {
+    if ( (irq_on_next_rx_char[1] && HAS_DATA(1) && sentbytes[1]<CHARSLIM ) ||
+          ((scc_w[1].s.wr1.r.rxintmode) && HAS_DATA(1) )      )
+                      {
                 DEBUG_LOG(0,"cha has data");
                 on_read_irq_handle(1);
                 scc_r[1].s.rr3.r.ch_a_ext_status_irq_pending=1;
@@ -727,13 +861,10 @@ int get_scc_pending_irq(void)
 
 
     // if there's no more data, don't trigger an IRQ for it.
-    if (!fliflo_buff_has_data(&SCC_READ[0]) && z8530_last_irq_status_bits==4 ) {z8530_last_irq_status_bits=0; scc_r[1].s.rr3.r.ch_b_rx_irq_pending=0;}
-    if (!fliflo_buff_has_data(&SCC_READ[1]) && z8530_last_irq_status_bits==12) {z8530_last_irq_status_bits=0; scc_r[1].s.rr3.r.ch_a_rx_irq_pending=0;}
-
-
+    if (!HAS_DATA(0) && z8530_last_irq_status_bits==4 ) {z8530_last_irq_status_bits=0; scc_r[1].s.rr3.r.ch_b_rx_irq_pending=0;}
+    if (!HAS_DATA(1) && z8530_last_irq_status_bits==64) {z8530_last_irq_status_bits=0; scc_r[1].s.rr3.r.ch_a_rx_irq_pending=0;}
 
     DEBUG_LOG(0,"Returning: %d or %d",(scc_r[1].r[3]) , z8530_last_irq_status_bits );
-
 
     return (scc_r[1].r[3]) || z8530_last_irq_status_bits;       // if zero, no irq, else irq
 }
@@ -745,8 +876,24 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
 {
    uint8 access, port=0, odata, regnum=0; //d,
 
+   avoid_rom_scc_tests();
+
+   DEBUG_LOG(0,"write %02x to %08x",data,address);
+   switch ((address & 0x000007) | 0x00FCD240)
+   {
+        case  SERIAL_PORT_B_CONTROL: access=0; port=0; DEBUG_LOG(0,"SCC PORT B CONTROL"); break;
+        case  SERIAL_PORT_B_DATA   : access=1; port=0; DEBUG_LOG(0,"SCC PORT B DATA");    break;
+        case  SERIAL_PORT_A_CONTROL: access=0; port=1; DEBUG_LOG(0,"SCC PORT A CONTROL"); break;
+        case  SERIAL_PORT_A_DATA:    access=1; port=1; DEBUG_LOG(0,"SCC PORT A DATA");    break;
+        default: ALERT_LOG(0,"Warning invalid access! %08x",address);
+        return;                   // invalid address, just ignore it.
+    }
+
    #ifdef DEBUG
    char *multiplier;
+   DEBUG_LOG(0,"---------------------------------------------------------------------------------------------------------------------");
+   dump_scc();
+
    switch(scc_w[port].s.wr4.r.clockmultipliermode)
    {  case 0 :   multiplier= "1"; break;
       case 1 :   multiplier="16"; break;
@@ -754,65 +901,57 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
       case 3 :   multiplier="64"; break;
       default:   multiplier="unknown";
    }
-
    DEBUG_LOG(0,"TC:%d, Baud:%ld %d bps %s parity Clock Multiplier:%s",(scc_w[port].w[12]+(scc_w[port].w[13]<<8)),get_baud_rate(port) ,
         (5+scc_w[port].s.wr3.r.rxbitsperchar),
         (( scc_w[port].s.wr4.r.parityenable) ? ((scc_w[port].s.wr4.r.evenparity) ? "Even":"Odd")   :  "No"),
         multiplier);
+   DEBUG_LOG(0,"---------------------------------------------------------------------------------------------------------------------");
    #endif
-
-   dump_scc();
-
-
-   switch ((address & 0x000007) | 0x00FCD240)
-   {
-        case  SERIAL_PORT_B_CONTROL: access=0; port=0; break;
-        case  SERIAL_PORT_B_DATA   : access=1; port=0; break;
-        case  SERIAL_PORT_A_CONTROL: access=0; port=1; break;
-        case  SERIAL_PORT_A_DATA:    access=1; port=1; break;
-        default: DEBUG_LOG(0,"Warning invalid access! %08x :=%02x",address,data);
-                 return;                   // invalid address, just ignore it.
-   }
-
-   DEBUG_LOG(0,"SRC:SCC: access:%d port %d",access,port);
 
    if ( access)                     // Write to data port.
       {
-        if (scc_w[1].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
+        if (scc_w[0].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
         DEBUG_LOG(0,"SRC:SCC: access:%d port %d",access,port);
-        if (!scc_w[port].s.wr5.r.txenable) {DEBUG_LOG(0,"TX not enabled!");       return;}         // can't send until tx is enabled.
-
+        if (!scc_w[port].s.wr5.r.txenable)        {DEBUG_LOG(0,"TX not enabled!");       return;}         // can't send until tx is enabled.
 
         if ( scc_w[port].s.wr14.r.localloopback)  {DEBUG_LOG(0,"loopback data: %02x",data & scc_bits_per_char_mask[port]);
                                                    DEBUG_LOG(0,"SCC_READ[port] is %p",&SCC_READ[port]);
                                                    DEBUG_LOG(0,"scc_bits_char_mask is:%02x",scc_bits_per_char_mask[port]);
-                                                   DEBUG_LOG(0,"pointer for add is: %p",fliflo_buff_add);
-                                                   DEBUG_LOG(0,"pointer for is full: %p",fliflo_buff_is_full);
-                                                   DEBUG_LOG(0,"pointer for get is: %p",fliflo_buff_get);
-
-                                                   fliflo_buff_add(&SCC_READ[port],data & scc_bits_per_char_mask[port]);}  // loopback? add the data to port's own receive buffer instead.
+                                                   // if loopback is true, add the data to port's own receive buffer instead.
+                                                   fliflo_buff_add(&SCC_READ[port],data & scc_bits_per_char_mask[port]);} 
         else // real writes - with option auto_echo
         {
-          TX_BUFF_EMPTY(port);
+          TX_BUFF_EMPTY(port);  // pretend infinite speed output, well at least don't tell the Lisa that output buffer is full.
 
           if (z8530_event==-1)  z8530_event=cpu68k_clocks+Z8530_XMIT_DELAY;
 
+          // if we received XON/XOFF, flag it for future use, but fall through to send the handshake char to the other end of the prot as well
+          if (xonenabled[port] && data==19) { ALERT_LOG(0,"XOFF ^S  received port %d (pause) \n",port); xoffflag[port]=1; TX_BUFF_EMPTY(port);}
+          if (xonenabled[port] && data==17) { ALERT_LOG(0,"XON  ^Q  received port %d (resume)\n",port); xoffflag[port]=0; if (HAS_DATA(port)) RX_CHAR_AVAILABLE(port); }
 
           if ( scc_w[port].s.wr14.r.auto_echo)    {DEBUG_LOG(0,"autoecho is on");  fliflo_buff_add(&SCC_READ[port],data & scc_bits_per_char_mask[port]);}  // copy to receive buffer too, as in loopback
 
-          if (scc_fn[port].write_serial_port )    {DEBUG_LOG(0,"write to write_serial_port_method byte:%02x",data);
+          // if there's an attach function/method, call it.
+          if (scc_fn[port].write_serial_port )    {ALERT_LOG(0,"write to write_serial_port_method byte:0x%02x (%d) XON-enabled?:%d xoff:%d",data,data,xonenabled[port],xoffflag[port]);
                                                    scc_fn[port].write_serial_port(port,data);
                                                    TX_BUFF_EMPTY(port);
 
+                                                   #ifdef DEBUG
+                                                   if (scc_fn[port].write_serial_port==write_serial_port_pty) ALERT_LOG(0,"sent to pty");
+                                                   if (scc_fn[port].write_serial_port==write_serial_port_nothing) ALERT_LOG(0,"sent to NOTHING!");
+                                                   #endif
                                                    }
-          else                                    {DEBUG_LOG(0,"write method is null, calling generic handler to write %02x",data);
+          else                                    {ALERT_LOG(0,"write method is null, calling generic handler to write %02x",data);
                                                    write_serial_port(port,data);
                                                    TX_BUFF_EMPTY(port);
                                                   }
         }
 
+        #ifdef DEBUG
         DEBUG_LOG(0,"SRC:SCC Write to port %d data %02x adjusted for bits/char:%02x",port,data,data & scc_bits_per_char_mask[port]);
         dump_scc();
+        #endif
+
         return;
       }
 
@@ -887,9 +1026,6 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
                        scc_r[1].r[3]=0; // z8530_find_highest_ius(scc_r[1].r[3], 1) & 63;         // the 2nd param tells  the fn to clear it
                        scc_r[0].r[2]=0;
                        z8530_last_irq_status_bits=0;
-
-
-
                        scc_w[port].s.wr0.r.cmd=0;  // clear command for next cycle (except for previous highpoint)
                        break;
               }
@@ -915,7 +1051,7 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
               DEBUG_LOG(0,"IRQ enabled is:%d",scc_interrupts_enabled);
               break;
 
-     case  2: DEBUG_LOG(0,"Storing %02x (irq vector bits) in register w2 %02x=odata",data,odata);
+     case  2: DEBUG_LOG(0,"Storing %02x (irq vector bits) in register w2 %02x=odata",data,odata);  // there is only one wr2 so shadow it
 
               scc_w[0   ].w[2] = data;   // interrupt vector bits  - there is only one port 2
               scc_w[1   ].w[2] = data;   // what does this actually do? enable the IRQ's????????????? is it an AND mask?
@@ -1002,14 +1138,9 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
               break;
 
      case  9: DEBUG_LOG(0,"Write to 9 MIE data=%02x odata=%02x",data,odata); // there is only one port 9
-
-
-              switch (scc_w[0].s.wr9.r.reset)
-              {
-               case 1 : scc_channel_reset_port(0); DEBUG_LOG(0,"resetting port 0 (B)");                          break;
-               case 2 : scc_channel_reset_port(1); DEBUG_LOG(0,"resetting port 1 (A)");                          break;
-               case 3 : scc_hardware_reset_port(0); scc_hardware_reset_port(1); DEBUG_LOG(0,"hw reset port0+1"); break;
-              }
+              scc_w[0].w[9] = scc_w[1].w[9] = data;
+              if (data & 1)  {scc_channel_reset_port(0); DEBUG_LOG(0,"resetting port 0 (B)"); }
+              if (data & 12) {scc_channel_reset_port(1); DEBUG_LOG(0,"resetting port 1 (A)"); }
 
               // possible bug in the docs MIE goes to 0 on a hw reset, but looks like it should not!
 
@@ -1028,7 +1159,8 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
 
               break;
 
-     case 10: scc_w[port].w[10]= data; DEBUG_LOG(0,"Unsupported Write to 10 data=%02x odata=%02x",data,odata);break;
+     case 10: scc_w[port].w[10]= data; ALERT_LOG(0,"Unsupported Write to WR10[%d] data=%02x odata=%02x",port,data,odata);break;
+     // d0= 6/8 bit sync, d1=loop mode, d2=abort/flag on underrun, d3=mark/flag idle, d4=go active on poll, d6-5=NRZ/NRZI/FM1/FM0, d7=CRC-preset io
 
      case 11: scc_w[port].w[11]= data; DEBUG_LOG(0,"Write to 11 data=%02x odata=%02x",data,odata);
 
@@ -1112,25 +1244,47 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
 
    // note if  scc_w[port].w14.localloopback external data should be ignored!
 
+   DEBUG_LOG(0,"read byte from %08x",address);
+
+   DEBUG_LOG(0,"---------------------------------------------------------------------------------------------------------------------");
    dump_scc();
+
+   avoid_rom_scc_tests();
+
+/* fcd241 = control-b   FCD243 = control-a
+   FCD245 = data-b      fcd247 = data-a
+#define SERIAL_PORT_A_DATA    0xFCD247
+#define SERIAL_PORT_A_CONTROL 0xFCD243
+#define SERIAL_PORT_B_DATA    0xFCD245
+#define SERIAL_PORT_B_CONTROL 0xFCD241
+*/
 
    switch ((address & 0x000007) | 0x00FCD240)
    {
-        case  SERIAL_PORT_B_CONTROL: access=0; port=0; break;
-        case  SERIAL_PORT_B_DATA   : access=1; port=0; break;
-        case  SERIAL_PORT_A_CONTROL: access=0; port=1; break;
-        case  SERIAL_PORT_A_DATA:    access=1; port=1; break;
-        default: DEBUG_LOG(0,"Warning invalid access! %08x",address);
+        case  SERIAL_PORT_B_CONTROL: access=0; port=0; DEBUG_LOG(0,"SCC PORT B CONTROL"); break;
+        case  SERIAL_PORT_B_DATA   : access=1; port=0; DEBUG_LOG(0,"SCC PORT B DATA");    break;
+
+        case  SERIAL_PORT_A_CONTROL: access=0; port=1; DEBUG_LOG(0,"SCC PORT A CONTROL"); break;
+        case  SERIAL_PORT_A_DATA:    access=1; port=1; DEBUG_LOG(0,"SCC PORT A DATA");    break;
+
+        default: ALERT_LOG(0,"Warning invalid access! %08x",address);
                  return 0;                   // invalid address, just ignore it.
     }
    DEBUG_LOG(0,"SRC:SCC: access:%d port %d",access,port);
-
+   DEBUG_LOG(0,"---------------------------------------------------------------------------------------------------------------------");
 
 
 
    if ( access ) //--------------- Data Port ---------------------------------------------------------------------------------
       {
-       if (scc_w[1].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; }
+        if  (running_lisa_os==LISA_OFFICE_RUNNING) {
+            if (!sentbytes[port]) {sentbytes_start[port]=cpu68k_clocks;}
+            
+            sentbytes[port]++;
+            ALERT_LOG(0,"port:%d sentbytes:%d startclk:%lld now:%lld dif:%lld", port,sentbytes[port],sentbytes_start[port],cpu68k_clocks,cpu68k_clocks-sentbytes_start[port]);
+        }
+
+       if (scc_w[0].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; } // only one wr9
 
        if ((!port && z8530_last_irq_status_bits==12) || (port && z8530_last_irq_status_bits==4)) z8530_last_irq_status_bits=0; //20060804
 
@@ -1138,13 +1292,22 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
        else
             {   uint8 c;
 
-             if (fliflo_buff_has_data(&SCC_READ[port]))
-                    c=fliflo_buff_get(&SCC_READ[port]) & scc_bits_per_char_mask[port];
-             else   c=scc_fn[port].read_serial_port(port);  // if nothing already waiting in fliflo, call read fn as needed.
-
-             DEBUG_LOG(0,"read char %02x %c from fifo or fn port:%d fliflo size is:%d",
+             if (HAS_DATA(port))
+                    {
+                      ///ALERT_LOG(0,"------------------------------ reading from fliflo for port %d---------------",port);
+                      //fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
+                      c=fliflo_buff_get(&SCC_READ[port]) & scc_bits_per_char_mask[port];
+                      //ALERT_LOG(0,"Read %02x from queue",c);
+                      //fliflo_dump(stderr,&SCC_READ[0],"AFTER get from queue");
+                      //ALERT_LOG(0,"-----------------------------------------------------------------------------");
+                    }
+             else   {
+                    ALERT_LOG(0,"fliflo is empty reading from port directly -------------------------------------");
+                      c=scc_fn[port].read_serial_port(port);  // if nothing already waiting in fliflo, call read fn as needed.
+                    }
+             ALERT_LOG(0,"read char %02x %c from fifo or fn port:%d fliflo size is:%d pc:%08x",
                     c,(c > 31 ? c:'.'),
-                    port,fliflo_buff_size(&SCC_READ[port]));
+                    port,fliflo_buff_size(&SCC_READ[port]),pc24);
 
              return c;
             }
@@ -1172,28 +1335,60 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
               // need to insert other pollers here for polled I/O
               //poll_telnet_serial_read(port);
 #ifndef __MSVCRT__
-              if (serial_b==SCC_TELNETD)
-               { int data=poll_telnet_serial_read(0);
-                 if (data>-1)
-                        {
-                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
+              if (serial_b==SCC_TELNETD) read_port_if_ready_telnetd(0);
+//               { int data=poll_telnet_serial_read(0);
+//                 if (data>-1)
+//                        {
+//                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
+//                            ALERT_LOG(0,"Received %02x %c from scc port:%d",
+//                                    (uint8)(data),
+//                                    ((data >31) ? ((uint8)(data)):'.'),
+//                                    port);
+//                        }
+//               }
 
-                            DEBUG_LOG(0,"Received %02x %c from scc port:%d",
-                                    (uint8)(data),
-                                    ((data >31) ? ((uint8)(data)):'.'),
-                                    port);
-                        }
+              if (serial_a==SCC_TELNETD) read_port_if_ready_telnetd(1);
+//               {
+//                 int data=poll_telnet_serial_read(1);
+//                 if (data>-1) {fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
+//                               ALERT_LOG(0,"Received %02x %c from scc port:%d",
+//                                    (uint8)(data),
+//                                    ((data >31) ? ((uint8)(data)):'.'),
+//                                    port);
+//                        }
+//               }
 
-               }
+              if (serial_b==SCC_PTY) read_port_if_ready_pty(0);
+//               { int data=read_serial_port_pty(0); // ::TODO:: this sometimes hangs - read gets called when it should not be even though we check for presence of data avail
+//                 if (data>-1)
+//                        {
+//                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
+//                            ALERT_LOG(0,"Received %02x %c from scc port:%d pc:%08x",
+//                                    (uint8)(data),
+//                                    ((data >31) ? ((uint8)(data)):'.'),
+//                                   port,pc24);
+//                        }
+//               }
 
-              if (serial_a==SCC_TELNETD)
-               {
-                 int data=poll_telnet_serial_read(1);
-                 if (data>-1) fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
-               }
+              if (serial_a==SCC_PTY) read_port_if_ready_pty(1);
+//               {
+//                 int data=read_serial_port_pty(1);
+//                 if (data>-1) {fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
+//                               ALERT_LOG(0,"Received %02x %c from scc port:%d",
+//                                    (uint8)(data),
+//                                    ((data >31) ? ((uint8)(data)):'.'),
+//                                    port);
+//                        }
+//               }
+
+              if (serial_b==SCC_TTY) read_port_if_ready_tty(0);
+              if (serial_a==SCC_TTY) read_port_if_ready_tty(1);
 #endif
 
-              scc_r[port].s.rr0.r.rx_char_available= fliflo_buff_has_data(&SCC_READ[port]);
+              if (serial_b==SCC_TERMINAL) read_port_if_ready_terminal(0);
+              if (serial_a==SCC_TERMINAL) read_port_if_ready_terminal(1);
+
+              scc_r[port].s.rr0.r.rx_char_available= HAS_DATA(port);
               scc_r[port].s.rr0.r.tx_buffer_empty  = fliflo_buff_is_empty(&SCC_WRITE[port]);
               scc_r[port].s.rr0.r.dcd=get_dcd(port);
               scc_r[port].s.rr0.r.cts=get_cts(port);
@@ -1202,13 +1397,9 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
               scc_r[port].s.rr0.r.tx_underrun_eom=(!scc_w[port].s.wr5.r.txenable);
               scc_r[port].s.rr0.r.zero_count=0;
 
-
-
-
               // sync hunt fakeout
               scc_r[port].s.rr0.r.sync_hunt=(scc_r[port].s.rr0.r.cts && scc_r[port].s.rr0.r.dcd);
-
-              DEBUG_LOG(0,"RR0[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d",
+              DEBUG_LOG(0,"RR0[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d xonenable:%d xoffflag:%d fliflo_has_data:%d",
                          port,
                          scc_r[port].s.rr0.r.rx_char_available,
                          scc_r[port].s.rr0.r.tx_buffer_empty,
@@ -1217,11 +1408,12 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
                          scc_r[port].s.rr0.r.break_abort,
                          scc_r[port].s.rr0.r.sync_hunt,
                          scc_r[port].s.rr0.r.tx_underrun_eom,
-                         scc_r[port].s.rr0.r.zero_count);
+                         scc_r[port].s.rr0.r.zero_count,
+                         xonenabled[port],xoffflag[port],fliflo_buff_has_data(&SCC_READ[port]) );
 
               if (scc_r[port].s.rr0.r.rx_char_available)
               {
-              DEBUG_LOG(0,"RR0[%d] rcv buffer size is:%d  bit0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d",
+              DEBUG_LOG(0,"RR0[%d] rcv buffer size is:%d  bit0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d xonenable:%d xoffflag:%d fliflo_has_data:%d",
                          port,fliflo_buff_size(&SCC_READ[port]),
                          scc_r[port].s.rr0.r.rx_char_available,
                          scc_r[port].s.rr0.r.tx_buffer_empty,
@@ -1230,7 +1422,8 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
                          scc_r[port].s.rr0.r.break_abort,
                          scc_r[port].s.rr0.r.sync_hunt,
                          scc_r[port].s.rr0.r.tx_underrun_eom,
-                         scc_r[port].s.rr0.r.zero_count);
+                         scc_r[port].s.rr0.r.zero_count,
+                         xonenabled[port],xoffflag[port],fliflo_buff_has_data(&SCC_READ[port]) );
               }
 
               return  BITORD(scc_r[port].r[0]);
@@ -1249,11 +1442,9 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
 
               scc_r[port].s.rr1.r.all_sent=fliflo_buff_is_empty(&SCC_WRITE[port]);
 
-
               scc_r[port].s.rr1.r.residue_code_2=0;  // for sdlc only, not implemented here.
               scc_r[port].s.rr1.r.residue_code_1=1;
               scc_r[port].s.rr1.r.residue_code_0=1;
-
 
               DEBUG_LOG(0,"RR1: all_sent:%d, residue_code_2:%d, residue_code_1:%d, residue_code_0:%d, parity_error:%d, rx_overrun_error:%d, crc_framing_error:%d, sdlc_end_of_frame:%d",
                             scc_r[port].s.rr1.r.all_sent,
@@ -1302,12 +1493,14 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
               if (port)
                {
                   // if software interrupt ack is on, it clears the IRQ on access to rr2.
-                  if (scc_w[1].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
-                  return scc_w[1].s.wr2.v;
+                  if (scc_w[0].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
+                  return scc_w[0].s.wr2.v;
                }
               else
               {
-
+               /*
+                  
+               */
                 uint8 r2=BITORD(scc_r[port].r[2]);
 
                      scc_r[0].r[2]=0;       /// 200608-8 <--- here here here here
@@ -1331,7 +1524,7 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
 
 
                 // if software interrupt ack is on, it clears the IRQ on access to rr2.
-                if (scc_w[1].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
+                if (scc_w[0].s.wr9.r.soft_int_ack)    {scc_r[0].r[2]=0; z8530_last_irq_status_bits=0; scc_r[port].r[2]=0;}
 
                 DEBUG_LOG(0,"before exit, z8530_last_irq_status_bits:%d rr2=%02x returning:%02x",z8530_last_irq_status_bits,scc_r[port].r[2],r2);
 
@@ -1532,8 +1725,8 @@ char read_serial_port_localport(unsigned int port)
 
 char read_serial_port(unsigned int port)                            // generic handler
 {
-    DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
-    DEBUG_LOG(0,"SRC:port:%d",port);
+    ALERT_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
+    ALERT_LOG(0,"SRC:port:%d",port);
     if (port)
     {
         if (serial_a==SCC_NOTHING)     return 0;
@@ -1549,6 +1742,25 @@ char read_serial_port(unsigned int port)                            // generic h
         {if (scc_b_port_F) return fgetc(scc_b_port_F);}
     }
     return 0;
+}
+
+void disconnect_serial(int port) {
+    if (port !=0 && port != 1) {
+        DEBUG_LOG(0, "Warning Serial port is not A/B: %d", port);
+        return;
+    }
+
+    switch(port) {
+      case 0: serial_b=SCC_NOTHING; break;
+      case 1: serial_a=SCC_NOTHING; break;
+      break;
+    }
+
+    scc_fn[port].read_serial_port=NULL;
+    scc_fn[port].write_serial_port=NULL;
+    scc_fn[port].read_port_if_ready=NULL;
+
+    return;
 }
 
 
@@ -1579,7 +1791,7 @@ void write_serial_port(unsigned port, char data)
     if (port)
     {
         if (serial_a==SCC_NOTHING)     return;
-        if (serial_a==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[port],data & scc_bits_per_char_mask[port]); return;}
+        if (serial_a==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[!port & 1],data & scc_bits_per_char_mask[port]); return;}
         if (serial_a==SCC_IMAGEWRITER)
         {
             if (scc_a_IW!=-1)      ImageWriterLoop(scc_a_IW,data);
@@ -1593,7 +1805,7 @@ void write_serial_port(unsigned port, char data)
     {
 
         if (serial_b==SCC_NOTHING)     return;
-        if (serial_b==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[port],data & scc_bits_per_char_mask[port]); return;}
+        if (serial_b==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[!port & 1],data & scc_bits_per_char_mask[port]); return;}
         if (serial_b==SCC_IMAGEWRITER)
         {
             if (scc_b_IW!=-1)
@@ -1605,204 +1817,4 @@ void write_serial_port(unsigned port, char data)
 
     return;
 }
-
-
-
-////////////////////////////// Telnet Server hookups - rewrite this code so it works for two ports ////////////////////////////
-
-#define MAX_SERIAL_PORTS 2
-#define MAXPENDING 1 /*Max connection requests*/
-#define BUFFSIZE 3   /* Telnet protocol has a max of 3 chars per block ff xx xx  */
-
-#define MAX_SERIAL_PORTS 2              // 14 is maximum with a 4 port serial port card in each expansion port slot,
-                                        // but need details on this (ROM+schematics+mem map) before we can implement them.
-
-int       port_state[MAX_SERIAL_PORTS];                // 0=waiting for connection, 1=connected, -1=telnetd not used.
-
-///// telnetd code - unix only ////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef __MSVCRT__
-struct    pollfd pfd_accept[MAX_SERIAL_PORTS], pfd_recv[MAX_SERIAL_PORTS];
-
-unsigned  telnet_buffer[MAX_SERIAL_PORTS][BUFFSIZE];
-
-struct    sockaddr_in telnetserver[MAX_SERIAL_PORTS],
-                      telnetclient[MAX_SERIAL_PORTS];
-
-int       serversock[MAX_SERIAL_PORTS],
-          clientsock[MAX_SERIAL_PORTS];
-
-
-// stuff to send to telnet client.
-char telnethax[]={0xff,0xfb,0x01,0xff,0xfb,0x03,0xff,0xfd,0x0f3};
-
-char read_serial_port_telnetd(unsigned int port)
-{
-    int c=poll_telnet_serial_read(port);
-    return (c>-1) ? (char) c : 0;
-}
-
-void write_serial_port_telnetd(unsigned int port, char c)
-{
-  char buffer[2];
-  buffer[0]=c;
-  DEBUG_LOG(0,"Write char %02x %c to port %d",c,(c>31 ? c:'.'),port);
-  send(clientsock[(unsigned)port],buffer,1,0);  // should this be telnetserver?
-}
-
-
-void init_telnet_serial_port(int portnum)
-{
-  // this sets up the listener
-
-ALERT_LOG(0,"Initializing telnetd for serial port #%d",portnum);
-
-/*Create the TCP socket*/
-if ((serversock[portnum]=socket(PF_INET,SOCK_STREAM,IPPROTO_TCP|SO_REUSEADDR)) < 0)
-{
-        ALERT_LOG(0,"could not create the socket for serial port #%d - port now disabled because:%d %s",portnum,errno,strerror(errno));
-        port_state[portnum]=-1;
-        return;
-}
-
-/*Construct the server sock addr_instructure*/
-
-memset(&telnetserver[portnum].sin_zero,0,8);     /*Clearstruct*/
-
-telnetserver[portnum].sin_family=AF_INET;                /*Internet/IP*/
-//telnetserver[portnum].sin_addr.s_addr=htonl(INADDR_ANY); /*address to listen on - want 127.0.0.1 instead!!!! */
-telnetserver[portnum].sin_addr.s_addr=htonl(INADDR_LOOPBACK); //htonl(INADDR_ANY); //INADDR_LOOPBACK); /*address to listen on - want 127.0.0.1 instead!!!! */
-
-if (portnum) telnetserver[portnum].sin_port=htons(scc_a_telnet_port);     /*serverport*/
-else         telnetserver[portnum].sin_port=htons(scc_b_telnet_port);     /*serverport*/
-
-ALERT_LOG(0,"SCC-telnetd Listening on port #%04x at address:%08x (porta:%d,portb:%d :: %04x,%04x)",
-        telnetserver[portnum].sin_port,
-        telnetserver[portnum].sin_addr.s_addr,
-        scc_a_telnet_port,scc_b_telnet_port,
-        htons(scc_a_telnet_port),htons(scc_b_telnet_port)
-        );
-
-/*Bind the server socket*/
-if (bind(serversock[portnum],(struct sockaddr*)&telnetserver[portnum], sizeof(telnetserver[portnum])) < 0)  // could not bind to the server port, so, bye bye
-{
-    ALERT_LOG(0,"Cannot bind for serial port #%d - port now disabled because:%d %s",portnum,errno,strerror(errno));
-    port_state[portnum]=-1;
-    return;
-}
-
-/*Listenonthetelnetserveret*/
-
-if(listen(serversock[portnum],MAXPENDING)<0)
-{   ALERT_LOG(0,"Cannot Listen for serial port #%d - port now disabled",portnum);
-    port_state[portnum]=-1;
-    return;
-}
-
-// if we got here, we're all set!
-ALERT_LOG(0,"Serial port socket %d now initialized and waiting for a connection\n",portnum);
-port_state[portnum]=0;
-return;
-}
-
-
-// returns -1 if no data (or not connected), -2 if break detected, otherwise the data itself.
-int poll_telnet_serial_read(int portnum)
-{
-  int pollret=0, received=0;
-  unsigned char buffer[MAX_SERIAL_PORTS][3];
-
-  if (portnum<0 || portnum>MAX_SERIAL_PORTS)
-                               return -1;      // non existant port
-  if (port_state[portnum]==-1) return -1;      // port disabled
-
-
-  if (port_state[portnum]==0)                 // we're waiting for a telnet connection (LISTEN_STATE)
-  {
-   int pollret;
-   unsigned int clientlen=sizeof(telnetclient[portnum]);
-
-   pfd_accept[portnum].fd=serversock[portnum];
-   pfd_accept[portnum].events=(POLLIN|POLLPRI);
-   //pfd1.revents
-
-   pollret=(poll(&pfd_accept[portnum],1,0));           // we can change this to poll all ports at once, but some may already be connected.
-   if (pollret==0)  return -1;                // timeout
-   if (pollret==-1) return -1;                // error on poll
-
-   if (pollret>0)
-      {
-       /*Wait for client connection*/
-       if((clientsock[portnum]= accept(serversock[portnum],(struct sockaddr*)&telnetclient[portnum], &clientlen))<0)
-          return -1;                           // shit happens, rama, rama.
-
-       ALERT_LOG(0,"Serial Port #%d Client connected:%s\n",portnum,inet_ntoa(telnetclient[portnum].sin_addr));
-       port_state[portnum]=1;                 // change to connected state
-
-       // on accept, send the telnet configuration string.
-       send(clientsock[portnum],telnethax,9,0);
-       return -1;                             // we don't yet have any useful data from the client, so return nothing.
-      }
-  }
-
- // we're already connected, so poll for data.
-
-  pfd_recv[portnum].fd=clientsock[portnum];
-  pfd_recv[portnum].events=(POLLIN|POLLPRI);
-
-  pollret=(poll(&pfd_recv[portnum],1,0));
-  if (pollret==0)  return -1; //timeout
-  if (pollret< 0)  return -1; // perror("got poll error doh!");
-
-  if (pollret>0)
-     if (pfd_recv[portnum].revents & (POLLIN|POLLPRI)) // we got data
-    {
-
-    /*Receiv emessage*/
-
-    if ((received=recv(clientsock[portnum],buffer[portnum],BUFFSIZE,0)) < 0)  // got an error, disconnect
-       {
-        // close this socket and start over
-        ALERT_LOG(0,"Failed to receive initial bytes from client, closing client connection.  Bye bye.");
-        port_state[portnum]=0;
-        close(clientsock[portnum]);
-       }
-
-    if (received>0)
-    {
-       if (buffer[portnum][0]==0xff)  // special telnet sequence?
-       {
-        switch (buffer[portnum][1])   // 3=^C, 8=^H
-        {
-          case 0xf3: return -2;  // printf("break\n");         break;
-          case 0xf1: return -1;  // printf("nop\n");           break;
-          case 0xef: return -1;  // printf("eor\n");           break;
-          case 0xee: return  3;  // printf("abort\n");         break;
-          case 0xf4: return  3;  // printf("interrupt process\n");     break;
-          case 0xf9: return -1;  // printf("Go ahead\n");      break;
-          case 0xf8: return -1;  // printf("Erase Line\n");        break;
-          case 0xf7: return  8;  // printf("Erase character\n");   break;
-          case 0xf6: return -1;  // printf("Are You there?\n");    break;
-          case 0xf5: return  3;  // printf("Abort Output\n");      break;
-
-          case 0x00: return 0xff; // printf("sync\n"); break;  // sync or maybe 0xff itself???
-
-          case 0xff: return 0xff; // maybe 0xff itself???
-
-          default:   return -1;  // printf("unknown\n");  break;
-        }
-      }
-      buffer[portnum][1]=0; buffer[portnum][2]=0; // clear remaining buffers
-      DEBUG_LOG(0,"Got %c %02x",buffer[portnum][0],buffer[portnum][0]);
-
-      return buffer[portnum][0];
-  }
- }
-
- return -1;                              // nothing for the client to deal with
-}
-
-
-#endif
-/////////////////////////////////////////////////////////////////////////////
-
 

@@ -534,12 +534,10 @@ UNUSED(s); UNUSED(data); UNUSED(V);
 
 int check_contrast_set(void)
 {
-
-//    if ((via[2].via[DDRB] & via[2].via[ORBB] & 0x80)==0x80 && via[2].via[DDRA]) // this is OK (DDRA used with port B!)
     if ((via[2].via[DDRB] & 0x84)==0x84 && (via[2].via[ORBB] & 0x4)==4 && via[2].via[DDRA]!=0) // this is OK (DDRA used with port B!)
     {
         contrast=via[2].via[DDRA] & via[2].via[ORAA]; videoramdirty|=9;
-        DEBUG_LOG(0,"Setting Contrast:%02x",contrast);
+//      ALERT_LOG(0,"Setting Contrast:%02x",contrast);
         if ( contrast==0xff) disable_vidram(); else enable_vidram();
 
         contrastchange();  // force UI to adjust display
@@ -1006,6 +1004,9 @@ write to register
             DEBUG_LOG(0,"T1LH1");                                                  // 7 T1HL value copied into T1HL, no transfer to T1CH
             via[1].via[T1LH]=(xvalue);                                             // Set timer1 latch and counter
             via_running=1;
+            
+            VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             //2005.05.31 - this next line was disabled - should it have been?
             //via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
             // VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer?
@@ -1180,8 +1181,6 @@ write to register
 
         case IFR1 :                      /* IFR  */
             via[1].via[IFR] &= (0x7f^(xvalue & 0x7f));          // 1 writes to IFR are used to clear bits!
-
-            
             FIX_VIA_IFR(1);
 
             DEBUG_LOG(0,"VIA1 IFR Write:%02x::%s %s %s %s %s %s %s %s\n",xvalue,
@@ -1279,6 +1278,8 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
         case T1LL1  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL1");
+            VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             return (via[1].via[T1LL]);
 
         case T1LH1  :   // Time 1 High Order Latch
@@ -1551,7 +1552,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
             via_running=1;
             //2005.05.31 - this next line was disabled - should it have been?
             //via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
-            // VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer?
+            VIA_CLEAR_IRQ_T1(2);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
 
             DEBUG_LOG(0,"lh-t1clk:%d (%04x) t1lh1=%02x T1 will now expire at:%llx - %llx cycles from now - clock now:%llx",
                     ((via[2].via[T1LH]<<8)|via[2].via[T1LL]) ,
@@ -1713,9 +1714,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         case IFR2:                      /* IFR  */
 
-            via[2].via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
-            FIX_VIA_IFR(2);
-            DEBUG_LOG(0,"IFR2 write bits: %s %s %s %s %s %s %s %s",
+            DEBUG_LOG(0,"IFR2=%02x before write bits= %s %s %s %s %s %s %s %s", via[2].via[IFR],
                            (via[2].via[IFR] &   1) ? "ifr0CA2:on"              :"ifr0CA2:off",
                            (via[2].via[IFR] &   2) ? "bsy_ifr1CA1:on"          :"bsy_ifr1CA1:off",
                            (via[2].via[IFR] &   4) ? "ifr2SR :on"              :"ifr2SR :off",
@@ -1725,6 +1724,18 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
                            (via[2].via[IFR] &  64) ? "ifr6T1 :on"              :"ifr6T1 :off",
                            (via[2].via[IFR] & 128) ? "ifr7ANY:on"              :"ifr7ANY:off");
 
+            via[2].via[IFR]&=~(xvalue);  // 1 writes to IFR are used to clear bits!
+            FIX_VIA_IFR(2);
+
+            DEBUG_LOG(0,"IFR2 write=%02x bits: %s %s %s %s %s %s %s %s",xvalue,
+                           (via[2].via[IFR] &   1) ? "ifr0CA2:on"              :"ifr0CA2:off",
+                           (via[2].via[IFR] &   2) ? "bsy_ifr1CA1:on"          :"bsy_ifr1CA1:off",
+                           (via[2].via[IFR] &   4) ? "ifr2SR :on"              :"ifr2SR :off",
+                           (via[2].via[IFR] &   8) ? "parity_ifr3CB2:on"       :"parity_ifr3CB2:off",
+                           (via[2].via[IFR] &  16) ? "not_connected_ifr4CB1:on":"not_connected_ifr4CB1:off",
+                           (via[2].via[IFR] &  32) ? "ifr5T2 :on"              :"ifr5T2 :off",
+                           (via[2].via[IFR] &  64) ? "ifr6T1 :on"              :"ifr6T1 :off",
+                           (via[2].via[IFR] & 128) ? "ifr7ANY:on"              :"ifr7ANY:off");
             return;
 
         case IER2:
@@ -1733,6 +1744,11 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
             if  (xvalue & 0x80) via[2].via[IER] |=xvalue;
             else                via[2].via[IER] &=(0x7f^(xvalue&0x7f));
+
+            // clear out anything that IER has disabled on the write.  2020.11.06
+            via[2].via[IFR] &= via[2].via[IER];
+            FIX_VIA_IFR(2);
+
 
 
             // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.
@@ -1864,6 +1880,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
         case T1LL2  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL2=%02x",(via[2].via[T1LL]));
+            VIA_CLEAR_IRQ_T1(2);  // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             return (via[2].via[T1LL]);
 
         case T1LH2  :   // Time 1 High Order Latch
@@ -2279,6 +2297,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
 
         case T1LL2  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL2=%02x",(V->via[T1LL]));
+            VIA_CLEAR_IRQ_T1(V->vianum);
             return (V->via[T1LL]);
 
         case T1LH2  :   // Time 1 High Order Latch
@@ -2723,7 +2742,9 @@ void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 
         case IFR2 :                      /* IFR  */
 
-            V->via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
+            //V->via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
+              V->via[IFR]&=~(xvalue);  // 1 writes to IFR are used to clear bits!
+
             if ( V->via[IFR] & 127) V->via[IFR]|=128;   // if all are cleared, clear bit 7 else set it
             else V->via[IFR]=0;
 
@@ -2745,6 +2766,11 @@ void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 
             if  (xvalue & 0x80)  V->via[IER] |=       xvalue;
             else                 V->via[IER] &=(0x7f^(xvalue&0x7f));
+
+            // clear out anything that IER has disabled on the write.  2020.11.06
+            V->via[IFR] &= V->via[IER];
+            if ( V->via[IFR] & 127) V->via[IFR]|=128;   // if all are cleared, clear bit 7 else set it
+            else V->via[IFR]=0;
 
 
             // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.

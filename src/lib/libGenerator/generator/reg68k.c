@@ -28,6 +28,11 @@ t_sr reg68k_sr;
 #endif
 #endif
 
+
+#define CHECK_HIGH_BYTE_PRESERVE 1
+
+
+
 #define LISA_REBOOTED(x)   { ALERT_LOG(0,"rebooting? reg68k_pc:%08lx,pc24:%08lx %16lx",(long)reg68k_pc,(long)pc24,(long)cpu68k_clocks); return x;}
 #define LISA_POWEREDOFF(x) { save_pram(); profile_unmount(); lisa_powered_off();  return x;}
 
@@ -306,38 +311,6 @@ static inline uint8 get_pending_vector(void)
 
   //---- recalculated pending vector bitmap, and find the highest IRQ to be serviced  ------------
 
-  #ifdef DEBUG
-  pending_vector_bitmap=                                         // no such thing as IRQ0 on 68000
-   (get_irq1_pending_irq() ? BIT1:0) |                           // VTIR/FDIR/VIA2   IRQ1
-   (get_cops_pending_irq() ? BIT2:0) |                           // COPS/VIA1        IRQ2
-   (get_exs2_pending_irq() ? BIT3:0) |                           // Expansion slot 2 IRQ3
-   (get_exs1_pending_irq() ? BIT4:0) |                           // Expansion slot 1 IRQ4
-   (get_exs0_pending_irq() ? BIT5:0) |                           // Expansion slot 0 IRQ5
-   (get_scc_pending_irq()  ? BIT6:0) |                           // SCC              IRQ6
-   (get_nmi_pending_irq()  ? BIT7:0) ;                           // NMI              IRQ7
-
-    highest=highest_bit_num(pending_vector_bitmap);
-    if (highest==0xff) highest=0;
-
-   DEBUG_LOG(0,"IRQ1:: vertical retrace:%d floppy_FDIR:%d via2_IFR:%02x  IRQ2:via1_IFR:%02x",
-           (vertical && (videoirq & 1)),
-           floppy_FDIR,
-           via[2].via[IFR],
-           via[1].via[IFR]);
-   if (highest==1 && floppy_FDIR && (!((regs.sr.sr_int>>8)&7))) append_floppy_log("get_pending_vector:Floppy FDIR IRQ1 is about to be taken if called\n");
-
-   DEBUG_LOG(0,"Next pending vector is:%d, map is:%s%s%s%s%s%s%s",highest,
-        ((pending_vector_bitmap & BIT1)  ? "v1":"."),
-        ((pending_vector_bitmap & BIT2)  ? "v2":"."),
-        ((pending_vector_bitmap & BIT3)  ? "v3":"."),
-        ((pending_vector_bitmap & BIT4)  ? "v4":"."),
-        ((pending_vector_bitmap & BIT5)  ? "v5":"."),
-        ((pending_vector_bitmap & BIT6)  ? "v6":"."),
-        ((pending_vector_bitmap & BIT7)  ? "v7":".") );
-
-
-  #else
-
   if       (get_nmi_pending_irq()  ) {highest=7;pending_vector_bitmap=BIT7;}
   else if  (get_scc_pending_irq()  ) {highest=6;pending_vector_bitmap=BIT6;}
   else if  (get_exs0_pending_irq() ) {highest=5;pending_vector_bitmap=BIT5;}
@@ -346,13 +319,9 @@ static inline uint8 get_pending_vector(void)
   else if  (get_cops_pending_irq() ) {highest=2;pending_vector_bitmap=BIT2;}
   else if  (get_irq1_pending_irq() ) {highest=1;pending_vector_bitmap=BIT1;}
 
-  #endif
-
-
-
+  DEBUG_LOG(0,"Highest IRQ: %d",highest);
   return highest;
 }
-
 
 #ifdef DEBUG
 static char templine[1024];
@@ -548,9 +517,6 @@ void dumpallmmu(void)
     DEBUG_LOG(0,"debug log file: %s",filename);
     out=fopen(filename,"wt");
 
-    //fprintf(out,"SRC::init_7E70SLR is set to: r/w %04x/%04x\n",mmu_trans_all[0][0x7e70].readfn,mmu_trans_all[0][0x7e70].writefn);
-
-    //dump_scc();
     #ifdef DEBUG
     printregs(out,"");
     #endif
@@ -1062,6 +1028,34 @@ void reg68k_exec_debug_block(int32 clocks, mmu_trans_t *mt, int k, t_ipc *ipc,ch
   }
   #endif
 
+
+
+  // dump disassembly roughly around the equivalent of where pro.c fn's would be.
+  if (running_lisa_os == LISA_UNIPLUS_RUNNING && pc24==0x0000c188)
+    {
+      debug_on("prouni+");
+      ALERT_LOG(0,"profile code disassembly for da win.");
+      for (pc24=0x20400; pc24<0x21000; pc24=pc24) {
+        char dumpline[1024];
+        char text[1024];
+        if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct since there's one already here.
+        abort_opcode=2; 
+        
+        if (!mt->table->ipc) cpu68k_makeipclist(pc24 & ADDRESSFILT);
+        ipc=&(mt->table->ipc[(pc24 & 0x1ff)>>1]);
+        diss68k_getdumpline(pc24,dumpline);
+        diss68k_gettext(ipc, text);
+        if (buglog)
+            fprintf(buglog,"%ld/%08lx (%ld %ld/%ld/%ld) %s  SRC:clk:%016llx +%ld clks\n",(long)context,(long)pc24,
+                (long)(segment1|segment2),(long)segment1,(long)segment2,(long)start,dumpline,(long long)cpu68k_clocks, (long)ipc->clks);
+        pc24+=ipc->wordlen;
+        if (!ipc->wordlen) pc24+=2;
+    }
+    dumpram("uniplus");
+    dumpallmmu();
+    EXIT(0,0,"kthx bye");
+  }
+
   // if the tracelog is not enabled, skip this
   if  (debug_log_enabled)
       {
@@ -1103,6 +1097,8 @@ void reg68k_exec_debug_block(int32 clocks, mmu_trans_t *mt, int k, t_ipc *ipc,ch
                       }
           }
           #endif  //--- SUPRESS_LOOP_DISASM
+
+
 
           #ifdef PROCNAME_DEBUG
           {  uint16 w,w1,w2,w3;
@@ -1244,7 +1240,7 @@ void print_ipc(uint32 pc)
     mmu_trans_t *mt;
 
     uint32 page;
-    page=(pc & 0x00ffffff)>>9;     
+    page=(pc & ADDRESSFILT)>>9;     
     mt=&mmu_trans[page];
     ipc=&(mt->table->ipc[(pc & 0x1ff)>>1]);
     piib = cpu68k_iibtable[ipc->opcode];
@@ -1275,6 +1271,231 @@ void drive_pattern_test(void);
 #endif
 
 #endif
+
+static uint32 last_display_str=0xc0def3f3;
+
+void display_stack_vals(void)
+{
+   uint32 straddrp = reg68k_regs[8+7];
+
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+ 0, lisa_ram_safe_getlong(context,straddrp+ 0));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+ 4, lisa_ram_safe_getlong(context,straddrp+ 4));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+ 8, lisa_ram_safe_getlong(context,straddrp+ 8));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+12, lisa_ram_safe_getlong(context,straddrp+12));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+16, lisa_ram_safe_getlong(context,straddrp+16));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+20, lisa_ram_safe_getlong(context,straddrp+20));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+24, lisa_ram_safe_getlong(context,straddrp+24));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+28, lisa_ram_safe_getlong(context,straddrp+28));
+   fprintf(buglog,"stackval[@%08x]=%08x\n",straddrp+32, lisa_ram_safe_getlong(context,straddrp+32));
+}
+
+
+void trap_opcode(uint32 n) {
+#ifdef DEBUG
+    if (!debug_log_enabled) return;
+
+    switch(n)
+     {
+       case 7: return; // trampoline
+       case 5:
+       {
+        char *label=NULL;
+        switch(reg68k_regs[7] & 0x0000ffff)
+        {
+        case 0x00:     /* 0028  */ label="driverin"; break;
+        case 0x68:     /* 0032  */ label="diskdriv"; break;
+        case 0x6a:     /* 0046  */ label="twiggydr"; break;
+        case 0x6c:     /* 005a  */ label="disksync"; break;
+        case 0x8c:     /* 006a  */ label="nmisync "; break;
+        case 0xaa:     /* 0076  */ label="copsync "; break;
+        case 0x9e:     /* 0082  */ label="poll    "; break;
+        case 0x02:     /* 008e  */ label="mouseloc"; break;
+        case 0x04:     /* a4    */ label="mouseupd"; break;
+        case 0x06:     /* b4    */ label="mousesca"; break;
+        case 0x08:     /* c4    */ label="mousethr"; break;
+        case 0xa8:     /* d4    */ label="nouseodo"; break;
+        case 0x0a:     /* e4    */ label="cursorlo"; break;
+        case 0x0c:     /* f8    */ label="cursortr"; break;
+        case 0x0e:     /* 108   */ label="cursorim"; break;
+        case 0x10:     /* 158   */ label="cursorhi"; break;
+        case 0x12:     /* 164   */ label="cursorsh"; break;
+        case 0x14:     /* 188   */ label="cursordi"; break;
+        case 0x6e:     /* 194   */ label="cursorob"; break;
+        case 0x70:     /* 1a0   */ label="cursorin"; break;
+        case 0x9c:     /* 1ac   */ label="cursorre"; break;
+        case 0x86:     /* 1b8   */ label="busyimag"; break;
+        case 0x88:     /* 208   */ label="busydela"; break;
+        case 0x16:     /* 218   */ label="framecou"; break;
+        case 0x8a:     /* 228   */ label="screensi"; break;
+        case 0x18:     /* 23e   */ label="screenad"; break;
+        case 0x1a:     /* 24e   */ label="altscree"; break;
+        case 0x8e:     /* 25e   */ label="screenke"; break;
+        case 0x90:     /* 26e   */ label="setscree"; break;
+        case 0x1c:     /* 27e   */ label="contrast"; break;
+        case 0x1e:     /* 28e   */ label="setcontr"; break;
+        case 0x20:     /* 29e   */ label="rampcont"; break;
+        case 0x82:     /* 2ae   */ label="dimcontr"; break;
+        case 0x84:     /* 2be   */ label="setdimco"; break;
+        case 0x22:     /* 2ce   */ label="fadedela"; break;
+        case 0x24:     /* 2de   */ label="setfaded"; break;
+        case 0x26:     /* 2ee   */ label="powerdow"; break;
+        case 0x28:     /* 2fa   */ label="powercyc"; break;
+        case 0x2a:     /* 30a   */ label="volume  "; break;
+        case 0x2c:     /* 31a   */ label="setvolum"; break;
+        case 0x2e:     /* 32a   */ label="noise   "; break;
+        case 0x30:     /* 33a   */ label="silece  "; break;
+        case 0x32:     /* 346   */ label="beep    "; break;
+        case 0x38:     /* 358   */ label="keyboard"; break;
+        case 0x96:     /* 368   */ label="legends "; break;
+        case 0x98:     /* 378   */ label="setlegen"; break;
+        case 0x34:     /* 388   */ label="keyisdow"; break;
+        case 0x36:     /* 39c   */ label="keymap  "; break;
+        case 0x3c:     /* 3b8   */ label="keybdpee"; break;
+        case 0x92:     /* 3d0   */ label="altkeype"; break;
+        case 0x3a:     /* 3fa   */ label="keybdeve"; break;
+        case 0x94:     /* 412   */ label="altkeyev"; break;
+        case 0x3e:     /* 43c   */ label="repeatra"; break;
+        case 0x40:     /* 452   */ label="setrepea"; break;
+        case 0x42:     /* 464   */ label="keypushe"; break;
+        case 0x72:     /* 476   */ label="nmikey  "; break;
+        case 0x74:     /* 486   */ label="setnmike"; break;
+        case 0xa0:     /* 498   */ label="toggleke"; break;
+        case 0xa2:     /* 4ab   */ label="settoggl"; break;
+        case 0x9a:     /* 4ba   */ label="microtim"; break;
+        case 0x44:     /* 4ca   */ label="timer   "; break;
+        case 0x46:     /* 4da   */ label="alarmass"; break;
+        case 0x48:     /* 4f2   */ label="alarmret"; break;
+        case 0x4a:     /* 502   */ label="alarmabs"; break;
+        case 0x4c:     /* 514   */ label="alarmrel"; break;
+        case 0x4e:     /* 526   */ label="alarmoff"; break;
+        case 0x50:     /* 536   */ label="datetime"; break;
+        case 0x52:     /* 558   */ label="setdatet"; break;
+        case 0x54:     /* 57a   */ label="datetoti"; break;
+        case 0x58:     /* 5a4   */ label="timestam"; break;
+        case 0x5a:     /* 5b4   */ label="settimes"; break;
+        case 0x5c:     /* 5c4   */ label="timetoda"; break;
+        default: fprintf(buglog,"Unknown trap #5 D7=%08x\n",reg68k_regs[7]);
+        }
+        return;
+     }
+     default:
+       fprintf(buglog,"Unknown TRAP #%d\n",n);
+       display_stack_vals();
+     }
+#endif
+}
+
+void a_line(void) {
+#ifdef DEBUG
+    #ifdef __WXMSW__ // windows app is compiled as GUI only so has no stdout
+    return;
+    #else
+    if (!debug_log_enabled) return;
+
+    if (running_lisa_os!=LISA_OFFICE_RUNNING) return;
+
+    abort_opcode=0;
+    uint32 alineopcode=(InstructionRegister<<16) | fetchword(reg68k_pc + 2);
+    if (abort_opcode) {abort_opcode=0;return;}
+
+    switch (alineopcode)
+    {
+      // maybe 3/a0c60100 or possibly: 3/a02201c8
+      case 0xa022024c: //CKOUTRED :TODO:: this is used for other stuff too, not just console writes.
+      /*26842886 +6  push address 00f7bd6b - this is the text to print!
+        26842887 +2  push address 00f7bc3d - buffer to copy into for whatever reason.
+        26842888 +0  word 2a=42   size*/
+            {
+              uint32 straddrp = reg68k_regs[8+7]+6; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              if (straddr==0xaf) {return;}
+
+              uint32 sizeaddr = reg68k_regs[8+7];  // that the wrapper library stripped out on the A-Line call
+              uint16 size     = lisa_ram_safe_getword(context,sizeaddr); 
+              if (size==0xaf) {return;}
+
+              fflush(buglog);
+              // this is a first pass at this, so this is not efficient
+              fprintf(buglog,"LISACONSOLE: at (%d,%d) clk:%016llx: str@%08x size:%04x text:", lisa_ram_safe_getbyte(1,0x1f9),lisa_ram_safe_getbyte(1,0x1f8),
+              (long long)cpu68k_clocks,straddr,size);
+              last_display_str=lisa_ram_safe_getlong(context,reg68k_regs[8+7]+2);
+              for (int i=0; i<size; i++) {
+                uint8 c=lisa_ram_safe_getbyte(context,straddr+i); //if (abort_opcode) {fprintf(buglog,"[abort-opcode on read]\n"); abort_opcode=0; return;}
+                switch (c) {
+                  case 13: fprintf(buglog,"⌤"); break;
+                  case 10: fprintf(buglog,"〷"); break;
+                  case ('L'-'@'): fprintf(buglog,"␌"); break;
+                  default:  if (c>31 && c<128) fprintf(buglog,"%c",c);
+                }
+              }
+
+              fprintf(buglog,"\n");
+              fflush(buglog);
+            }
+            break;
+      /*
+      case 0xa0c00080: //WRITEDATA :TODO:: this is used for other stuff too, not just console writes.
+            {
+              uint32 straddrp = reg68k_regs[8+7]+0; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              uint8 size=lisa_ram_safe_getbyte(context,straddr); if (size==0xaf) return;
+              fprintf(buglog,"LISACONSOLE(writedata):%016llx: str@%08x size:%04x text:",(long long)cpu68k_clocks,straddrp,size);
+
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 0, lisa_ram_safe_getlong(context,straddrp+ 0));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 4, lisa_ram_safe_getlong(context,straddrp+ 4));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 8, lisa_ram_safe_getlong(context,straddrp+ 8));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+12, lisa_ram_safe_getlong(context,straddrp+12));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+16, lisa_ram_safe_getlong(context,straddrp+16));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+20, lisa_ram_safe_getlong(context,straddrp+20));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+24, lisa_ram_safe_getlong(context,straddrp+24));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+28, lisa_ram_safe_getlong(context,straddrp+28));
+              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+32, lisa_ram_safe_getlong(context,straddrp+32));
+
+              for (int i=1; i<size; i++) {
+                uint8 c=lisa_ram_safe_getbyte(context,straddr+i); //if (abort_opcode) {fprintf(buglog,"[abort-opcode on read]\n"); abort_opcode=0; return;}
+                switch (c) {
+                  case 13: fprintf(buglog,"⌤"); break;
+                  case 10: fprintf(buglog,"〷"); break;
+                  case ('L'-'@'): fprintf(buglog,"␌"); break;
+                  default:  if (c>31 && c<128) fprintf(buglog,"%c",c);
+                }
+              }
+
+              fprintf(buglog,"\n");
+              fflush(buglog);
+            }
+            break;
+            */
+      case 0xa0c00050: fprintf(buglog,"LISACONSOLE: CLS\n"); break; //CLEARTHE
+
+      default:
+    
+            {
+              uint32 straddrp = reg68k_regs[8+7]+0; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
+              uint8 size=lisa_ram_safe_getbyte(context,straddr); if (size==0xaf) return;
+              fprintf(buglog,"ALINE:%08x:%016llx: A7=%08x\n",alineopcode,(long long)cpu68k_clocks,straddrp);
+
+              for (int i=0; i<32; i+=2)
+                  if (lisa_ram_safe_getlong(context,straddrp+ i)==last_display_str ) {
+                      fprintf(buglog,"\n\nLISADISPLAY maybe found trap 0x%08xdisplay param is at offset %i off A7\n",alineopcode,i);
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 0, lisa_ram_safe_getlong(context,straddrp+ 0));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 4, lisa_ram_safe_getlong(context,straddrp+ 4));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 8, lisa_ram_safe_getlong(context,straddrp+ 8));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+12, lisa_ram_safe_getlong(context,straddrp+12));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+16, lisa_ram_safe_getlong(context,straddrp+16));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+20, lisa_ram_safe_getlong(context,straddrp+20));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+24, lisa_ram_safe_getlong(context,straddrp+24));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+28, lisa_ram_safe_getlong(context,straddrp+28));
+                      fprintf(buglog,"val[@%08x]=%08x\n",straddrp+32, lisa_ram_safe_getlong(context,straddrp+32));
+                      fprintf(buglog,"\n\n");
+                  }
+       return;
+             }
+    }
+    #endif
+#endif
+}
 
 int32 reg68k_external_execute(int32 clocks)
 {
@@ -1342,7 +1563,7 @@ static uint32 last_pc;
             abort_opcode=0;
             SET_CPU_FNC_CODE();
 
-            pc24 = reg68k_pc; //20180401// & 0x00ffffff;
+            pc24 = reg68k_pc;
             if (reg68k_pc & 1)  LISA_REBOOTED(0);
 
             /* C ROM */ 
@@ -1414,7 +1635,7 @@ static uint32 last_pc;
                 {
                     if (abort_opcode==1) break;
                     if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct since there's one already here.
-                    abort_opcode=2; cpu68k_makeipclist(pc24 & ADDRESSFILT); //20200723 & 0x00ffffff); 
+                    abort_opcode=2; cpu68k_makeipclist(pc24 & ADDRESSFILT);
                     if (abort_opcode==1) break; //==24726== Conditional jump or move depends on uninitialised value(s)
                     ipc=&(mt->table->ipc[(pc24 & 0x1ff)>>1]);
                 }
@@ -1479,14 +1700,31 @@ static uint32 last_pc;
                        #if defined(DEBUG) && defined(CPU_CORE_TESTER)
                        reg68k_ext_core_tester_pre();
                        #endif
-                       SET_CPU_FNC_DATA(); ipc->function(ipc);
+                       SET_CPU_FNC_DATA();
+                       #ifdef CHECK_HIGH_BYTE_PRESERVE
+                       static int tested;
+                       uint32 opc=pc24;
+                       #endif
+                       ipc->function(ipc);
+                       #ifdef CHECK_HIGH_BYTE_PRESERVE
+                       if ((opc & 0xff000000)!=0 && (reg68k_pc & 0xff000000)==0) {
+                         if ( (reg68k_pc -(opc & 0x00ffffff))<16 ) ALERT_LOG(0,"Lost high byte in PC oldpc:%08x after:%08x",opc,reg68k_pc);
+                       }
+
+                       if (  (opc & 0xff000000)==(reg68k_pc & 0xff000000) && (reg68k_pc & 0xff000000)!=0 && ! tested)
+                          {ALERT_LOG(0,"high byte test PASSED."); tested=1;}
+                       #endif
                      }     // execute the function, else rebuild the IPC //==24726==    by 0x300669: init_ipct_allocator (cpu68k.c:813)
                 else  {                                             //                                            // Uninitialised value was created by a heap allocation
                         static t_iib *piib;
 
                         PAUSE_DEBUG_MESSAGES();
                         if (!(piib = cpu68k_iibtable[fetchword(reg68k_pc)]))
-                            ALERT_LOG(1,"Invalid instruction @ %08lX\n", (long)reg68k_pc); // RA
+                            {
+                               ALERT_LOG(1,"Invalid instruction @ %08lX\n", (long)reg68k_pc); // RA
+                               piib = cpu68k_iibtable[0x4AFC*2]; // point to illegal opcode
+                               ipc->function=cpu68k_functable[0x4afc];
+                            }
                         RESUME_DEBUG_MESSAGES();
 
                         SET_CPU_FNC_CODE();
@@ -1507,6 +1745,9 @@ static uint32 last_pc;
 
                         PAUSE_DEBUG_MESSAGES();
                         ipc->function=cpu68k_functable[fetchword(reg68k_pc) * 2 + 1];
+                        if (!ipc->function) ipc->function=cpu68k_functable[0x4afc*2];
+                        if (!ipc->function) ALERT_LOG(0,"Failed to get function for illegal opcode %04x", cpu68k_functable[0x4afc]);
+
                         PAUSE_DEBUG_MESSAGES();
 
                         SET_CPU_FNC_DATA();
@@ -1523,7 +1764,16 @@ static uint32 last_pc;
                               reg68k_ext_core_tester_pre();
                               #endif
 
-                              if (ipc->function) ipc->function(ipc);
+                              if  (ipc->function) {
+                                  #ifdef CHECK_HIGH_BYTE_PRESERVE
+                                  uint32 opc=pc24;
+                                  #endif
+                                  ipc->function(ipc);
+                                  #ifdef CHECK_HIGH_BYTE_PRESERVE
+                                  if ((opc & 0xff000000)!=0 && (reg68k_pc & 0xff000000)==0)
+                                    if ( (reg68k_pc -(opc & 0x00ffffff))<16 ) ALERT_LOG(0,"Lost high byte in PC oldpc:%08x after:%08x",opc,reg68k_pc);
+                                  #endif
+                              }
                               else {   EXITR(277,0,"No ipc function at %ld/%08lx, even after attempting to get one!\n",(long)context,(long)pc24);}
                             }
                       }
@@ -1533,7 +1783,7 @@ static uint32 last_pc;
                     #endif
 
                     #if defined(DEBUG) && defined(XXXDEBUG)
-                      reg68k_ext_exec_various_dug();
+                      reg68k_ext_exec_various_dbug();
                     #endif
 
                     pc24 = reg68k_pc;
@@ -1794,11 +2044,12 @@ void reg68k_update_supervisor_external(void)  {lastsflag=regs.sr.sr_struct.s;}
 
 void reg68k_internal_autovector(int avno)   { reg68k_internal_vector(V_AUTO + avno - 1,reg68k_pc,0); }
 
+static uint32 lastoldpc;
+static int32  lastclk;
+static int lastvno;
+
 void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
 {
-    static uint32 lastoldpc;
-    static int32  lastclk;
-    static int lastvno;
     uint16 saved_sr=reg68k_sr.sr_int;
 
     int avno=(vno-V_AUTO+1);
@@ -1861,9 +2112,6 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
      * Vector Address->PC               // PC=Vector
      * --------------------------------------------------*/
 
-   // #ifdef DEBUG
-   //     validate_mmu_segments("reg68k internal_vector");
-   //  #endif
 
    // avoid bus/addr error repeats on multi-operand opcodes...
     if  (lastclk==cpu68k_clocks && lastvno==vno)
@@ -1952,13 +2200,14 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
         regs.sr = reg68k_sr;
     }
 
-    if  (vno==2 || vno==3)
+    if  (vno==2 || vno==3 ||vno==4)
         {
             if        ((InstructionRegister & 0xff00)==0x4a00) {oldpc+=2;}
             else if   ((InstructionRegister & 0xff00)==0x4e00)
             {
               if      ((InstructionRegister & 0x00f0)==0x00d0) {oldpc+=2;}
               else if ((InstructionRegister & 0x00ff)==0x0075) {oldpc+=2; regs.sp+=4;}
+              else if ((InstructionRegister & 0x00ff)==0x007a) {oldpc+=0;} // movec vbr,d0 from http://bitsavers.org/pdf/apple/lisa/unisoft/Unisoft_Lisa_Kernel_Aug1983.pdf p3 determine cpu type
               else if ((InstructionRegister & 0x00ff)==0x0073) {oldpc+=0;}
               else if ((InstructionRegister & 0x00ff)==0x00f9) {oldpc+=2;}
               else if ((InstructionRegister & 0x00ff)==0x00b9) {oldpc+=6;}
@@ -1971,17 +2220,20 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
             }
         }
 
-        DEBUG_LOG(0,"PUSH PC %08lx context:%ld",(long)oldpc,(long)context);  
-        A7PUSH_LONG(oldpc); //   ? (oldpc+(cpu68k_iibtable[InstructionRegister]->wordlen<<1)) : oldpc);
-        if (abort_opcode==1) {EXIT(783,0,"Doh! got abort_opcode=1 on push pc %s!\n",__FUNCTION__); }
-        DEBUG_LOG(0,"PUSH SR %04x context:%d",saved_sr,context);  
-        A7PUSH_WORD(saved_sr); 
-        if (abort_opcode==1) {EXIT(784,0,"Doh! got abort_opcode=1 on push sr in %s!\n",__FUNCTION__); }
+    DEBUG_LOG(0,"PUSH PC %08lx context:%ld",(long)oldpc,(long)context);  
+
+    // this fails, if oldpc points to a page that's lisa_wl_bad_page - it will recursively call bus error and crash.
+    // add check before A7PUSH_LONG.
+    A7PUSH_LONG(oldpc);  if (abort_opcode==1) {EXIT(783,0,"Doh! got abort_opcode=1 on push pc %s!\n",__FUNCTION__); }
+
+    DEBUG_LOG(0,"PUSH SR %04x context:%d",saved_sr,context);  
+    A7PUSH_WORD(saved_sr);
+    if (abort_opcode==1) {EXIT(784,0,"Doh! got abort_opcode=1 on push sr in %s!\n",__FUNCTION__); }
     // "Short format 0 only four words are to be removed from the top of the stack. SR and PC are loaded from the stack frame."
     abort_opcode=0;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    if (vno==2 || vno==3)               // PUSH IS IN THIS ORDER: ---> PC,SR,IR,ADDR,BUSFN
+    if (vno==2 || vno==3 || vno==4)    // PUSH IS IN THIS ORDER: ---> PC,SR,IR,ADDR,BUSFN
     {  // memerror=(uint16)(( CHK_MMU_TRANS(addr_error) )>>5);
 
         memerror=(uint16)((               addr_error  )>>5);
@@ -2066,32 +2318,31 @@ void print_pc_and_regs(char *text)
 }
 #endif
 
+static uint32 last_be_ex_pc;
+static XTIMER last_be_clocks;
+
 void lisa_buserror(uint32 addr_error)
 {
+    if (reg68k_pc == last_be_ex_pc && cpu68k_clocks == last_be_clocks) return;
+    last_be_ex_pc=reg68k_pc; last_be_clocks=cpu68k_clocks;
+
     reg68k_internal_vector(2 ,reg68k_pc, addr_error);
     abort_opcode=1;
 }
 
 #define LINE(x) DEBUG_LOG(0,"%s:%s:%d %s LINE LOG"       ,__FILE__,__FUNCTION__,__LINE__,x); fflush(buglog);
 
+static uint32 last_mmu_ex_pc;
+static XTIMER last_mmu_clocks;
+
 void lisa_mmu_exception(uint32 addr_error)
 {
-    char temp[1024];
+    if (reg68k_pc == last_mmu_ex_pc && cpu68k_clocks == last_mmu_clocks) return;
+    last_mmu_ex_pc=reg68k_pc; last_mmu_clocks=cpu68k_clocks;
 
-    //20060105 memerror=(uint16)(( CHK_MMU_TRANS(addr_error)+(maxlisaram!=RAM1024K ? 0:RAM512K) )>>5);
     memerror=(uint16)(( CHK_MMU_TRANS(addr_error) )>>5);
-/*
-    ALERT_LOG(0,"MMU BUSERROR: IR:%04x @ %d/@%08x :: buserr@addr:%08x -> phys-addr:%08x SOR:%04x SLR:%04x %s",
-          InstructionRegister,context,reg68k_pc,
-          addr_error,
-          CHK_MMU_REGST(addr_error),
-          mmu[(addr_error & MMUSEGFILT)>>17].sor,
-          mmu[(addr_error & MMUSEGFILT)>>17].slr,
-          printslr(temp,1024, mmu[(addr_error & MMUSEGFILT)>>17].slr)
-          );
-*/
-    reg68k_internal_vector(2,reg68k_pc,addr_error);
-    abort_opcode=1;
+
+    lisa_buserror(addr_error);
 }
 
 

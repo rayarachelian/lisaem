@@ -265,6 +265,10 @@ void get_profile_spare_table(ProFileType *P)
      case 65536:  a='3'; b='2'; c='M';    break;//32M
      case 81920:  a='4'; b='0'; c='M';    break;//40M
      case 131072: a='6'; b='4'; c='M';    break;//64M
+
+     case 262144: a='1'; b='2'; c='8';    break;//128M
+     case 524288: a='2'; b='5'; c='6';    break;//256M // 0x080000
+     case 1048576:a='5'; b='1'; c='2';    break;//512M // 0x100000
    //case 9728:
      default:     a=' '; b=' '; c=' ';          // 5M
     }
@@ -343,7 +347,7 @@ void do_profile_read(ProFileType *P, uint32 block)
 
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+    errno=0;
     blk=dc42_read_sector_data(&(P->DC42),block);
 
     if (P->DC42.retval || blk==NULL)
@@ -358,14 +362,13 @@ void do_profile_read(ProFileType *P, uint32 block)
 
     if (blk!=NULL) memcpy( &(P->DataBlock[4       ]), blk, P->DC42.tagsize);   //4+512
 
-
     #ifdef DEBUG
     dump_profile_block(buglog, &(P->DataBlock[4]), block, "read");
     #endif
 
 	if ( errno )
 	{
-        DEBUG_LOG(0,"Error reading ProFile Image! errno: %d, State:%d,IndexWrite:%d,ProfileCommand:%d,BSY:%d,Data:%d,CMDL:%d,buffer:%2x:%2x:%2x:%2x:%2x:%2x\n",
+        ALERT_LOG(0,"Error reading ProFile Image! errno: %d, State:%d,IndexWrite:%d,ProfileCommand:%d,BSY:%d,Data:%d,CMDL:%d,buffer:%2x:%2x:%2x:%2x:%2x:%2x\n",
 			errno,
 			P->indexwrite,
 			P->StateMachineStep,P->Command,P->BSYLine,P->VIA_PA,P->CMDLine,
@@ -373,7 +376,6 @@ void do_profile_read(ProFileType *P, uint32 block)
 			P->DataBlock[8],P->DataBlock[9]);
 
 	}
-
 
 	P->indexread=0;                     // reset index pointers to status
 	P->indexwrite=4;
@@ -627,11 +629,11 @@ void ProfileReset(ProFileType *P)
 
 char *profile_event_names[5]=
      {
-        "IRB",
-        "IRA",
-        "ORA",
-        "ORB",
-        "NUL"
+        "read IRB",
+        "read IRA",
+        "write ORA",
+        "write ORB",
+        "write NUL"
      };
 
 
@@ -707,6 +709,36 @@ void ProfileLoop(ProFileType *P, int event)
     if ( !P->DENLine && P->vianum!=2) {ALERT_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
         
 
+/*
+6 bytes so far.
+1 @1/0001d766 - state machine high order state. this is 01, 02, or in the error state 03.
+1 @1/0001d767 - state machine low byte - this is also 06 which is the 2nd profile response for write 
+                this isn't the same a5 from the above code, need to find out how to get this address.
+4 @1/0001d768 - VIA2 address
+1 @1/0001d770 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
+1 @1/0001d771 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
+1 @1/0001d772 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
+1 @1/0001d773 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
+4 @1/0001d774 - mentioned 2915097 1/0000f414 (2 0/2/0) : 0680 0001 d774             : .....t   :   92 : ADD.L      #$0001d774,D0  SRC:clk:000000007de90235 +12 clks
+              zero.l is written here.
+4 @1/0001d778 - unknown/unused.
+
+*/
+
+
+    #ifdef DEBUG
+    {
+            DEBUG_LOG(0,"----------------------------------------------------------------------");
+            DEBUG_LOG(0,"Xenix ProFile State:         %04x",lisa_ram_safe_getword(1,0x0001d766) );
+            DEBUG_LOG(0,"Xenix ProFile VIA address:   %08x",lisa_ram_safe_getlong(1,0x0001d768) );
+            DEBUG_LOG(0,"Xenix ProFile status bytes:  %08x",lisa_ram_safe_getlong(1,0x0001d770) ); // 1d776+c=1D772 so c isn't the size of this.
+            DEBUG_LOG(0,"Xenix ProFile unknown 1d774: %08x",lisa_ram_safe_getlong(1,0x0001d774) );
+            DEBUG_LOG(0,"Xenix ProFile unknown 1d778: %08x",lisa_ram_safe_getlong(1,0x0001d778) );
+            if (debug_log_enabled) fdumpvia2(buglog);
+            DEBUG_LOG(0,"------------ State:%d PC:%d/%08x------------------------------------",P->StateMachineStep,context,pc24);
+    }
+    #endif
+
  switch (P->StateMachineStep)
  {
 
@@ -716,7 +748,7 @@ void ProfileLoop(ProFileType *P, int event)
 
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-         DEBUG_LOG(0,"In state 0 now - idle - CMDLine is:%d && P->last_cmd:%d if non zero, should see state transition.",P->CMDLine,P->last_cmd);
+         DEBUG_LOG(0,"State:0 now - idle - CMDLine is:%d && P->last_cmd:%d if non zero, should see state transition.",P->CMDLine,P->last_cmd);
          #endif
 
          P->BSYLine=0;
@@ -731,7 +763,7 @@ void ProfileLoop(ProFileType *P, int event)
                                                 P->VIA_PA=0x01;         // ACK cmd on bus
                                                 P->last_a_accs=0;
 
-                                                DEBUG_LOG(0,"ACK CMD - sending 01 - State Transition to 3");
+                                                DEBUG_LOG(0,"ACK CMD - sending 01 - State transition to State:2");
                                                 return;
                                               }
 
@@ -754,7 +786,7 @@ void ProfileLoop(ProFileType *P, int event)
   //
   //       #ifdef DEBUG
   //       if (!(EVENT_WRITE_NUL))
-  //           DEBUG_LOG(0,"In state 1 - waiting for CMD==0, if I get it will raise BSY. BSY:%d CMD:%d",P->BSYLine,P->CMDLine);
+  //           DEBUG_LOG(0,"State:1 - waiting for CMD==0, if I get it will raise BSY. BSY:%d CMD:%d",P->BSYLine,P->CMDLine);
   //       #endif
   //
   //
@@ -767,7 +799,7 @@ void ProfileLoop(ProFileType *P, int event)
   //
   //       P->StateMachineStep=3;     //skip 2 from now on
   //       SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);
-  //       DEBUG_LOG(0,"ACK CMD - sending 01 - State Transition to 3");
+  //       DEBUG_LOG(0,"ACK CMD - sending 01 - State transition to Step:3");
   //
   //
   //       return;
@@ -778,34 +810,34 @@ void ProfileLoop(ProFileType *P, int event)
 
          CHECK_PROFILE_LOOP_TIMEOUT;
 		
-         // basically, waith 1/100t of a second before flipping BSY, or if Lisa wrote a byte, then skip the wait
-        if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC)  && !EVENT_WRITE_ORA) //20060429// was 1/1000th sec
-           {
-            #ifdef DEBUG                          // don't fill up the log with useless shit
-            if (!(EVENT_WRITE_NUL))
+//20201029//         // basically, waith 1/100t of a second before flipping BSY, or if Lisa wrote a byte, then skip the wait
+//20201029//        if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC)  && !EVENT_WRITE_ORA) //20060429// was 1/1000th sec
+//20201029//           {
+//20201029//            #ifdef DEBUG                          // don't fill up the log with useless shit
+//20201029//            if (!(EVENT_WRITE_NUL))
+//20201029//
+//20201029//            DEBUG_LOG(0,"State:2 - wasting while waiting for 55, got %02x, last_a_accs:%d before turning BSY to 0: left:%016llx",
+//20201029//               P->VIA_PA,
+//20201029//               P->last_a_accs,
+//20201029//               (TIMEPASSED_LEFT(HUN_THOUSANDTH_OF_A_SEC)-cpu68k_clocks)
+//20201029//               );
+//20201029//            #endif
+//20201029//
+//20201029//
+//20201029//            P->BSYLine=0;
+//20201029//            return;
+//20201029//            }
+         #ifdef DEBUG                          // don't fill up the log with useless shit
+         if (!(EVENT_WRITE_NUL))
 
-            DEBUG_LOG(0,"In state 2 - wasting while waiting for 55, got %02x, last_a_accs:%d before turning BSY to 0: left:%016llx",
-               P->VIA_PA,
-               P->last_a_accs,
-               (TIMEPASSED_LEFT(HUN_THOUSANDTH_OF_A_SEC)-cpu68k_clocks)
-               );
-            #endif
-
-
-            P->BSYLine=0;
-            return;
-           }
+         DEBUG_LOG(0,"State:2 - waiting for 55, last PA=%02x, last_a_accs:%d  - BSY is now %d",
+                P->VIA_PA,
+                P->last_a_accs,P->BSYLine);
+         #endif
 
          P->BSYLine=1;
          if (EVENT_WRITE_NUL) return;
 
-         #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
-
-         DEBUG_LOG(0,"In state 2 - waiting for 55, last PA=%02x, last_a_accs:%d  - BSY is now %d",
-                P->VIA_PA,
-                P->last_a_accs,P->BSYLine);
-         #endif
 
      //    if ( EVENT_WRITE_ORA)//P->last_a_accs)// now wait for 0x55 ACK from Lisa, else, go back to idle
                 //{
@@ -816,7 +848,7 @@ void ProfileLoop(ProFileType *P, int event)
                                                 P->StateMachineStep=GET_CMDBLK_STATE; //DELAY_BEFORE_CMD_STATE; //GET_CMDBLK_STATE;
                                                 SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND);
 
-                                                DEBUG_LOG(0,"State Transition to 4 - got 0x55");
+                                                DEBUG_LOG(0,"State:transition to Step:4 - got 0x55");
                                                 P->indexread=4;         // start at offset 4
                                                 P->indexwrite=4;        // (4 byte preable reserved for status for lisa to read later
                                                 return;
@@ -845,20 +877,17 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
 
-         DEBUG_LOG(0,"In state 4 - waiting for command");
+         DEBUG_LOG(0,"State:4 - waiting for command");
          #endif
 		
-
          CHECK_PROFILE_LOOP_TIMEOUT;
-
          // wait a bit before flopping busy, but if Lisa sends a byte, accept it
-         if ( TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC)  && !(EVENT_WRITE_ORA)) //was 1/100th
-                {
-                    DEBUG_LOG(0,"State 4 - wasting 1/100,000th of a sec");
-                    P->BSYLine=0;
-                    return;
-                }
-
+         if ( TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC)  && !(EVENT_WRITE_ORA) && running_lisa_os!=LISA_UNIPLUS_RUNNING) //was 1/100th
+            {
+                DEBUG_LOG(0,"State:4 - wasting 1/100,000th of a sec");
+                P->BSYLine=0;
+                return;
+            }
 
          P->BSYLine=1;
          if (EVENT_WRITE_NUL) return;
@@ -949,7 +978,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
     case WAIT_2nd_0x55_STATE:       // 5
 
          #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))               DEBUG_LOG(0,"State 5");
+         if (!(EVENT_WRITE_NUL))               DEBUG_LOG(0,"State:5");
          #endif
 
          CHECK_PROFILE_LOOP_TIMEOUT;
@@ -967,7 +996,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          P->BSYLine=1; //2006.05.09 was 0
          if (EVENT_WRITE_NUL) return;
          if (EVENT_WRITE_ORA) //  && P->last_a_accs && P->CMDLine && P->RRWLine)
-                                         {      DEBUG_LOG(0,"State 5: checking what we got:%02x==0x55",P->VIA_PA);
+                                         {      DEBUG_LOG(0,"State:5: checking what we got:%02x==0x55",P->VIA_PA);
                                                if (P->VIA_PA==0x55)   {
                                                                        P->StateMachineStep=PARSE_CMD_STATE;
                                                                        SET_PROFILE_LOOP_TIMEOUT(HALF_OF_A_SECOND);
@@ -996,7 +1025,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
                 #ifdef DEBUG                          // don't fill up the log with useless shit
                 if (!(EVENT_WRITE_NUL))
-                 DEBUG_LOG(0,"State 6 - wasting cycles for a bit to simulate a busy profile (%d cycles)",PROFILE_WAIT_EXEC_CYCLE);
+                 DEBUG_LOG(0,"State:6 - wasting cycles for a bit to simulate a busy profile (%d cycles)",PROFILE_WAIT_EXEC_CYCLE);
                 #endif
 
                  return;
@@ -1054,7 +1083,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
                       P->StateMachineStep=ACCEPT_DATA_FOR_WRITE_STATE;
                       P->indexwrite=10;  // bytes 0-3 are status, 4-6 are cmd block, 10-522 are byte, 523-542 are tags.
-                      SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND);
+                      SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND*3);
 
                       #ifdef DEBUG
 
@@ -1093,25 +1122,23 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
 
     case ACCEPT_DATA_FOR_WRITE_STATE:    // 7    // handle write/write+verify - read bytes from lisa into buffer
-
          CHECK_PROFILE_LOOP_TIMEOUT;
 
          P->BSYLine=0;
 
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-
-         DEBUG_LOG(0,"State 7 - ready to read bytes from ProFile for writes event:%02x bsy:%02x cmd:%02x rrw:%02x PA:%02x @%d",
+         DEBUG_LOG(0,"State:7 - reading bytes from ProFile for write sector event:%02x bsy:%02x cmd:%02x rrw:%02x PA:%02x @ index%d",
            event, P->BSYLine,   P->CMDLine,  P->RRWLine, P->VIA_PA, P->indexwrite );
          #endif
 
          if (EVENT_WRITE_NUL) return; //2006.05.19
 
-
          if (EVENT_WRITE_ORA && P->RRWLine && !P->CMDLine)
          {
+            
             P->DataBlock[P->indexwrite++]=P->VIA_PA;
-            if (P->indexwrite>552) {PRO_STATUS_BUFFER_OVERFLOW; P->StateMachineStep=0; DEBUG_LOG(0,"State 7 write buffer Overflow");}
+            if (P->indexwrite>552) {PRO_STATUS_BUFFER_OVERFLOW; P->StateMachineStep=0; DEBUG_LOG(0,"State:7 write buffer Overflow");}
             else SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);
 
          }
@@ -1127,13 +1154,12 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
             }
             else
                 {
-                    DEBUG_LOG(0,"State 7 did not recognize byte event:%02x bsy:%02x cmd:%02x rrw:%02x",
+                    DEBUG_LOG(0,"State:7 did not recognize byte event:%02x bsy:%02x cmd:%02x rrw:%02x",
                       event,
                       P->BSYLine,
                       P->CMDLine,
                       P->RRWLine);
                 }
-
          return;
 
 
@@ -1142,51 +1168,42 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
 
-         DEBUG_LOG(0,"State 8 - wait for 3rd 0x55 - write:bsy:%d",P->BSYLine);
+         DEBUG_LOG(0,"State:8 - wait for 3rd 0x55 - write:bsy:%d, PA=%02x CMD:%d",P->BSYLine,P->VIA_PA,P->CMDLine);
          #endif
 
          CHECK_PROFILE_LOOP_TIMEOUT;
-         //
-         //if (EVENT_WRITE_ORA && P->RRWLine && !P->CMDLine)
-         //
-
          P->BSYLine=1; //no this should always be 1 - do not change it!
          if (EVENT_WRITE_NUL) return;
 
          if (EVENT_WRITE_ORA)
-                                               {if (P->VIA_PA==0x55)
-                                                   {
-                                                    P->StateMachineStep=WRITE_BLOCK_STATE; // accept command
-                                                    SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND);
-
-                                                    P->indexread=0;
-                                                    PRO_STATUS_GOT55;
-                                                    DEBUG_LOG(0,"Command accepted, transition to 9");
-                                                   }
-                                                else
-                                                    {P->StateMachineStep=0;
-                                                     PRO_STATUS_NO55;}
-                                               }
+            {if (P->VIA_PA==0x55)
+                {
+                 P->StateMachineStep=WRITE_BLOCK_STATE; // accept command
+                 SET_PROFILE_LOOP_TIMEOUT(HUN_THOUSANDTH_OF_A_SEC*5);
+                 P->indexread=0;
+                 PRO_STATUS_GOT55;
+                 DEBUG_LOG(0,"Command accepted, transition to Step:9");
+                }
+             else
+                 {P->StateMachineStep=0;
+                  PRO_STATUS_NO55;}
+            }
          return;
 
 
-    case WRITE_BLOCK_STATE:     // 8  // do the write and waste some time
+    case WRITE_BLOCK_STATE:                    // 8  // do the write and waste some time
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-
-         DEBUG_LOG(0,"State 9 - write and waste more time (%d)",PROFILE_WAIT_EXEC_CYCLE);
+         DEBUG_LOG(0,"State:9 - write and waste more time (%d)",PROFILE_WAIT_EXEC_CYCLE);
          #endif
-
-         CHECK_PROFILE_LOOP_TIMEOUT;
-         if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC) ) return;
+         if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC*5) ) return;
 
          blocknumber=(P->DataBlock[5]<<16) |
                      (P->DataBlock[6]<< 8) |
                      (P->DataBlock[7]    ) ;
 
          #ifdef DEBUG
-                                                              //   0     1    2    3    4     5   6    7     8     9   10   11   12   13   14  15
-
+                                                      //   0    1   2     3    4      5    6   7      8    9   10   11   12   13   14  15
           DEBUG_LOG(0,"Writing block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x|%02x %02x %02x %02x %02x %02x",
             blocknumber, blocknumber,
             P->DataBlock[ 0],
@@ -1230,8 +1247,6 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
             P->DataBlock[522+ 19]
             );
 
-
-
          #endif
 
          do_profile_write(P,blocknumber);
@@ -1254,7 +1269,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
     case SEND_DATA_AND_TAGS_STATE:     //10                       // Let Lisa read the status/data
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-         DEBUG_LOG(0,"State 10, allow Lisa to read the status and data  - pointer:%d",P->indexread);
+         DEBUG_LOG(0,"State:10, allow Lisa to read the status and data  - pointer:%d",P->indexread);
          #endif
 
          P->BSYLine=0;
@@ -1330,7 +1345,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-          DEBUG_LOG(0,"State 12, post write - allow Lisa to read the status and data  - pointer:%d",P->indexread);
+          DEBUG_LOG(0,"State:12, post write - allow Lisa to read the status and data  - pointer:%d",P->indexread);
          #endif
 
 
@@ -1342,7 +1357,6 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          if (!P->CMDLine)
          {
-
             if (EVENT_READ_IRA)
             {
              P->VIA_PA=P->DataBlock[P->indexread++]; if (P->indexread>3) P->indexread=0;

@@ -533,7 +533,7 @@ if (profileboot==0)
 //  lisaram[0x80183]=0;
 
   if  (!P) {
-      messagebox("Can't boot from non-existant ProFile. Create a ProFile, boot from an OS instal disk, and install an operating system on the ProFile.", "No ProFile Hard Drive");
+      messagebox("Can't boot from non-existant ProFile. Create a ProFile, boot from an OS install disk, and install an operating system on the ProFile.", "No ProFile Hard Drive");
       cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
       lisa_powered_off();
       return 1;

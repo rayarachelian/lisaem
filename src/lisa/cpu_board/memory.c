@@ -389,6 +389,8 @@ void  *dmem68k_memptr(char *file, char *function, int line,uint32 addr)
     return ret;
 }
 
+uint32 get_physaddr(uint32 addr) { CHK_RAM_LIMITS(addr); return physaddr; }
+
 
 uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
 {
@@ -399,12 +401,11 @@ uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"%s:%s:%d: READ BYTE @ %d/%08x:: %s",file,function,line, context,addr, chk_mtmmu(a,0));
     #endif
-    if (mmu_trans[((addr) & MMUEPAGEFL)>>9].readfn<2)
-    {EXITR(306,0,"MMU_T[%04x].rfn is %d!", ((addr) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(306,0,"MMU_T[%04x].rfn is %d!", ((addr) & MMUEPAGEFL)>>9,rfn);}
 
-
-    ret=mem68k_fetch_byte[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ BYTE %02x '%s' from @%d/%08x (@%08x)",ret,ascbyte(ret),context,a,addr);
+    ret=mem68k_fetch_byte[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ BYTE %02x '%s' from @%d/%08x (phys @%08x) using %s",ret,ascbyte(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) MEMDEBUG_LOG(100,":::::Got abort_opcode=1 for READ BYTE %02x '%s' from @%d/%08x (@%08x)",ret,ascbyte(ret),context,a,addr);
@@ -412,7 +413,6 @@ uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
     #endif
 
 #ifdef CPU_CORE_TESTER
-//    void record_access(uint32 address, int size, int write, uint32 prewriteval, uint32 value)
     record_access(addr, 1, 0,  (uint32)ret);
 #endif
 
@@ -427,13 +427,10 @@ uint16 dmem68k_fetch_word(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: READ WORD @ %d/%08x:: %s",file,function,line, context,a, chk_mtmmu(a,0));
     #endif
-
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].readfn<2)
-    {EXITR(307,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
-
-
-    ret=mem68k_fetch_word[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ WORD %04x '%s' from @%d/%08x (@%08x)",ret,ascword(ret),context,a,addr);
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(307,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,rfn);}
+    ret=mem68k_fetch_word[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ WORD %04x '%s' from @%d/%08x (phys @%08x) using %s",ret,ascword(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! READ WORD %04x '%s' from @%d/%08x (@%08x)",ret,ascword(ret),context,a,addr);
@@ -456,12 +453,11 @@ uint32 dmem68k_fetch_long(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: REAd LONG @ %d/%08x:: %s",file,function,line, context,a, chk_mtmmu(a,0));
     #endif
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(308,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,rfn);}
 
-    if ((mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)<2)
-    {EXITR(308,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
-
-    ret=mem68k_fetch_long[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ LONG %08x '%s' from @%d/%08x (@%08x)",ret,asclong(ret),context,a,addr);
+    ret=mem68k_fetch_long[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ LONG %08x '%s' from @%d/%08x (phys @%08x) using %s",ret,asclong(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! READ LONG %08x '%s' from @%d/%08x (@%08x)",ret,asclong(ret),context,a,addr);
@@ -484,15 +480,14 @@ void   dmem68k_store_byte(char *file, char *function, int line,uint32 addr, uint
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: WRITE BYTE %02x to @ %d/%08x:: %s",file,function,line, d,context,a, chk_mtmmu(a,1));
     #endif
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-    {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
-
-    MEMDEBUG_LOG(100,":::::WRITE BYTE %02x '%s' to @%d/%08x",d,ascbyte(d),context,a);
-    mem68k_store_byte[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    MEMDEBUG_LOG(0,":::::WRITE BYTE %02x '%s' to @%d/%08x using %s",d,ascbyte(d),context,a,memspaces[wfn]);
+    mem68k_store_byte[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! :::::WRITE BYTE %02x '%s' to @%d/%08x",d,ascbyte(d),context,a);
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! :::::WRITE BYTE %02x '%s' to @%d/%08x (phys @%08x) using %s",d,ascbyte(d),context,a,get_physaddr(addr),memspaces[wfn]);
     #endif
 #ifdef CPU_CORE_TESTER
 //    void record_access(uint32 address, int size, int write, uint32 prewriteval, uint32 value)
@@ -509,14 +504,14 @@ void   dmem68k_store_word(char *file, char *function, int line,uint32 addr, uint
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: WRITE WORD %04x to @ %d/%08x:: %s",file,function,line, d,context,a, chk_mtmmu(a,1));
     #endif
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-        {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    MEMDEBUG_LOG(100,":::::WRITE WORD %04x '%s' to @%d/%08x",d,ascword(d),context,a);
-    mem68k_store_word[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    MEMDEBUG_LOG(100,":::::WRITE WORD %04x '%s' to @%d/%08x using %s",d,ascword(d),context,a,memspaces[wfn]);
+    mem68k_store_word[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE WORD %04x '%s' to @%d/%08x",d,ascword(d),context,a);
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE WORD %04x '%s' to @%d/%08x (phys @%08x)using %s",d,ascword(d),context,a,get_physaddr(addr),memspaces[wfn]);
     #endif
 
 #ifdef CPU_CORE_TESTER
@@ -532,16 +527,16 @@ void   dmem68k_store_long(char *file, char *function, int line,uint32 addr, uint
     HIGH_BYTE_FILTER();
     uint32 a=addr;
 
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-        {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    MEMDEBUG_LOG(100,":::::WRITE LONG %08x '%s' to @%d/%08x %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):"")  );
+    MEMDEBUG_LOG(100,":::::WRITE LONG %08x '%s' to @%d/%08x %s (phys @%08x) using %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):""), get_physaddr(addr), 
+                     memspaces[wfn]  );
 
-
-    mem68k_store_long[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    mem68k_store_long[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE LONG %08x '%s' to @%d/%08x %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):"")  );
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE LONG %08x '%s' to @%d/%08x %s using %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):""),memspaces[wfn]  );
     #endif
 
 #ifdef CPU_CORE_TESTER
@@ -2060,10 +2055,9 @@ void   lisa_wb_Oxe000_latches(uint32 addr, uint8 data)
         case 0x01A:
                     DEBUG_LOG(100,"About to ENABLE VideoIRQ. videoirq=%d vertical=%d",videoirq,vertical);
                     if (!videoirq) {serialnumshiftcount=0; serialnumshift=0;}
-                    videoirq=1;     ALERT_LOG(100,"virq:VTIRMASK: enabling vertical retrace IRQ's");
+                    videoirq=1;     DEBUG_LOG(100,"virq:VTIRMASK: enabling vertical retrace IRQ's");
                     verticallatch=0;
                     reset_video_timing();
-
                     return;
         //fce018                        // was vertical=0 for fce018, disabling to satisfy lisa os 3.1
 
@@ -2135,6 +2129,30 @@ uint32 lisa_rl_Oxe800_videlatch(uint32 addr)
     else return 0;
 }
 
+void refresh_vidram_fns(void) {  // erase old vidram fn's and update the new one.
+    int i,j; uint32 a, videomax=0;
+
+    //if (maxlisaram==1024*1024) videolatchaddress-=0x80000;
+    videomax=videolatchaddress+32768;
+
+    //ALERT_LOG(100,"new videolatch address:%02x->@%08x:Refreshing mmu_t tables for vidram for %08x-%08x at pc=%d/%08x",data,addr,videolatchaddress,videomax-1,context,pc24);
+
+//    for (j=0; j<5; j++) 
+        for (i=0; i<32768; i++)
+        {   // clear existing vidram and turn it into just ram
+            if  (mmu_trans_all[context][i].writefn==vidram)  
+                 mmu_trans_all[context][i].writefn=ram;
+            // if it's RAM check to see if it can be vidram
+            if  (mmu_trans_all[context][i].writefn==ram) {
+                    a=( (i<<9)+mmu_trans_all[context][i].address) & TWOMEGMLIM;
+                    if (a>=videolatchaddress && a<videomax) mmu_trans_all[context][i].writefn=vidram;
+                }
+        }
+    videoramdirty=32768;   videoximgdirty|=9;    LisaScreenRefresh();
+    videoramdirty=32768;   videoximgdirty|=9;
+}
+
+
 void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
 {
     int i,j; uint32 a, videomax=0;
@@ -2142,57 +2160,32 @@ void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
   //  char shout[1024];
   //  #endif
 
-    DEBUG_LOG(100,"@%08x:%02x videolatch/motherboard error led",addr,data);
+    ALERT_LOG(100,"@%08x:%02x videolatch/motherboard error led",addr,data);
 
     videoramdirty=32768;
 
     if ((addr & 0x000000fff)==0x00000800)
     {
-        if (data & 0x80)  {  DEBUG_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x",addr,data);  return;}
+        if (data & 0x80)  {  ALERT_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x",addr,data);  return;}
 
         if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
             {
-                lastvideolatch=videolatch; lastvideolatchaddress=videolatchaddress;
                 videolatch=data; videolatchaddress=(videolatch*32768);
-
-                //ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);
-
-                //20051111
-                if (maxlisaram==1024*1024) videolatchaddress-=0x80000;
-
-                videomax=videolatchaddress+32768;
-
-                // erase old vidram fn's and update the new one.
-                DEBUG_LOG(100,"new videolatch address:%02x->@%08x:Refreshing mmu_t tables for vidram for %08x-%08x at pc=%d/%08x",data,addr,videolatchaddress,videomax-1,context,pc24);
-
-                for (j=0; j<5; j++) for (i=0; i<32768; i++)
-                    {
-                     // clear existing vidram and turn it into just ram
-                        if (mmu_trans_all[j][i].writefn==vidram)  mmu_trans_all[j][i].writefn=ram;
-
-                        if (mmu_trans_all[j][i].writefn==ram)
-                            {
-                                a=( (i<<9)+mmu_trans_all[j][i].address) & TWOMEGMLIM;
-                                if (a>=videolatchaddress && a<videomax) mmu_trans_all[j][i].writefn=vidram;
-                            }
-                    }
-                videoramdirty=32768;   videoximgdirty|=9;    LisaScreenRefresh();
-                videoramdirty=32768;   videoximgdirty|=9;
+                ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);
+                if (lastvideolatch!=videolatch)refresh_vidram_fns();
+                lastvideolatch=videolatch; lastvideolatchaddress=videolatchaddress;
             }
-            else {DEBUG_LOG(100,"video latch write:OUT OF RANGE:%02x->@%08x %08x-%08x at pc=%d/%08x\n",
+            else {ALERT_LOG(100,"video latch write:OUT OF RANGE:%02x->@%08x %08x-%08x at pc=%d/%08x\n",
                     data,
                     addr,
                     videolatchaddress,
                     videomax-1,
                     context,
                     pc24);}
-
          //   if (data!=((maxlisaram>>15)-1))
          //       {   debug_log_enabled=1; debug_on(""); DEBUG_LOG(100,"Debug ON - latch write");
          //           DEBUG_LOG(100,"Debug Enabled because of write %02x to %08x video latch at pc=%d/%08x",data,addr,context,pc24);
          //       }
-
-
     }
 }
 
@@ -2525,7 +2518,6 @@ uint8  lisa_rb_ram(uint32 addr)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) return (uint8)(lisaram[physaddr]);
-
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2542,7 +2534,7 @@ uint16 lisa_rw_ram(uint32 addr)
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) return LOCENDIAN16(*(uint16 *)(&lisaram[physaddr]) );
 
-   // something went wrong here!
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2563,7 +2555,7 @@ uint32 lisa_rl_ram(uint32 addr)
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
-
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    return 0x39393939;
 }
 
@@ -2575,7 +2567,7 @@ void   lisa_wb_ram(uint32 addr, uint8 data)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) {*(uint8  *)(&lisaram[physaddr])=data; return;}
-
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    CPU_READ_MODE=0;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2591,7 +2583,6 @@ void   lisa_ww_ram(uint32 addr, uint16 data)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) {*(uint16 *)(&lisaram[physaddr]) = LOCENDIAN16(data); return;}
-
    CPU_READ_MODE=0;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2934,12 +2925,12 @@ uint32 lisa_rl_ro_violn(uint32 addr)               {return lisa_rl_vidram(addr);
 #endif
 
 uint8  *lisa_mptr_bad_page(uint32 addr)            {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); return NULL;}
-uint8  lisa_rb_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-uint16 lisa_rw_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-uint32 lisa_rl_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-void   lisa_wb_bad_page(uint32 addr, uint8 data)   {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
-void   lisa_ww_bad_page(uint32 addr, uint16 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
-void   lisa_wl_bad_page(uint32 addr, uint32 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
+uint8  lisa_rb_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+uint16 lisa_rw_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+uint32 lisa_rl_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+void   lisa_wb_bad_page(uint32 addr, uint8 data)   {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
+void   lisa_ww_bad_page(uint32 addr, uint16 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
+void   lisa_wl_bad_page(uint32 addr, uint32 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
 
 // Do reads of the ROM
 uint8  *lisa_mptr_sio_rom(uint32 addr)             {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); return (uint8 *)(&lisarom[addr & 0x3fff]);}
@@ -3095,12 +3086,6 @@ void   lisa_wb_sio_mrg(uint32 addr, uint8 data)
         if (con)  {  mmu_all[0][a].slr=r; mmu_all[0][a].changed|=1;}
         mmu_all[con][a].slr=r; mmu_all[con][a].changed |=1;
 
-
-       // #ifdef DEBUG
-       //   dumpmmupage(con,a,buglog);
-       // #endif
-
-
         // must correct mmu here!
         GET_MMU_DIRTY(0); if ((a+1)!=mmudirty)  {SET_MMU_DIRTY((mmudirty<<8) | (a+1));  if (context) mmuflush(0);}
         return;
@@ -3118,8 +3103,10 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
 
     if (addr & 8) // Segment Origin Register
     {
-        data &=0xfff;
+        data &=0x0fff;
         if (data==mmu_all[con][a].sor)   {DEBUG_LOG(100,"mmu[%d][%d].sor no change needed ",con,a);return;} // don't bother wasting time here - sync new just incase.
+
+        //ALERT_LOG(0,"Wrote %03x to mmu[%d][%d].sor addr=%08x",data,context,a,addr);
 
         // Shadow the write to context 0 and 1 (context 0 is our START mode, context 1 is the real lisa context 0)
         if (con==1)    { mmu_all[0][a].sor=data; mmu_all[0][a].changed|=2;}
@@ -3138,19 +3125,14 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
                       mmu_all[con][a].sor,data,(uint32)(pagestart<<9),(uint32)(pageend<<9),rfn,wfn);
         }
         #endif
-        // DEBUG_LOG(100, "  MMUPATTERN: mmu_all[%d][%d]newsor=%04x",con,a,mmu_all[con][a].newsor);
-
-        //DEBUG_LOG(100, "mmu write %04x to mmu_all[%d][(%02x)%d].slr",data,con,a,a);
-
-      //  #ifdef DEBUG
-      //    dumpmmupage(con,a,buglog);
-      //  #endif
-
         return;
     }
     else // Segment Limit Register
     {
         data &=0x0fff;
+
+        //ALERT_LOG(0,"Wrote %03x to mmu[%d][%d].slr addr=%08x",data,context,a,addr);
+
         if (data==mmu_all[con][a].slr)
             {DEBUG_LOG(100,"no change to slr: mmu_all[%d][%d].slr=%04x changed=%d data=%04x",
                           con,a,
@@ -3180,15 +3162,7 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
                       mmu_all[con][a].slr, slrname(mmu_all[con][a].slr),
                       mmu_all[con][a].sor,data,(uint32)(pagestart<<9),(uint32)(pageend<<9),rfn,wfn);
         }
-
-        // DEBUG_LOG(100, "  MMUPATTERN: mmu_all[%d][%d]newslr=%04x",con,a,mmu_all[con][a].newslr);
-
-        //DEBUG_LOG(100, "mmu write %04x to mmu_all[%d][(%02x)%d].sor",data,con,a,a);
-
-        //  dumpmmupage(con,a,buglog);
         #endif
-
-
 
         return;
     }
@@ -3996,16 +3970,14 @@ uint8  lisa_rb_Oxf800_statreg(uint32 addr)
  retval |=STATREG_INVBIT;
 #endif
 
-
 if (cxdiff>=64236)
    {
        video_scan=cpu68k_clocks;
        cxdiff=0;
-
-       retval &= ~STATREG_VERTICALRTC;
-
+       retval &= ~STATREG_VERTICALRTC; // 2021.02.23 this was clears vertical bit=0
        cxdiff=cxdiff % 64236;
    }
+else   retval |= STATREG_VERTICALRTC;  // 2021.02.23 this did not exist - if these two are reversed Boot throws error 42, but UniPlus goes further, else gets stuck in infinite loop
 
 cxx=(int32)(cxdiff-2328);
 
@@ -4036,7 +4008,7 @@ else
     parity_error_hit=0;          // clear the parity error flag - do we do this now or when PAROFF happens?
     softmemerror=0;
 
-    DEBUG_LOG(100,"retval:%02x :: (active low) bit0softerr:%d,1parity:%d,2vret:%d::%d,3bustmout:%d,4vidbit:%d,5hzsync:%d,6invbit:%d  maxx",
+    DEBUG_LOG(100,"retval:%02x :: (active low) bit0softerr:%d, 1parity:%d, 2vret:%d::%d, 3bustmout:%d, 4vidbit:%d, 5hzsync:%d, 6invbit:%d  maxx",
                              retval,
                              retval &  STATREG_SOFTMEM_ERR,
                              retval &  STATREG_HARDMEM_ERR,
@@ -4046,7 +4018,7 @@ else
                              retval &  STATREG_HORIZONTAL,
                              retval &  STATREG_INVBIT);
 
-   //if (vertical != ((retval &  STATREG_VERTICALRTC) ?1:0) )
+   //if (vertical != ((retval &  STATREG_VERTICALRTC) ?1:0) );
    //   DEBUG_LOG(100,"Vertical=%d statreg bit is: %d at clk:%016llx",vertical,(retval &  STATREG_VERTICALRTC),cpu68k_clocks );
 
    if (verticallatch)        retval &=~STATREG_VERTICALRTC;

@@ -37,6 +37,8 @@
  * --------------------------------------------------*/
 #define BCD_NV_SAME 1
 
+#define PRESERVE_HIGH_BYTE 1
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1875,6 +1877,10 @@ void generate(FILE *o, int topnibble)
                     C_ABRT_CHK(o);
                     OUT("\n");
 
+                    fprintf(o,"   #ifdef DEBUG\n");
+                    fprintf(o,"   trap_opcode(srcdata);\n");
+                    fprintf(o,"   #endif\n");
+
                     fprintf(o, "  reg68k_internal_vector(V_TRAP+srcdata, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     pcinc = 0;
@@ -2011,6 +2017,9 @@ void generate(FILE *o, int topnibble)
 
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"RTS: ->0x%X\\n\", PC);", o);
+                        #ifdef DEBUG
+                        fputs("  if (!(PC)) {extern void dumpallscreenshot(void); dumpallscreenshot();}", o);
+                        #endif
                     pcinc = 0;
                     break;
 
@@ -2046,12 +2055,15 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)-= 4;\n");
                     fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
                     ABORT_CHECK(o);
+                    #ifdef PRESERVE_HIGH_BYTE
                   //OUT("  fetchword(srcaddr);"); //20060113
                   //ABORT_CHECK(o);
-//                    if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
-//                         {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
-//                    else 
-                           OUT("  PC = srcaddr;\n");
+                    if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+                         {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+                    else  OUT("  PC = srcaddr;\n");
+                    #else
+                          OUT("  PC = srcaddr;\n");
+                    #endif
 
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"JSR: ->0x%X\\n\", PC);", o);
@@ -2069,17 +2081,19 @@ void generate(FILE *o, int topnibble)
                   //OUT("  fetchword(srcaddr);\n"); //20060113
                   //ABORT_CHECK(o);  // suspect there's an issue here **** 20180316 ****
 //         fputs("  fprintf(stderr,\"JMP: %08x->0x%08x\\n\", PC, srcaddr);\n", o);  //2020.07.24
-
-                  //if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
-                  //     {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
-                  //else 
+                  #ifdef PRESERVE_HIGH_BYTE
+                  if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+                       {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+                  else  OUT("  PC = srcaddr;\n");
+                  #else
                          {OUT("  PC = srcaddr;\n");}
+                  #endif
 
-                    if (DEBUG_BRANCH)
-                        fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", o);
+                  if (DEBUG_BRANCH)
+                      fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", o);
                     
-                    pcinc = 0;
-                    break;
+                  pcinc = 0;
+                  break;
 
                 case i_Scc:
                     GENDBG("");
@@ -2156,8 +2170,11 @@ void generate(FILE *o, int topnibble)
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"Bcc: 0x%X\\n\", PC);\n", o);
                     OUT("  if (cc)\n");
-                  //OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
+                    #ifdef PRESERVE_HIGH_BYTE
+                    OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
+                    #else
                     OUT("    {  PC = srcdata; cpu68k_clocks+=(10-8);}\n");
+                    #endif
                     OUT("  else\n");
                     if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                   }\n", (iib->wordlen)*2);
                     else                        fprintf(o, "    {PC+= %d; cpu68k_clocks+=(12-8);}\n", (iib->wordlen)*2);
@@ -2176,9 +2193,11 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)-= 4;\n");
                     fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
                     ABORT_CHECK(o);
-                  //OUT("  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff);\n");
+                    #ifdef PRESERVE_HIGH_BYTE
+                    OUT("  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff);\n");
+                    #else
                     OUT("  PC = srcdata;\n");
-
+                    #endif
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"BSR: ->0x%X\\n\", PC);\n", o);
                     pcinc = 0;
@@ -2342,6 +2361,10 @@ void generate(FILE *o, int topnibble)
                     GENDBG("");
                     OUT("\n");
                     //fprintf(o, "  PC+=2;\n  reg68k_internal_vector(V_LINE10, PC,0);\n");        //20060116-RA
+
+                    fprintf(o,"#ifdef DEBUG\n");
+                    fprintf(o,"a_line();\n");
+                    fprintf(o,"#endif\n");
                     fprintf(o, "reg68k_internal_vector(V_LINE10, PC,0);\n");
 
                     pcinc = 0;
@@ -2356,8 +2379,10 @@ void generate(FILE *o, int topnibble)
 
                 case i_ILLG:
                     GENDBG("");
+                    OUT("  if (ipc->opcode==0x4e7a) PC+=4; else PC+=2;\n"); // http://bitsavers.org/pdf/apple/lisa/unisoft/Unisoft_Lisa_Kernel_Aug1983.pdf p3 movec vbr,d0
                     OUT("  printf(\"Illegal instruction @ %x\\n\", PC);\n");
                     fprintf(o, "  reg68k_internal_vector(4, PC,0);\n");  // RA2002.08.02
+                    pcinc = 0;
                     break;
 
             } /* switch */

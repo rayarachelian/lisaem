@@ -13,9 +13,9 @@
 #include <def68k-funcs.h>
 
 
-#ifdef DEBUG
-#undef DEBUG
-#endif
+//#ifdef DEBUG
+//#undef DEBUG
+//#endif
 
 
 /*** externally accessible variables ***/
@@ -59,11 +59,8 @@ static int iib_checks_enabled=0;
 static void *iib_table_ptr[65536];
 static void *iib_check_fns[65536];
 
-
-
-
 // this wasn't triggered, so our LisaTest bug isn't caused by this at all
-#ifdef TEST_FREE_IPCTS_ARE_EMPTY
+#ifdef XXXXTEST_FREE_IPCTS_ARE_EMPTY
 void check_ipct_memory(void)
 {
   t_ipc_table *ipct=ipct_free_head;
@@ -74,27 +71,26 @@ void check_ipct_memory(void)
   {
       if  (mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].table==ipct)
       {
-          DEBUG_LOG(20,"There's an unhappy little IPCT over here, and maybe over there lives a big buggy mmu_trans_all table...")
-          DEBUG_LOG(20,"*BUG* Found the current IPCT for PC:%d/%08x in the free list!!! at ipct_free_head[%d] ipct=%p mmu.table=%p",
+          DEBUG_LOG(200,"There's an unhappy little IPCT over here, and maybe over there lives a big buggy mmu_trans_all table...")
+          DEBUG_LOG(200,"*BUG* Found the current IPCT for PC:%d/%08x in the free list!!! at ipct_free_head[%d] ipct=%p mmu.table=%p",
                     context,pc24,i,ipct,mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].table);
-          DEBUG_LOG(20,"*BUG* ipct->next:%p",ipct->next);
-          DEBUG_LOG(20,"*BUG* ipct->context:%d",ipct->context);
-          DEBUG_LOG(20,"*BUG* ipct->address:%08x",ipct->address);
-          DEBUG_LOG(20,"*BUG* ipct->used:%d",ipct->used);
-          DEBUG_LOG(20,"*BUG* pc24>>9=%08x, mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].address=%08x rfn:%d,wfn:%d",(pc24 & MMUEPAGEFL)>>9,
+          DEBUG_LOG(200,"*BUG* ipct->next:%p",ipct->next);
+          DEBUG_LOG(200,"*BUG* ipct->context:%d",ipct->context);
+          DEBUG_LOG(200,"*BUG* ipct->address:%08x",ipct->address);
+          DEBUG_LOG(200,"*BUG* ipct->used:%d",ipct->used);
+          DEBUG_LOG(200,"*BUG* pc24>>9=%08x, mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].address=%08x rfn:%d,wfn:%d",(pc24 & MMUEPAGEFL)>>9,
                         mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].address,
                         mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].readfn,          mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].writefn);
       }
 
       for (j=0; j<256; j++)
         {
-          if (ipct->ipc[j].function!=NULL) {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].function is not NULL @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
-          if (ipct->ipc[j].used!=0)        {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].used is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
-          if (ipct->ipc[j].set!=0)         {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].set is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
-          if (ipct->ipc[j].opcode!=0xf33f) {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].opcode is not 0xf33f @%p it is %04x\n",context,pc24,ipct->context,ipct->address,i,j,ipct,ipct->ipc[j].opcode);}
-          if (ipct->ipc[j].reg!=0)         {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].reg is not 0 @%p it is %08lx\n",context,pc24,ipct->context,ipct->address,i,j,ipct,(long)ipct->ipc[j].reg);}
-          if (ipct->ipc[j].src!=0)         {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].src is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct,(long)ipct->ipc[j].src);}
-          if (ipct->ipc[j].dst!=0)         {DEBUG_LOG(20,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].dst is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct,(long)ipct->ipc[j].dst);}
+          if (ipct->ipc[j].function!=NULL) {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].function is not NULL @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
+          if (ipct->ipc[j].used!=0)        {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].used is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
+          if (ipct->ipc[j].set!=0)         {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].set is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct);}
+          if (ipct->ipc[j].opcode!=0xf33f) {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].opcode is not 0xf33f @%p it is %04x\n",context,pc24,ipct->context,ipct->address,i,j,ipct,ipct->ipc[j].opcode);}
+          if (ipct->ipc[j].src!=0)         {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].src is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct,(long)ipct->ipc[j].src);}
+          if (ipct->ipc[j].dst!=0)         {DEBUG_LOG(200,"*BUG* pc24:%d/%08x addr:%d/%08x ipct_free_head[%d]->ipc[%d].dst is not 0 @%p\n",context,pc24,ipct->context,ipct->address,i,j,ipct,(long)ipct->ipc[j].dst);}
 
           //ipct->ipc[j].function=NULL; 
           //ipct->ipc[j].used=0;        
@@ -106,7 +102,7 @@ void check_ipct_memory(void)
         }
 
     if  (mmu_trans_all[context][(pc24 & MMUEPAGEFL)>>9].table==ipct) {
-        DEBUG_LOG(20,"This is the end, my only friend, the end...")
+        DEBUG_LOG(200,"This is the end, my only friend, the end...")
         i=0; ipct=ipct_free_head;
         for (int c=0; c<5; c++)
           for (int s=0; s<32768; s++)
@@ -114,17 +110,17 @@ void check_ipct_memory(void)
               {
                 if (mmu_trans_all[c][s].table==ipct)
                 {
-                    DEBUG_LOG(20,"*BUG* ipct from free_list[%d] found pointed to from mmu_trans_all[%d][%d<<9=(%08x)].table==%p",i,context,s,s<<9,ipct);
-                    DEBUG_LOG(20,"*BUG* ipct->next:%p",ipct->next);
-                    DEBUG_LOG(20,"*BUG* ipct->context:%d",ipct->address);
-                    DEBUG_LOG(20,"*BUG* ipct->address:%08x",ipct->address);
-                    DEBUG_LOG(20,"*BUG* ipct->used:%d",ipct->used);
-                    DEBUG_LOG(20,"---------------------------------------------")
+                    DEBUG_LOG(200,"*BUG* ipct from free_list[%d] found pointed to from mmu_trans_all[%d][%d<<9=(%08x)].table==%p",i,context,s,s<<9,ipct);
+                    DEBUG_LOG(200,"*BUG* ipct->next:%p",ipct->next);
+                    DEBUG_LOG(200,"*BUG* ipct->context:%d",ipct->address);
+                    DEBUG_LOG(200,"*BUG* ipct->address:%08x",ipct->address);
+                    DEBUG_LOG(200,"*BUG* ipct->used:%d",ipct->used);
+                    DEBUG_LOG(200,"---------------------------------------------")
                 }
                 ipct=ipct->next;
                 i++;
               }
-        DEBUG_LOG(20,"======================== I am the Alizarine King, I can't do anything ====================================================");
+        DEBUG_LOG(200,"======================== I am the Alizarine King, I can't do anything ====================================================");
         EXIT(0,0,"kthxbyee! Found current ipct in free list, so quitting.");
         }
     
@@ -138,20 +134,20 @@ void check_ipct_counts(const char *function, const long linenum)
 {
   long int sum=0; long i=0, usedsum=0;
   t_ipc_table *ipctz=NULL, *ipctl=NULL;
-  DEBUG_LOG(20,"------------------------------------------------------------------------------------ipc");
-  DEBUG_LOG(20,"Called from: %s:%s:%d",__FILE__,function,linenum);
-  DEBUG_LOG(20,"------------------------------------------------------------------------------------ipc");
-  DEBUG_LOG(20,"iipct_mallocs:   %ld",(long)iipct_mallocs);
-  DEBUG_LOG(20,"ipcts_allocated: %ld, %ld bytes",(long)ipcts_allocated,(long)(ipcts_allocated*sizeof(t_ipc_table)));
-  DEBUG_LOG(20,"ipcts_used:      %ld",(long)ipcts_used);
-  DEBUG_LOG(20,"ipcts_free:      %ld",(long)ipcts_free);
+  DEBUG_LOG(200,"------------------------------------------------------------------------------------ipc");
+  DEBUG_LOG(200,"Called from: %s:%s:%d",__FILE__,function,linenum);
+  DEBUG_LOG(200,"------------------------------------------------------------------------------------ipc");
+  DEBUG_LOG(200,"iipct_mallocs:   %ld",(long)iipct_mallocs);
+  DEBUG_LOG(200,"ipcts_allocated: %ld, %ld bytes",(long)ipcts_allocated,(long)(ipcts_allocated*sizeof(t_ipc_table)));
+  DEBUG_LOG(200,"ipcts_used:      %ld",(long)ipcts_used);
+  DEBUG_LOG(200,"ipcts_free:      %ld",(long)ipcts_free);
  //2020.02.07 disabling this, while useful, not the issue. leaving it in, but commented out incase future bugs sneak in
  // for (i=0; i<iipct_mallocs; i++) 
  // {
- //   DEBUG_LOG(20,"ipct_mallocs[%ld]=%p size:%ld ipcts size:%ld bytes",i,ipct_mallocs[i],sipct_mallocs[i],sipct_mallocs[i]*sizeof(t_ipc_table));
+ //   DEBUG_LOG(200,"ipct_mallocs[%ld]=%p size:%ld ipcts size:%ld bytes",i,ipct_mallocs[i],sipct_mallocs[i],sipct_mallocs[i]*sizeof(t_ipc_table));
  //   sum+=sipct_mallocs[i];
  // }
- // DEBUG_LOG(20,"We have %ld mallocs, ipc_allocated are:%ld total ipcts:%ld total bytes: %ld",(long) iipct_mallocs, (long)ipcts_allocated,
+ // DEBUG_LOG(200,"We have %ld mallocs, ipc_allocated are:%ld total ipcts:%ld total bytes: %ld",(long) iipct_mallocs, (long)ipcts_allocated,
  //           (long)sum, (long)(sum*sizeof(t_ipc_table)) );
  // ipctz=ipct_free_head; i=0;
  // while (ipctz) {
@@ -160,11 +156,11 @@ void check_ipct_counts(const char *function, const long linenum)
  //   ipctz=ipctz->next; 
  //   i++;
  // }
- // DEBUG_LOG(20,"Counted %ld ipcts, %ld are in use",i,usedsum);
- // if (ipctl!=ipct_free_tail) {DEBUG_LOG(20,"actual ipct_tail:%p tail:%p",ipctl,ipct_free_tail)};
- // DEBUG_LOG(20,"Counted %ld free ipcts",(long)i);
+ // DEBUG_LOG(200,"Counted %ld ipcts, %ld are in use",i,usedsum);
+ // if (ipctl!=ipct_free_tail) {DEBUG_LOG(200,"actual ipct_tail:%p tail:%p",ipctl,ipct_free_tail)};
+ // DEBUG_LOG(200,"Counted %ld free ipcts",(long)i);
   check_ipct_memory();
-  DEBUG_LOG(20,"------------------------------------------------------------------------------------ipc");
+  DEBUG_LOG(200,"------------------------------------------------------------------------------------ipc");
 }
 #endif
 
@@ -176,11 +172,10 @@ void seed_iib_check(void)
   for ( i=0; i<65536; i++)
   {
     iib_table_ptr[i]=cpu68k_iibtable[i];
-    if ( cpu68k_iibtable[i])
-               iib_check_fns[i]=(void *)(cpu68k_iibtable[i]->funcnum);
-    else
-            iib_check_fns[i]=NULL;
+    if ( cpu68k_iibtable[i])  iib_check_fns[i]=(void *)(cpu68k_iibtable[i]->funcnum);
+    else iib_check_fns[i]=NULL;
   }
+
   iib_checks_enabled=1;
 }
 
@@ -373,8 +368,14 @@ int cpu68k_init(void)
 
   j = 0;
 
-  for (i = 0; i < 65536; i++) if (cpu68k_iibtable[i]) j++;
-
+  for (i = 0; i < 65536; i++) {
+    if (cpu68k_iibtable[i]) j++;
+    else  {
+            cpu68k_iibtable[ i     ]  = cpu68k_iibtable[ 0x4AFC*2];    // set all unused to illegal 2020.11.03
+            cpu68k_functable[i*2   ]  = cpu68k_functable[0x4AFC*2]; 
+            cpu68k_functable[i*2 +1]  = cpu68k_functable[0x4AFC*2]; 
+          }
+  }
 
   if (j != cpu68k_totalinstr)
     {
@@ -436,7 +437,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
     addr=NULL;
 
 
-#define MMU_FAIL_CHECK if (abort_opcode==1) { DEBUG_LOG(20,"DANGER! GOT abort_opcode=1 unexpectedly"); ipc->function=NULL; ipc->opcode=0xf33f; return; }
+#define MMU_FAIL_CHECK if (abort_opcode==1) { DEBUG_LOG(200,"DANGER! GOT abort_opcode=1 unexpectedly"); ipc->function=NULL; ipc->opcode=0xf33f; return; }
 #define RET_FAIL       {ipc->function=NULL; ipc->opcode=0xf33f; return;}
 #define MMU_TRY(A)     {abort_opcode=2; A; if (abort_opcode==1) {mmuflush(0x2000); abort_opcode=2; A; MMU_FAIL_CHECK;} abort_opcode=0;}
 
@@ -445,11 +446,11 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
     #endif
 
     if  (ipc==NULL) {
-        DEBUG_LOG(20,"NULL ipc.\nLet the bodies hit the floor... 1, Nothin' wrong with me. 2, Nothing wrong with me, 3. Nothing wrong with me. 4. Nothing wrong with me.");
+        DEBUG_LOG(200,"NULL ipc.\nLet the bodies hit the floor... 1, Nothin' wrong with me. 2, Nothing wrong with me, 3. Nothing wrong with me. 4. Nothing wrong with me.");
         EXIT(123,0,"Received NULL IPC! This usually indicates a corrupt operating system."); }
 
     if  (iib==NULL) {
-        DEBUG_LOG(20,"NULL iib.\nLet the bodies hit the floor... 1, Nothin' wrong with me. 2, Nothing wrong with me, 3. Nothing wrong with me. 4. Nothing wrong with me.");
+        DEBUG_LOG(200,"NULL iib.\nLet the bodies hit the floor... 1, Nothin' wrong with me. 2, Nothing wrong with me, 3. Nothing wrong with me. 4. Nothing wrong with me.");
         EXIT(123,0,"Received NULL IIB! This usually indicates a corrupt operating system."); }
 
     addr68k &=ADDRESSFILT;
@@ -468,16 +469,16 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
       /* low 8 bits of current instruction are addr+1 */
       //ipc->src = (sint32)(*(sint8 *)(addr + 1));
       MMU_TRY( ipc->src = (sint32)((sint8)(fetchbyte(addr68k+1))) )
-      DEBUG_LOG(0,"i_Bcc @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      DEBUG_LOG(100,"i_Bcc @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
 
       if (ipc->src == 0) {
         MMU_TRY(  ipc->src = (sint32)(sint16)(fetchword(addr68k + 2)) );
-        DEBUG_LOG(0,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+        DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
         ipc->wordlen++;
       }
 
       ipc->src += addr68k + 2;    /* add PC of next instruction */
-      DEBUG_LOG(0,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
       return;
     }
 
@@ -488,7 +489,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
       RESUME_DEBUG_MESSAGES();
       ipc->src += addr68k + 2;    /* add PC of next instruction */
       ipc->wordlen++;
-      DEBUG_LOG(0,"i_DBcc/DBRA @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      DEBUG_LOG(100,"i_DBcc/DBRA @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
       return;
     }
 
@@ -528,7 +529,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if ( type == tp_src ) {MMU_TRY( ipc->sreg=fetchbyte(addr68k) );} 
         else                  {MMU_TRY( ipc->dreg=fetchbyte(addr68k) );}
 
-        DEBUG_LOG(0,"dt_Adix @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_Adix @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
 
         ipc->wordlen++;
         addr += 2;
@@ -541,7 +542,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         MMU_TRY( *p = (sint32)(sint16)fetchword(addr68k)  );
         RESUME_DEBUG_MESSAGES();
         ipc->wordlen++;
-        DEBUG_LOG(0,"dt_AbsW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_AbsW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         addr += 2;
         addr68k += 2;
         break;
@@ -551,7 +552,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         //*p = (uint32)((LOCENDIAN16(*(uint16 *)addr) << 16) +
         //              LOCENDIAN16(*(uint16 *)(addr + 2)));
         MMU_TRY(  *p=fetchlong(addr68k)  );
-        DEBUG_LOG(0,"dt_AbsL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_AbsL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen += 2;
         addr += 4;
         addr68k += 4;
@@ -563,7 +564,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         MMU_TRY( *p = (sint32)(sint16)fetchword(addr68k) );
         RESUME_DEBUG_MESSAGES();
         *p += addr68k;   /* add PC of extension word (this word) */
-        DEBUG_LOG(0,"dt_Pdis @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_Pdis @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -586,7 +587,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if ( type == tp_src ) {MMU_TRY( ipc->sreg=fetchbyte(addr68k) );}
         else                  {MMU_TRY( ipc->dreg=fetchbyte(addr68k) );}
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(0,"dt_Pidx @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_Pidx @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -598,7 +599,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES();
         MMU_TRY(  *p = (uint32)fetchbyte(addr68k + 1)  );
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(0,"dt_ImmB @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_ImmB @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -609,7 +610,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES();
         MMU_TRY(  *p = (uint32)fetchword(addr68k)  );
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(0,"dt_ImmW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_ImmW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -619,7 +620,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES(); 
         MMU_TRY(  *p = (uint32)fetchlong(addr68k)  ); // ((LOCENDIAN16(*(uint16 *)addr) << 16) +  LOCENDIAN16(*(uint16 *)(addr + 2)));
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(0,"dt_ImmL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        DEBUG_LOG(100,"dt_ImmL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen += 2;
         addr += 4;
         addr68k += 4;
@@ -629,12 +630,12 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if  (type == tp_src)
             {
                 *p = (ipc->opcode >> iib->sbitpos) & 7;
-                DEBUG_LOG(0,"dt_Imm3 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+                // DEBUG_LOG(100,"dt_Imm3 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
             }
         else
             {
                 *p = (ipc->opcode >> iib->dbitpos) & 7;
-                DEBUG_LOG(0,"dt_Imm3 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+                // DEBUG_LOG(100,"dt_Imm3 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
             }
         break;
 
@@ -643,12 +644,12 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if (type == tp_src)
             {
                 *p = (ipc->opcode >> iib->sbitpos) & 15;
-                DEBUG_LOG(0,"dt_Imm4 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+                // DEBUG_LOG(100,"dt_Imm4 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
             }
         else
           {
               *p = (ipc->opcode >> iib->dbitpos) & 15;
-              DEBUG_LOG(0,"dt_Imm4 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+              // DEBUG_LOG(100,"dt_Imm4 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
           }
         break;
 
@@ -657,12 +658,12 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if (type == tp_src)
           {
               *p = (ipc->opcode >> iib->sbitpos) & 255;
-              DEBUG_LOG(0,"dt_Imm8 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+              // DEBUG_LOG(100,"dt_Imm8 src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
           }
         else
           {
               *p = (ipc->opcode >> iib->dbitpos) & 255;
-              DEBUG_LOG(0,"dt_Imm8 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+              // DEBUG_LOG(100,"dt_Imm8 dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
           }
         break;
 
@@ -672,12 +673,12 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if (type == tp_src)
           {
               *p = (sint32)(sint8)((ipc->opcode >> iib->sbitpos) & 255);
-              DEBUG_LOG(200,"dt_Imm8s src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+              // DEBUG_LOG(200,"dt_Imm8s src @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
           }
         else
           {
               *p = (sint32)(sint8)((ipc->opcode >> iib->dbitpos) & 255);
-              DEBUG_LOG(200,"dt_Imm8s dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+              // DEBUG_LOG(200,"dt_Imm8s dst @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
           }
         break;
 
@@ -695,30 +696,6 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
 }
 
 
-
-/****
-typedef struct _t_ipc_table
-{
-    // Pointers to all the IPC's in this page.  Since the min 68k opcode is 2 bytes in size
-    // the most you can have are 256 instructions per page.  We thus no longer need a hash table
-    // nor any linked list of IPC's as this is a direct pointer to the IPC.  Ain't life grand?
-    t_ipc ipc[256];
-
-    // These are merged together so that on machines with 32 bit architectures we can
-    // save four bytes.  It will still save 2 bytes on 64 bit machines.
-    union _t
-    {     uint32 clocks;
-        _t_ipc_table *next;
-    } t;
-
-
-#ifdef PROCESSOR_ARM
-    void (*compiled)(struct _t_ipc *ipc);
-    //uint8 norepeat;    // what's this do? this only gets written to, but not read.  Maybe Arm needs it?
-#endif
-}t_ipc_table;
-****/
-
 // keep me - I've been checked.
 void init_ipct_allocator(void)
 {
@@ -734,7 +711,7 @@ void init_ipct_allocator(void)
     ipcts_used=0;
     ipcts_free=0;
 
-    DEBUG_LOG(0,"init ipct_allocator.");
+    DEBUG_LOG(100,"init ipct_allocator.");
     // clear our table of pointers
     for (i=0; i<MAX_IPCT_MALLOCS; i++) ipct_mallocs[i]=NULL;
 
@@ -767,7 +744,7 @@ void init_ipct_allocator(void)
     ipcts_used=0; ipcts_allocated=initial_ipcts;
     ipcts_free=i;
 
-    DEBUG_LOG(0,"zzzzzzz ipct land allocated:: %p -to- %p", ipct_mallocs[0], (void *)(ipct_mallocs[0]+initial_ipcts * sizeof(t_ipc_table)));
+    DEBUG_LOG(100,"zzzzzzz ipct land allocated:: %p -to- %p", ipct_mallocs[0], (void *)(ipct_mallocs[0]+initial_ipcts * sizeof(t_ipc_table)));
 
 }
 
@@ -783,21 +760,21 @@ void free_ipct(t_ipc_table *ipct)
 
     if (ipct==(void *)0xffffffffffffffff)
     {
-      DEBUG_LOG(20,"Was passed 0xffffffffffffffff to free!");
+      DEBUG_LOG(200,"Was passed 0xffffffffffffffff to free!");
       return;
     }
 
-    if (!ipct->used) {DEBUG_LOG(20,"Attempt to free already free ipct at %p, current pc:%d/%08x, current ipct:%p",ipct,context,pc24,mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].table); 
+    if (!ipct->used) {DEBUG_LOG(200,"Attempt to free already free ipct at %p, current pc:%d/%08x, current ipct:%p",ipct,context,pc24,mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].table); 
                       return;}
 
     if  (mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].table==ipct)
     {
-        DEBUG_LOG(20,"*BUG* attempt to free the current IPCT, allowing it at %p, current pc:%d/%08x, current ipct:%p",ipct,context,pc24,mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].table);
+        DEBUG_LOG(200,"*BUG* attempt to free the current IPCT, allowing it at %p, current pc:%d/%08x, current ipct:%p",ipct,context,pc24,mmu_trans_all[context][(pc24 & ADDRESSFILT)>>9].table);
         //debug_on("free_ipct=current pc");
         //return;
     }
 
-    DEBUG_LOG(20,"Freeing IPCT at %p:",ipct);
+    DEBUG_LOG(200,"Freeing IPCT at %p:",ipct);
 
     //check_ipct_counts(__FUNCTION__,__LINE__);
 
@@ -832,11 +809,11 @@ void free_all_ipcts(void)
 
   for (i=0; i<MAX_IPCT_MALLOCS; i++) 
       if (ipct_mallocs[i]!=NULL) {
-          DEBUG_LOG(20,"ipct[%d]=%p count:%uld",i,ipct_mallocs[i],sipct_mallocs[i]);
+          DEBUG_LOG(200,"ipct[%d]=%p count:%uld",i,ipct_mallocs[i],sipct_mallocs[i]);
           free(ipct_mallocs[i]); ipct_mallocs[i]=NULL; sum+=sipct_mallocs[i]; sipct_mallocs[i]=0;
         }
-  DEBUG_LOG(20,"--------------------------------------------------------------------------------------------")
-  DEBUG_LOG(20,"Freed all IPCTs: %ld mallocs were done, %ld count, %ld bytes",(long)iipct_mallocs,(long)sum,(long)(sum*sizeof(t_ipc_table)));
+  DEBUG_LOG(200,"--------------------------------------------------------------------------------------------")
+  DEBUG_LOG(200,"Freed all IPCTs: %ld mallocs were done, %ld count, %ld bytes",(long)iipct_mallocs,(long)sum,(long)(sum*sizeof(t_ipc_table)));
 
   iipct_mallocs=0;
   ipcts_allocated=0;
@@ -866,7 +843,7 @@ t_ipc_table *get_ipct(uint32 address)
     if (mmu_trans_all[context][(address)>>9].table) {
         if  (mmu_trans_all[context][(address)>>9].address == ((address & 0x00fffe00)))
             {
-              DEBUG_LOG(20,"Recycling IPCT at mmu_trans_all[%d][%08x] for address %08x",context,(address & 0x00fffe00)>>9,address);
+              DEBUG_LOG(200,"Recycling IPCT at mmu_trans_all[%d][%08x] for address %08x",context,(address & 0x00fffe00)>>9,address);
               return mmu_trans_all[context][(address)>>9].table;
             }
     }
@@ -877,16 +854,16 @@ t_ipc_table *get_ipct(uint32 address)
           {
               if (ipct_mallocs[i][s].context==context && ipct_mallocs[i][s].address==(address & 0x00fffe00) )
               {
-                DEBUG_LOG(20,"Found lost IPCT at ipct_mallocs[%ld][%ld] for context:%d address %08x used flag:%d",i,s,context,address,ipct_mallocs[i][s].used);
+                DEBUG_LOG(200,"Found lost IPCT at ipct_mallocs[%ld][%ld] for context:%d address %08x used flag:%d",i,s,context,address,ipct_mallocs[i][s].used);
                 if  (mmu_trans_all[context][(address)>>9].table == &ipct_mallocs[i][i])
-                    DEBUG_LOG(20,"^ this is the actual one, the others are lost");
+                    DEBUG_LOG(200,"^ this is the actual one, the others are lost");
               }
           }
 
       if (ipcts_free<0) EXITR(0,NULL,"LisaEm bug ipcts_free is negative!!");
       if (ipcts_used<0) EXITR(0,NULL,"LisaEm bug ipcts_used is negative!!");
       if (ipcts_free+ipcts_used+1!=ipcts_allocated) 
-          DEBUG_LOG(20,"LisaEm bug ipcts_free+ipcts_used !=ipcts_allocated %lld+%lld!=%lld!!",
+          DEBUG_LOG(200,"LisaEm bug ipcts_free+ipcts_used !=ipcts_allocated %lld+%lld!=%lld!!",
                         (long long)ipcts_free,(long long)ipcts_used,(long long)ipcts_allocated);
 
       #ifdef TEST_FREE_IPCTS_ARE_EMPTY
@@ -914,16 +891,16 @@ t_ipc_table *get_ipct(uint32 address)
         if ((iipct_mallocs++)>MAX_IPCT_MALLOCS) { EXITR(2,NULL,"Excessive mallocs of ipct's recompile with more!");}
 
         // possible off by 1?
-        if (ipcts_free) DEBUG_LOG(20,"There are no free ipcts, but ipcts_free is non zero! %lld",(long long)ipcts_free);
+        if (ipcts_free) DEBUG_LOG(200,"There are no free ipcts, but ipcts_free is non zero! %lld",(long long)ipcts_free);
         ipcts_free=0;
         size_to_get = (100*ipcts_allocated/IPCT_ALLOC_PERCENT)+1; // add a percentange of what we have, least 1
         if ( !(ipct_mallocs[iipct_mallocs]=(t_ipc_table *)calloc(size_to_get , sizeof(t_ipc_table) )  ))
         {
-            DEBUG_LOG(20,"Out of RAM %ld ipcts allocated so far, %ld are free, %ld used, %ld mallocs done", (long) ipcts_allocated, (long) ipcts_free, (long) ipcts_used, (long) iipct_mallocs);
+            DEBUG_LOG(200,"Out of RAM %ld ipcts allocated so far, %ld are free, %ld used, %ld mallocs done", (long) ipcts_allocated, (long) ipcts_free, (long) ipcts_used, (long) iipct_mallocs);
             //check_ipct_counts(__FUNCTION__,__LINE__);
             EXITR(86,NULL,"Out of memory while allocating more ipct's");
         }
-        DEBUG_LOG(20,"ipct[%d]=%p count:%lld",iipct_mallocs,ipct_mallocs[iipct_mallocs],size_to_get);
+        DEBUG_LOG(200,"ipct[%d]=%p count:%lld",iipct_mallocs,ipct_mallocs[iipct_mallocs],size_to_get);
 
 
         // Zap the new IPC's and link them to the free linked list ---  since we're fresh out
@@ -934,7 +911,7 @@ t_ipc_table *get_ipct(uint32 address)
         ipct=ipct_mallocs[iipct_mallocs];
 
         { long int sum=0; for (i=0; i<iipct_mallocs; i++) sum+=sipct_mallocs[i];
-          DEBUG_LOG(20,"Allocated more ipct's.  we now have %ld mallocs, ipc_allocated are:%ld total ipcts:%ld total bytes: %ld",(long) iipct_mallocs, (long)ipcts_allocated,
+          DEBUG_LOG(200,"Allocated more ipct's.  we now have %ld mallocs, ipc_allocated are:%ld total ipcts:%ld total bytes: %ld",(long) iipct_mallocs, (long)ipcts_allocated,
                     (long)sum, (long)(sum*sizeof(t_ipc_table)) );
         }
         //check_ipct_counts(__FUNCTION__,__LINE__);
@@ -996,15 +973,14 @@ void checkNullIPCFN(void)
 long int i; int q=0;
 
 for ( i=0; i<65536*2; i++)
-        if ( !cpu68k_functable[i]) {DEBUG_LOG(0,"Null function: for opcode %04lx:%ld",(long)(i>>1),(long)(i &1) ); q=1;}
+        if ( !cpu68k_functable[i]) {DEBUG_LOG(100,"Null function: for opcode %04lx:%ld",(long)(i>>1),(long)(i &1) ); q=1;}
  if ( q) {EXIT(13,9,"failed checkNullIPCFN"); }
  //check_iib();
 }
 
 
 // 20061223 need to optimize this - it's the heaviest fn according to gprof.
-t_ipc_table *cpu68k_makeipclist(uint32 pc)
-{
+t_ipc_table *cpu68k_makeipclist(uint32 pc) {
     // Generator was meant to work from ROMs, not from volatile RAM.
     // In fact, the original code checks to see if code is executing in RAM,
     // and if it is, it disables the IPC's.  But this would be slow.  In the
@@ -1032,6 +1008,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
     // of the code except for this function.)  -- Ray Arachelian.
 
     //int size = 0;
+    uint32 original_pc=pc;
     pc &= ADDRESSFILT;
 
     t_iib *iib, *illegaliib; //*myiib,
@@ -1055,9 +1032,6 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
 
     int ix=0; // index to the ipcs.
     abort_opcode=0;
-    //if (pc&1) {fprintf(buglog,"%s:%s:%d odd pc!",__FILE__,__FUNCTION__,__LINE__); EXIT(88);}
-
-    //check_ipct_counts(__FUNCTION__,__LINE__);
 
     #ifdef DEBUG
     DEBUG_LOG(1000,"PC I filtered to 24 bit: %08x",pc);
@@ -1100,17 +1074,17 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
         instrs++;
         //check_ipct_counts(__FUNCTION__,__LINE__);
         //check_iib();
-        //DEBUG_LOG(0,"ipc is now %p at pc %06x max %06x",ipc,pc,xpc);
+        //DEBUG_LOG(100,"ipc is now %p at pc %06x max %06x",ipc,pc,xpc);
 
         // Get the IIB, if it's NULL, then get the IIB for an illegal instruction.
         abort_opcode=2; opcode=fetchword((pc));
         if (abort_opcode==1)     // flush mmu and retry once
         {   mmuflush(0x2000); abort_opcode=2; opcode=fetchword((pc));
-            if (abort_opcode==1) {DEBUG_LOG(20,"DANGER! GOT abort_opcode=1 the 2nd time!"); free(ipcs);  NULL;}
+            if (abort_opcode==1) {DEBUG_LOG(200,"DANGER! GOT abort_opcode=1 the 2nd time!"); free(ipcs);  NULL;}
         }
         abort_opcode=0;
         iib=cpu68k_iibtable[opcode]; // iib =  myiib ? myiib : illegaliib;  *** REMOVED DUE TO ILLEGAL OPCODES *****
-        if (!iib) { DEBUG_LOG(20,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08x\n",opcode,pc);
+        if (!iib) { DEBUG_LOG(200,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08x\n",opcode,pc);
                     free(ipcs); return NULL;}
 
         if (!iib ) {EXITR(53,NULL,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08lx\n",opcode,(long)pc);}
@@ -1130,10 +1104,22 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
         #endif
 
         // grow the list of ipcs if we need to.
-        if (instrs>=ipcs_to_get)
-        {
-            EXITR(24,NULL,"Welcome to the realms of chaos! I'm dealing with over %ld instructions in a basic block, this should not happen, %ld ipcs! %ld/%ld/%ld pc=%ld/%08lx",
+        if (instrs>=ipcs_to_get)  {
+          uint32 opc=original_pc & ADDRESSFILT;
+          int count=0;
+          ALERT_LOG(0,"=============== FATAL ERROR: Welcome to the Realms of Chaos ===============================================");
+          ALERT_LOG(0,"Entered at: %08x",original_pc);
+          while (opc<pc)  {
+            abort_opcode=2; opcode=fetchword(pc); printf("%04x ",opcode); opc++; count++; if (count>15) {count=0; printf("\n%08x: ",opc);}
+          }
+          #ifdef DEBUG
+            ALERT_LOG(0,"dumpallmmu"); debug_on("chaos"); dumpram("chaos"); dumpallmmu(); debug_off(); ALERT_LOG(0,"MMU dump completed");
+          #else
+            ALERT_LOG(0,"\n\n\nDebug has not been compiled in, cannot dump mmu\n\n\n");
+          #endif
+          EXITR(24,NULL,"Welcome to the realms of chaos! I'm dealing with over %ld instructions in a basic block, this should not happen, %ld ipcs! %ld/%ld/%ld pc=%ld/%08lx",
                     (long)instrs,(long)ipcs_to_get,(long)segment1,(long)segment2,(long)start,(long)context,(long)pc);
+          exit(255);
         }
 
         DEBUG_LOG(200,"Copying ipc to ipcs buffer");
@@ -1151,21 +1137,18 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
             }
             ipc = &(table->ipc[((pc>>1) & 0xff)]);  //setup next ipc
             DEBUG_LOG(200,"ipc is now %p at pc %08lx max %08lx",ipc,(long)pc,(long)xpc);
-            //ipcs[instrs-1]=ipc; // copy pointer to ipcs buffer
         }
         else       // No we didn't go over the MMU page limited yet, it's cool
         {
                 if  (!mmu_trn->table)
                     { mmu_trn->table=get_ipct((pc)); table=mmu_trn->table; if (!table) EXITR(27,NULL,"Couldnt get IPC Table! Doh!"); }
-                //check_iib();
                 ipc = &(table->ipc[((pc>>1) & 0xff)]); // ipc points to the ipc in mmu_trans
                 DEBUG_LOG(200,"ipc is now %p at pc %08lx max %08lx",ipc,(long)pc,(long)xpc);
         }
         DEBUG_LOG(200,"ipc is now %p at pc %08lx max %08lx",ipc,(long)pc,(long)xpc);
 
-        //check_ipct_counts(__FUNCTION__,__LINE__);
     
-    } while (!iib->flags.endblk); // || instrs>=ipcs_to_get) ?
+    } while (!iib->flags.endblk);
 
     //check_iib();
     DEBUG_LOG(200,"ipc is now %p at pc %06lx max %06lx  WE DID %d instructions! pc=%08lx xpc=%08lx**** \n\n",ipc,(long)pc,(long)xpc,instrs,(long)pc,(long)xpc);
@@ -1173,8 +1156,8 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
 
     // Do we need this?  correct final ipc out of the loop.
     //iib=cpu68k_iibtable[(fetchword(pc))]; // iib =  myiib ? myiib : illegaliib;  *** REMOVED DUE TO ILLEGAL OPCODES *****
-    //if ( !iib ) {DEBUG_LOG(0,"Worse yet, there's no proper IIB for the illegal instruction opcode 0x4afc!"); EXIT(555);}
-    //if ( !ipc )  { DEBUG_LOG(0,"I'm about to do something really stupid.(ipc=NULL)\n");  EXIT(1);  }
+    //if ( !iib ) {DEBUG_LOG(100,"Worse yet, there's no proper IIB for the illegal instruction opcode 0x4afc!"); EXIT(555);}
+    //if ( !ipc )  { DEBUG_LOG(100,"I'm about to do something really stupid.(ipc=NULL)\n");  EXIT(1);  }
     //
     //cpu68k_ipc(pc, iib, ipc);
     //table->t.clocks += iib->clocks;
@@ -1198,7 +1181,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
                   // Get the IIB, if it's NULL, then get the IIB for an illegal instruction.
 
                   iib=cpu68k_iibtable[ipc->opcode];
-                  if ( !iib) {DEBUG_LOG(0,"Boink! Got null IIB for this opcode=%04lx",(long)ipc->opcode); }
+                  if ( !iib) {DEBUG_LOG(100,"Boink! Got null IIB for this opcode=%04lx",(long)ipc->opcode); }
                 }
     }
     //check_iib();
@@ -1220,52 +1203,39 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc)
 
     //check_ipct_counts(__FUNCTION__,__LINE__);
 
-    DEBUG_LOG(20,"ipc is now %p at pc %06lx max %06lx **** About to correct ipc's: %ld instructions **** \n\n",
+    DEBUG_LOG(200,"ipc is now %p at pc %06lx max %06lx **** About to correct ipc's: %ld instructions **** \n\n",
               ipc,(long)pc,(long)xpc,(long)instrs);
 
     while(ix--)
     {
-        //check_iib();
         ipc=ipcs[ix];
 
-        DEBUG_LOG(20,"ipc is now %p at pc %06lx max %06lx ix=%ld",ipc,(long)pc,(long)xpc,(long)ix);
+        DEBUG_LOG(200,"ipc is now %p at pc %06lx max %06lx ix=%ld",ipc,(long)pc,(long)xpc,(long)ix);
         if ( !ipc) { EXITR(29,NULL,"Null ipc, bye"); }
 
         ipc->set &=  required;
         required &= ~ipc->set;
         required |=  ipc->used;
 
-        if (ipc->set) { ipc->function = cpu68k_functable[(ipc->opcode << 1) + 1]; }
-        else          { ipc->function = cpu68k_functable[ ipc->opcode << 1];      }
+        ipc->function = cpu68k_functable[(ipc->opcode << 1) + (ipc->set ? 1:0)];
 
-        if (!ipc->function) { EXITR(3,NULL,"Null IPC fn returned for opcode:%04lx ix=%ld of %ld instrs",(long)ipc->opcode,(long)ix,(long)instrs); }
+        if (!ipc->function) {
+           #ifdef DEBUG
+           debug_off();
+           #endif
+           EXITR(3,NULL,"Null IPC fn returned for opcode:%04lx ix=%ld of %ld instrs",(long)ipc->opcode,(long)ix,(long)instrs); 
+          }
 
-       // cpu68k_printipc(ipc);
-        DEBUG_LOG(20,"ipc is now %p at pc %06lx max %06lx ix=%ld",ipc,(long)pc,(long)xpc,(long)ix);
+        DEBUG_LOG(200,"ipc is now %p at pc %06lx max %06lx ix=%ld",ipc,(long)pc,(long)xpc,(long)ix);
         if (ix) ipcs[ix-1]->next=ipc; // previous ipc's next link points to current ipc.
-
-        //check_ipct_counts(__FUNCTION__,__LINE__);
     }
-    DEBUG_LOG(20,"out of ix-- loop, ix=%ld ipc is now %p at pc %06lx max %06lx **** corrected ipc's: %ld instructions **** \n\n",(long)ix,
+    DEBUG_LOG(200,"out of ix-- loop, ix=%ld ipc is now %p at pc %06lx max %06lx **** corrected ipc's: %ld instructions **** \n\n",(long)ix,
               ipc,(long)pc,(long)xpc,(long)instrs);
 
-    #ifdef DEBUG
-    // Sanity check - something is running away somewhere - likely clobbering the iib table and some ipc's...
-    // remove this after we are done.
-    //check_ipct_counts(__FUNCTION__,__LINE__);
-    //for (ix=0; ix<instrs; ix++)
-    //    if (ipcs[ix]->function==NULL)
-    //    {
-    //        ipc=ipcs[ix];
-    //        EXITR(6,NULL,"FATAL ipc with null fnction at index %ld-> used:%ld, set:%ld, opcode %04lx, len %02lx, src %08lx, dst %08lx\n",
-    //                (long)ix, (long)ipc->used, (long)ipc->set, (long)ipc->opcode, (long)ipc->wordlen, (long)ipc->src, (long)ipc->dst);
-    //    }
-    #endif
     free(ipcs); return rettable;
 }
 
 void cpu68k_endfield(void)  { /* cpu68k_clocks = 0; */ }
-
 
 // Before we call this, Lisa memory must be allocated, ROM mem must be allocated and loaded!
 // the MALLOC pointers must be set to NULL the first time around, otherwise we'd attempt to free garbage.
@@ -1279,7 +1249,7 @@ void cpu68k_reset(void)
     reg68k_pc = regs.pc = fetchlong(4);
     reg68k_regs[15] = regs.regs[15] = fetchlong(0);
 
-    DEBUG_LOG(0,"CPU68K Reset: Context: %ld, PC set to %08lx, SSP set to %08lx\n",(long)context,(long)regs.pc,(long)regs.regs[15]);
+    DEBUG_LOG(100,"CPU68K Reset: Context: %ld, PC set to %08lx, SSP set to %08lx\n",(long)context,(long)regs.pc,(long)regs.regs[15]);
 
     regs.sr.sr_int = 0;
     regs.sr.sr_struct.s = 1;      /* Supervisor mode */
@@ -1303,5 +1273,4 @@ void cpu68k_reset(void)
     segment1=0; segment2=0;
 
     //check_ipct_counts(__FUNCTION__,__LINE__);
-
 }

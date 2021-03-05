@@ -32,6 +32,11 @@ so: lee·suh·em,  \ ˈlē·sə·em \
 
 Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
 
+## 2021.01.15
+
+Added TerminalWx vt100 terminal widget, xmodem for interfacing with BLU
+switched Preferences for serial port to pull down menu instead of radio button since there's too many endpoints now.
+Disabled Serial port A as it causes crashing in Lisa Terminal
 
 ## 2020.08.21
 

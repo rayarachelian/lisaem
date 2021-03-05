@@ -1,0 +1,254 @@
+Starting compile at 1614181350 Wed 24 Feb 2021 10:42:30 AM EST
+---------------------------- /tmp/slot.3703072.1.failure -------------------------------
+ gcc -o ../bin///patchxenix -W -Wstrict-prototypes -I/usr/local/wx3.1.2-gtk/lib/wx/include/gtk3-unicode-static-3.1 -I/usr/local/wx3.1.2-gtk/include/wx-3.1 -D_FILE_OFFSET_BITS=64 -DwxDEBUG_LEVEL=0 -D__WXGTK__ -pthread -fdiagnostics-color=always -fcommon -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-empty-body -Wno-duplicate-decl-specifier -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-parentheses -Wno-format -Wno-unused-parameter -Wno-unused -I ../../lib/libdc42/include -I /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/src/tools/include -Wno-format -Wno-unused patchxenix.c ../../lib/libdc42/lib/libdc42.0.9.6-RELEASE_2019.11.24.a
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/src/tools/src
+
+!!  Compiled                  patchxenix.c...
+In file included from [01m[Kpatchxenix.c:9[m[K:
+[01m[K../../lib/libdc42/include/libdc42.h:307:10:[m[K [01;31m[Kfatal error: [m[Kmachine.h: No such file or directory
+  307 | #include [01;31m[K<machine.h>[m[K
+      |          [01;31m[K^~~~~~~~~~~[m[K
+compilation terminated.
+see: /tmp/slot.3703072.1.sh /tmp/slot.3703072.1.sh.failed for details
+failed command was: gcc -o ../bin///patchxenix -W -Wstrict-prototypes -I/usr/local/wx3.1.2-gtk/lib/wx/include/gtk3-unicode-static-3.1 -I/usr/local/wx3.1.2-gtk/include/wx-3.1 -D_FILE_OFFSET_BITS=64 -DwxDEBUG_LEVEL=0 -D__WXGTK__ -pthread -fdiagnostics-color=always -fcommon -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -Wno-empty-body -Wno-duplicate-decl-specifier -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-parentheses -Wno-format -Wno-implicit-function-declaration -Wno-unused-parameter -Wno-unused -I ../../lib/libdc42/include -I /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/src/tools/include -Wno-format -Wno-unused patchxenix.c ../../lib/libdc42/lib/libdc42.0.9.6-RELEASE_2019.11.24.a
+from: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/src/tools/src
+--------------------- Compilation Aborted ---------------------
+---------------------- /tmp/slot.3703072.1.sh.done -----------------------
+ /usr/bin/strip patchxenix || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.2.sh.done -----------------------
+ /usr/bin/strip blu-to-dc42 || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.3.sh.done -----------------------
+ /usr/bin/strip dc42-resize-to-400k || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.4.sh.done -----------------------
+ /usr/bin/strip dc42-dumper || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.5.sh.done -----------------------
+ /usr/bin/strip lisadiskinfo || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.6.sh.done -----------------------
+ /usr/bin/strip lisafsh-tool || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.7.sh.done -----------------------
+ /usr/bin/strip dc42-copy-boot-loader || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.8.sh.done -----------------------
+ /usr/bin/strip lisa-serial-info || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.9.sh.done -----------------------
+ /usr/bin/strip los-bozo-on || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.10.sh.done -----------------------
+ /usr/bin/strip los-deserialize || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.11.sh.done -----------------------
+ /usr/bin/strip los-depassword || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.12.sh.done -----------------------
+ /usr/bin/strip idefile-to-dc42 || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.13.sh.done -----------------------
+ /usr/bin/strip rraw-to-dc42 || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.14.sh.done -----------------------
+ /usr/bin/strip dc42-to-raw || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.15.sh.done -----------------------
+ /usr/bin/strip raw-to-dc42 || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.16.sh.done -----------------------
+ /usr/bin/strip dc42-to-tar || true
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.17.sh.done -----------------------
+ /usr/bin/md5sum patchxenix >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.18.sh.done -----------------------
+ /usr/bin/sha1sum patchxenix >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.19.sh.done -----------------------
+ /usr/bin/sha256sum patchxenix >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.20.sh.done -----------------------
+ /usr/bin/md5sum blu-to-dc42 >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.21.sh.done -----------------------
+ /usr/bin/sha1sum blu-to-dc42 >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.22.sh.done -----------------------
+ /usr/bin/sha256sum blu-to-dc42 >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.23.sh.done -----------------------
+ /usr/bin/md5sum dc42-resize-to-400k >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.24.sh.done -----------------------
+ /usr/bin/sha1sum dc42-resize-to-400k >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.25.sh.done -----------------------
+ /usr/bin/sha256sum dc42-resize-to-400k >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.26.sh.done -----------------------
+ /usr/bin/md5sum dc42-dumper >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.27.sh.done -----------------------
+ /usr/bin/sha1sum dc42-dumper >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.28.sh.done -----------------------
+ /usr/bin/sha256sum dc42-dumper >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.29.sh.done -----------------------
+ /usr/bin/md5sum lisadiskinfo >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.30.sh.done -----------------------
+ /usr/bin/sha1sum lisadiskinfo >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.31.sh.done -----------------------
+ /usr/bin/sha256sum lisadiskinfo >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.32.sh.done -----------------------
+ /usr/bin/md5sum lisafsh-tool >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.33.sh.done -----------------------
+ /usr/bin/sha1sum lisafsh-tool >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.34.sh.done -----------------------
+ /usr/bin/sha256sum lisafsh-tool >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.35.sh.done -----------------------
+ /usr/bin/md5sum dc42-copy-boot-loader >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.36.sh.done -----------------------
+ /usr/bin/sha1sum dc42-copy-boot-loader >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.37.sh.done -----------------------
+ /usr/bin/sha256sum dc42-copy-boot-loader >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.38.sh.done -----------------------
+ /usr/bin/md5sum lisa-serial-info >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.39.sh.done -----------------------
+ /usr/bin/sha1sum lisa-serial-info >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.40.sh.done -----------------------
+ /usr/bin/sha256sum lisa-serial-info >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.41.sh.done -----------------------
+ /usr/bin/md5sum los-bozo-on >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.42.sh.done -----------------------
+ /usr/bin/sha1sum los-bozo-on >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.43.sh.done -----------------------
+ /usr/bin/sha256sum los-bozo-on >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.44.sh.done -----------------------
+ /usr/bin/md5sum los-deserialize >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.45.sh.done -----------------------
+ /usr/bin/sha1sum los-deserialize >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------- /tmp/slot.3703072.46.sh.done -----------------------
+ /usr/bin/sha256sum los-deserialize >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+---------------------------- /tmp/slot.3703072.47.failure -------------------------------
+ /usr/bin/md5sum los-depassword >>hashes.txt
+in: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+
+
+see: /tmp/slot.3703072.47.sh /tmp/slot.3703072.47.sh.failed for details
+failed command was: /usr/bin/md5sum los-depassword >>hashes.txt
+from: /z1/RA/sxfer/lisa_projects/lisaem-irae/lisaem-1.2.7/bin
+--------------------- Compilation Aborted ---------------------

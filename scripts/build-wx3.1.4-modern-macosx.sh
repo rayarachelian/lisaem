@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-OSVER="$( sw_vers -productVersion | cut -f1,2 -d'.' )"
+export OSVER="macOS-$(A=$(sw_vers -productVersion); MAJOR=$(echo ${A} | cut -f1 -d '.'); MID=$(echo ${A} | cut -f2 -d'.'); printf "%02d.%02d" ${MAJOR} ${MID} )"
 
 export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$( basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
@@ -20,9 +20,7 @@ if [[ ! -d "wxWidgets-${VER}" ]]; then
       (  curl -L https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 \
           -o wxWidgets-${VER}.tar.bz2|| \
          wget https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 || exit 2 )
-
    tar xjvf wxWidgets-${VER}.tar.bz2 || exit 3
-
 fi
 
 
@@ -32,36 +30,24 @@ if [[ "$VER" < "3.1.3" ]]; then
 fi
 
 pushd wxWidgets-${VER}
-TYPE=cocoa-x86-${OSVER}-clang-sdl
+TYPE=cocoa-${OSVER}-clang-sdl
 
 rm -rf build-${TYPE}
 mkdir  build-${TYPE}
 cd     build-${TYPE}
 
-XLIBS='LIBS="-lstdc++.6 -L /usr/lib"'
+# default to build for both 64 bit and 32 bit x86 for older OS's
+XLIBS='LIBS="-lstdc++.6 -L /usr/lib"
 CPUS="x86_64,i386"
-CCXXFLAGS='CXXFLAGS="-std=c++0x -stdlib=libc++"'
-if [[ "$OSVER" > "macOS-10.14" ]]; then 
-   CPUS="x86_64"
-   XLIBS=""
-fi
+CCXXFLAGS='CXXFLAGS="-std=c++0x"
 
-# cc1plus: error: unrecognized command line option "-std=c++0x"
-# cc1plus: error: unrecognized command line option "-stdlib=libc++"
+[[ "$OSVER" < "macOS-10.09" ]] export XLIBS="" CCXXFLAGS=""
 
-if [[ "$OSVER" < "macOS-10.9" ]]; then 
-   XLIBS=""
-   CCXXFLAGS=""
-fi
+# macos 10.14-10.15 build only x86_64, 11.0+ build for both x86_64 and arm64.
+[[ "$OSVER" > "macOS-10.14" ]] export CPUS="x86_64"       XLIBS=""
+[[ "$OSVER" > "macOS-11.00" ]] export CPUS="x86_64,arm64" XLIBS="" CCXXFLAGS='CXXFLAGS="-std=c++0x"
 
-# catalina: ld: library not found for -lstdc++.6
-# ray@catalina scripts % find /usr -name "libstdc++.*" -ls 2>/dev/null 
-# lrwxr-xr-x    1 root             wheel                  21 Nov  3 12:45 /usr/lib/libstdc++.6.dylib -> libstdc++.6.0.9.dylib
-# -rwxr-xr-x    1 root             wheel              725280 Sep 29  2019 /usr/lib/libstdc++.6.0.9.dylib
-# lrwxr-xr-x    1 root             wheel                  17 Nov  3 12:45 /usr/lib/libstdc++.dylib -> libstdc++.6.dylib
-
-#../configure --enable-monolithic --enable-unicode --with-cocoa  LIBS=-lc++ CXXFLAGS="-std=c++0x -stdlib=libc++" CPPFLAGS="-stdlib=libc++" LIBS=-lc++ \
-# vs LIBS="-lstdc++.6 -L /usr/lib"
+TYPE=cocoa-${OSVER}-${CPUS}
 ../configure --enable-monolithic --enable-unicode --with-cocoa ${CCXXFLAGS} ${XLIBS} \
              --enable-universal-binary=${CPUS} \
              --with-macosx-version-min=$MIN_MACOSX_VERSION \

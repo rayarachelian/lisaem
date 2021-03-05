@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      RC2 2020.08.15                   *
+*              The Lisa Emulator Project  V1.2.7      RC4 2020.10.15                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) MCMXCVIII, MMXX Ray A. Arachelian                     *
@@ -30,6 +30,7 @@
 //#define DEBUG_MOUSE_LOG 1
 ///#define DEBUG_REFRESH_RECT 1
 //#define DRAW_CROSSHAIRS_SKINLESS 1
+//#define DEBUGSCREENSHOTS 1
 #endif
 
 #define SKINLESS_BLACK_EDGES 1
@@ -146,7 +147,7 @@
 #include <wx/cmdline.h>
 #include <wx/utils.h> 
 #include <wx/dnd.h>
-
+#include <terminalwx.h>
 
 
 // RAW_BITMAP_ACCESS should be used in most cases as it proves much higher performance
@@ -324,6 +325,13 @@ static double on_start_zoom=0.0;
 wxString   on_start_lisaconfig="",
            on_start_floppy="";
 
+
+
+
+// actions to do about 20s after startup - initialize scc after BOOT ROM tests of SCC are done. Dispatched via LisaWin::OnMouseMove
+// not related to command line options
+static int on_startup_actions_done=0; 
+
 static const wxCmdLineEntryDesc cmdLineDesc[] =
 {
     { wxCMD_LINE_SWITCH, "h", "help",       "show this help message",                            wxCMD_LINE_VAL_NONE,  wxCMD_LINE_OPTION_HELP},
@@ -393,6 +401,11 @@ void set_hidpi_scale(void);
 #else
 #define DCTYPE wxBufferedPaintDC
 #endif
+
+extern "C" void disconnect_serial(int port);
+extern "C" void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial, wxString *setting, wxString *param, wxString *xon, int *scc_telnet_port);
+
+extern TerminalWx  *Terminal[16];
 
 class LisaWin : public wxScrolledWindow
 {
@@ -479,11 +492,14 @@ BEGIN_EVENT_TABLE(LisaWin, wxScrolledWindow)
 
     EVT_ERASE_BACKGROUND(LisaWin::OnErase)
     EVT_PAINT(LisaWin::OnPaint)
-    EVT_MOTION(LisaWin::OnMouseMove)
-    EVT_LEFT_DOWN(LisaWin::OnMouseMove)
-    EVT_LEFT_UP(LisaWin::OnMouseMove)
-    EVT_RIGHT_DOWN(LisaWin::OnMouseMove)
-    EVT_RIGHT_UP(LisaWin::OnMouseMove)
+
+    //EVT_MOTION(LisaWin::OnMouseMove)
+    //EVT_LEFT_DOWN(LisaWin::OnMouseMove)
+    //EVT_LEFT_UP(LisaWin::OnMouseMove)
+    //EVT_RIGHT_DOWN(LisaWin::OnMouseMove)
+    //EVT_RIGHT_UP(LisaWin::OnMouseMove)
+
+    EVT_MOUSE_EVENTS(LisaWin::OnMouseMove)
 
 END_EVENT_TABLE()
 
@@ -1035,7 +1051,7 @@ wxMenu *throttleMenu = NULL;
 wxMenu *profileMenu  = NULL;
 
 wxMenu *helpMenu     = NULL;
-
+wxMenu *windowMenu   = NULL;
 
 LisaConfig       *my_lisaconfig=NULL;
 LisaWin          *my_lisawin=NULL;
@@ -1449,7 +1465,7 @@ void LisaWin::SetVideoMode(int mode)
 
   if  (skins_on)
       {
-        SetMinSize(  wxSize(_H(720),_H(500) )  );
+        if  (!set_window_size_already) {SetMinSize(  wxSize(_H(720),_H(500) )  );}
         if  (skin.width_size>0 && skin.height_size>0)
             {
               if  (!set_window_size_already) {
@@ -1457,6 +1473,8 @@ void LisaWin::SetVideoMode(int mode)
                   SetMaxSize(                 wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
                   my_lisaframe->SetClientSize(wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
                   //my_lisaframe->SetMaxSize(   wxSize(  _H(skin.width_size), _H(skin.height_size)  ) );
+
+                  set_window_size_already=1;
                   }
               DEBUG_LOG(0,"** Reset max window size to %d,%d at hidpi:%f ***",
                               _H(skin.width_size), _H(skin.height_size), hidpi_scale            );
@@ -1564,6 +1582,9 @@ int LisaEmFrame::EmulateLoop(long idleentry)
     if (my_lisaframe->soundsw.Time()>1000 && sound_effects_on) // OH WOW! When sound is looping it fails to stop here and we're stuck in a loop! 
        {my_lisaframe->soundplaying=0; wxSound::Stop();}        // silence floppy motor if it hasn't been accessed in 500ms
 
+    seek_mouse_event(); //2020.09.14
+
+
     while (now-idleentry<emulation_time && running)            // don't stay in OnIdleEvent for too long, else UI gets unresponsive
     {
         long cpuexecms=(long)((float)(cpu68k_clocks-cpu68k_reference)*clockfactor); //68K CPU Execution in MS
@@ -1595,7 +1616,7 @@ int LisaEmFrame::EmulateLoop(long idleentry)
             get_next_timer_event();                           // handle any pending IRQ's/timer prep work            
                                                               // if we need to, refresh the display
 #ifndef __WXOSX__
-            if (now-lastcrtrefresh>refresh_rate_used)                                      // OS X, esp slower PPC's suffer if we use the if statement
+            if (now-lastcrtrefresh>refresh_rate_used)         // OS X, esp slower PPC's suffer if we use the if statement
 #endif
                {   VidRefresh(now); }  // but if we don't, Linux under X11 gets too slow.  
 
@@ -1638,15 +1659,17 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     if (mhzactual>1000) {mhzactual/=1000.0; c="KHz";}
     if (mhzactual>1000) {mhzactual/=1000.0; c="MHz";}
     if (mhzactual>1000) {mhzactual/=1000.0; c="GHz";}
- 
+
     char *s="Hz";
     float vidhz=(float)screen_paint_update;
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="KHz";}
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="MHz";}
   
-    text.Printf(_T("CPU: %1.2f%s, video refresh:%1.2f%s %c  %x%x:%x%x:%x%x.%x @%d/%08x (cpu_cycles:%lld"),
-                mhzactual,c,
+    text.Printf(_T("CPU: %1.2f%s want:%1.2fMHz tick:%d, video refresh:%1.2f%s %c contrast:%02x %s %x%x:%x%x:%x%x.%x @%d/%08x clk_cycles:%lld"),
+                mhzactual,c,throttle,emulation_tick,
                 vidhz,s,  (videoramdirty ? 'd':' '),
+                contrast,
+                debug_log_enabled ? "TRACELOG":"",
                 lisa_clock.hours_h,lisa_clock.hours_l,
                 lisa_clock.mins_h,lisa_clock.mins_l,
                 lisa_clock.secs_h,lisa_clock.secs_l,
@@ -1692,8 +1715,8 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     }
 
 
-  #ifdef DEBUG  // do ram, mmu, and screenshot dumps every 5s
-    if  (buglog && abs(lisa_clock.secs_l-last_lisa_clock_secs)>15 )
+  #ifdef DEBUGSCREENSHOTS  // do ram, mmu, and screenshot dumps every 15s
+    if  ( (!!buglog) && abs(lisa_clock.secs_l-last_lisa_clock_secs)>15 )
         {
            dumpallscreenshot();            
            last_lisa_clock_secs=lisa_clock.secs_l;
@@ -2063,7 +2086,7 @@ LisaWin::LisaWin(wxWindow *parent)
                     DEBUG_LOG(0,"Resetting screen size to:%ld,%ld since screensize is %ld, %ld",(long)x,(long)y,
                                   (long)screensizex, (long)screensizey);
             }
-            SetMinSize( wxSize( _H(720),_H(500) ) );  DEBUG_LOG(0,"Set window size to %d,%d",x,y);
+            if  (!set_window_size_already) {SetMinSize( wxSize( _H(720),_H(500) ) );  DEBUG_LOG(0,"Set window size to %d,%d",x,y);}
             //SetClientSize(wxSize(x,y));                                                         // LisaWin //
             //SetMaxSize(wxSize(ISKINSIZE));                                                      // LisaWin //
             //GetClientSize(&dwx,&dwy);
@@ -3055,16 +3078,16 @@ void LisaWin::LogKeyEvent(const wxChar* WXUNUSED(name), wxKeyEvent& event, int k
 // also should get rid of this and replace it with some sort of table/array instead.
 //
         case WXK_LEFT:
-        case WXK_NUMPAD_LEFT:        lisakey=KEYCODE_CURSORL;  forcelisakey=1;       break;
+        case WXK_NUMPAD_LEFT:        lisakey=KEYCODE_CURSORL;  forcelisakey=1; ALERT_LOG(0,"CURSOR LEFT");     break;
 
         case WXK_UP :
-        case WXK_NUMPAD_UP:          lisakey=KEYCODE_CURSORU;  forcelisakey=1;       break;
+        case WXK_NUMPAD_UP:          lisakey=KEYCODE_CURSORU;  forcelisakey=1; ALERT_LOG(0,"CURSOR UP");       break;
 
         case WXK_RIGHT :
-        case WXK_NUMPAD_RIGHT:       lisakey=KEYCODE_CURSORR;  forcelisakey=1;       break;
+        case WXK_NUMPAD_RIGHT:       lisakey=KEYCODE_CURSORR;  forcelisakey=1; ALERT_LOG(0,"CURSOR RIGHT");      break;
 
         case WXK_DOWN:
-        case WXK_NUMPAD_DOWN :       lisakey=KEYCODE_CURSORD;  forcelisakey=1;       break;
+        case WXK_NUMPAD_DOWN :       lisakey=KEYCODE_CURSORD;  forcelisakey=1; ALERT_LOG(0,"CURSOR DOWN");      break;
 
 
         case WXK_NUMPAD_INSERT:      lisakey=KEYCODE_LENTER;          break;
@@ -3522,6 +3545,7 @@ void LisaWin::OnChar(wxKeyEvent& event)
 
 void LisaWin::ContrastChange(void)
 {
+      if ( contrast<=0x40) {contrast=0x42;  return;}      // prevent yellowing
       if ((contrast>>1)==lastcontrast)      return;
 
       lastcontrast=contrast>>1;
@@ -4758,7 +4782,7 @@ void LisaWin::OnPaint(wxPaintEvent& event )
   if (!my_lisaframe || !my_lisawin) return; // not fully running yet, return so we don't crash
 
   if (!my_lisaframe->running)   repaintall |= REPAINT_INVALID_WINDOW;
-  if (refresh_bytemap) {ALERT_LOG(0,"Contrast change"); ContrastChange();}
+  if (refresh_bytemap) {ALERT_LOG(0,"Contrast change"); ContrastChange(); enable_vidram();}
 
   if ( my_lisabitmap==NULL)
   {
@@ -5354,8 +5378,10 @@ extern "C" void lisa_powered_off(void)
         flushscreen();
       }
 
-  if (skins_on) lightning();                         // CRT lightning
+  if (skins_on) lightning();                        // CRT lightning
   else          black();
+
+  on_startup_actions_done=0;                        // reset
 
   unvars();                                         // reset global vars
 // can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
@@ -5379,6 +5405,7 @@ extern "C" void lisa_powered_off(void)
   if (on_start_quit_on_poweroff) quit_lisaem();
 }
 
+
 extern "C" void free_all_ipcts(void);
 
 extern "C" void lisa_rebooted(void)
@@ -5386,6 +5413,7 @@ extern "C" void lisa_rebooted(void)
   setstatusbar("The Lisa is rebooting.");
   my_lisaconfig->Save(pConfig, floppy_ram);         // save PRAM, configuration
   unvars();                                         // reset global vars and all
+  on_startup_actions_done=0;
 // can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
 #if defined(__WXMSW__)    && defined(DEBUG) 
   buglog=fopen("lisaem-output.txt","a+");
@@ -5395,10 +5423,9 @@ extern "C" void lisa_rebooted(void)
   my_lisawin->powerstate = POWER_OFF;               // will be turned back on immediately
   handle_powerbutton();                             // back on we go.
   free_all_ipcts();
-  free(lisaram);
-  lisaram=NULL;
+  //free(lisaram);
+  //lisaram=NULL;
 }
-
 
 void LisaWin::OnMouseMove(wxMouseEvent &event)
 {
@@ -5413,9 +5440,16 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
     if (my_lisabitmap==NULL)       return;
      // in full screen mode, show menu bar when above line. or maybe disable this and always show the menu bar, but that's fugly. :(  Grrr.
 
-#ifdef CPU_CORE_TESTER
-                if (debug_log_cpu_core_tester) return;
-#endif
+
+    // disable mouse if core tester is running
+    #ifdef CPU_CORE_TESTER
+    if (debug_log_cpu_core_tester) return;
+    #endif
+
+
+    if  (!on_startup_actions_done && cpu68k_clocks>100000000L) { 
+         on_startup_actions_done=1;
+    }
 
     #if (!defined(__WXOSX__)) && (!defined(SHOW_MENU_IN_FULLSCREEN))
     if (!FullScreenCheckMenuItem)  return;
@@ -5476,20 +5510,7 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
           {
               ox=abs(w_width  - _H(720) )/2; 
               oy=abs(w_height - (_H(364)*544/500 / 2 ) );
-              //ox=(w_width  - (my_lisahq3xbitmap->GetWidth()  / (100*hidpi_scale)))/2;
-              //oy=(w_height - (my_lisahq3xbitmap->GetHeight() / (100*hidpi_scale))*HQ3XYSCALE)/2;
-              //ALERT_LOG(0,"o:%d,%d e_l_size:%d,%d win:%d,%d",ox,oy,effective_lisa_vid_size_x,effective_lisa_vid_size_y,w_width,w_height);
           }
-          //else
-          //{
-              //ox=abs(w_width  - o_effective_lisa_vid_size_x)/2;
-              //oy=abs(w_height - o_effective_lisa_vid_size_y)/2;
-
-              //ALERT_LOG(0,"w_width|height:%d,%d  o_effective_lisa_vid_size:%d,%d ox,oy:%d,%d ssox,y:%d,%d",w_width,w_height,
-              //          o_effective_lisa_vid_size_x,o_effective_lisa_vid_size_y,
-              //          ox,oy,  
-              //          skin.screen_origin_x,skin.screen_origin_y);
-          //}
           
           if (!skinless_center) {ox=0; oy=0;}
 
@@ -5591,29 +5612,6 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
       #endif
       //----------------------------------------------------------------------------------------------------------------------------------
 
-      /*
-      ALERT_LOG(0,"h:%d,%d floppy:%d,%d-%d,%d * 1.0",(xh),(yh),
-               (skin.floppy2_tl_x),(skin.floppy2_tl_y),
-              ((skin.floppy2_tl_x+(my_floppy0->GetWidth())    ) ),
-              ((skin.floppy2_tl_y+(my_floppy0->GetHeight())   ) )
-        );
-
-      ALERT_LOG(0,"h:%d,%d floppy:%d,%d-%d,%d * HIDPI\n",_H(xh),_H(yh),
-              _H(skin.floppy2_tl_x), _H(skin.floppy2_tl_y),
-              _H(skin.floppy2_tl_x+(my_floppy0->GetWidth())    ),
-              _H(skin.floppy2_tl_y+(my_floppy0->GetHeight())   )
-        );
-      */
-      // lisaem_wx.cpp:OnMouseMove:4214:sizeof int:4, long:8
-      // lisaem_wx.cpp:OnMouseMove:4220:h:52,1220 floppy:1099,481-1430,672 * 1.0
-      // lisaem_wx.cpp:OnMouseMove:4226:h:0,0 floppy:31,1447161952-0,1112539136 * HIDPI  <<<-- some kind of overflow happened here
-      // lisaem_wx.cpp:OnMouseMove:4214:sizeof int:4, long:8                      replacing * hidpi_scale with H() everywhere because of this.
-      // lisaem_wx.cpp:OnMouseMove:4220:h:38,1215 floppy:1099,481-1430,672 * 1.0
-      //lisaem_wx.cpp:OnMouseMove:4217:h:46,680 floppy:1099,481-1430,672
-      //                                 xh,yh         flox,y  
-      //lisaem_wx.cpp:OnMouseMove:4217:h:0,0 floppy:31,1447161952-1458,1446274496
-      //----------------------------------------------------------------------------------------------------------------------------------
-
 
       if  ( xh > skin.power_button_tl_x  &&  xh < skin.power_button_br_x  && 
             yh > skin.power_button_tl_y  &&  yh < skin.power_button_br_y    ) {
@@ -5684,6 +5682,7 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
             #endif
           //----------------------------------------------------------------------------------------------
             #ifdef DEBUG
+              //if (lu) {ALERT_LOG(0,"Received Left UP from wx event");}
               if (event.LeftDown() && debug_log_onclick)
                 {
                   debug_log_onclick=0;
@@ -5749,7 +5748,12 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
           //else if (event.MiddleDown())  {add_mouse_event(x,y, 3); ALERT_LOG(0,"Sending middle click down");}
           //else if (event.MiddleUp())    {add_mouse_event(x,y,-3); ALERT_LOG(0,"Sending middle click up");  }
           //else                          
-          {add_mouse_event(x,y, lu ? -1:  (event.LeftDown() ? 1:0) );        }
+          {
+             int b=0;
+             if (event.LeftUp()) b=-1;
+             if (event.LeftDown()) b=1;
+             add_mouse_event(x,y, b );
+          }
           seek_mouse_event();
 
           // double click hack  - fixme BUG BUG BUG - fixme - well timing bug, will not be fixed if 32Mhz is allowed
@@ -5757,7 +5761,8 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
               {
                 if  (now-lastup<1500)
                     {
-                      add_mouse_event(x,y,  1); add_mouse_event(x,y, -1);
+//                      ALERT_LOG(0,"sending extra mousedown/up");
+//                      add_mouse_event(x,y,  1); add_mouse_event(x,y, -1);
                       add_mouse_event(x,y,  1); add_mouse_event(x,y, -1);
                     }
                 lastup=now;
@@ -5895,7 +5900,7 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
     wxAboutBox(info);
 }
 
-
+extern "C" void close_all_terminalwx(void);
 
 //#ifdef __WXOSX__
 void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
@@ -5938,7 +5943,9 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
     EXTERMINATE(my_poweronDC           );
     EXTERMINATE(my_poweroffDC          );
 
-    my_lisaframe->m_emulation_timer->Stop();     // stop the timer
+    if (my_lisaframe)                                    // prevent segfault here
+        if (my_lisaframe->m_emulation_timer) 
+            my_lisaframe->m_emulation_timer->Stop();     // stop the timer
 
     #ifdef __WXOSX__
      wxMilliSleep(emulation_time*2);              // ensure that any pending timer events are allowed to finish
@@ -5958,8 +5965,11 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
           delete my_LisaConfigFrame; my_LisaConfigFrame=NULL;
         }  
       wxMilliSleep(750);
-      EXTERMINATE(my_lisaframe->m_emulation_timer);
+      if (my_lisaframe) EXTERMINATE(my_lisaframe->m_emulation_timer);
       wxMilliSleep(250);
+
+
+      close_all_terminalwx();
       EXTERMINATE(my_lisaframe);
       wxExit();
     #endif
@@ -6595,7 +6605,9 @@ void LisaEmFrame::OnxFLOPPY(void)
     wxFileDialog open(this,                     wxT("Insert a Lisa diskette"),
                                                 wxEmptyString,
                                                 wxEmptyString,
-                                                wxT("Disk Copy (*.dc42)|*.dc42|DART (*.dart)|*.dart|Image (*.image)|*.image|All (*.*)|*.*"),
+//                                                wxT("Disk Copy (*.dc42)|*.dc42|DART (*.dart)|*.dart|Image (*.image)|*.image|All (*.*)|*.*"),
+//                                              "BMP and GIF files (*.bmp;*.gif)|*.bmp;*.gif|PNG files (*.png)|*.png"
+                                                 wxT("Disk Image (*.dc42;*.image;*.Image;*.dart;*.DART;*.Dart)|*.dc42;*.image;*.Image;*.dart;*.DART;*.Dart|All (*.*)|*.*"),
                                                 (long int)wxFD_OPEN,wxDefaultPosition);
     if (open.ShowModal()==wxID_OK)              openfile=open.GetPath();
 
@@ -6935,6 +6947,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     throttleMenu      = new wxMenu;
     profileMenu       = new wxMenu;
     helpMenu          = new wxMenu;
+    windowMenu        = new wxMenu;
 
     /* https://wiki.wxwidgets.org/WxMac-specific_topics#Keyboard_Shortcuts
        Keyboard shortcuts use the command-key (the cloverleaf or open-apple key on the keyboard) instead of the control key. wxMac lets you specify 
@@ -7145,6 +7158,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     menuBar->Append(throttleMenu, wxT("Throttle"));
     menuBar->Append(profileMenu,  wxT("Parallel Port"));
 
+    //menuBar->Append(windowMenu,   wxT("&Window"));   // ::TODO:: add this in later once we have some code to handle this.
     menuBar->Append(helpMenu,     wxT("&Help"));
 
     ALERT_LOG(0,"Set menubar");
@@ -7197,7 +7211,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
 
            if (!set_window_size_already)SetClientSize(wxSize(x,y));                                                           // Frame    //
            GetClientSize(&x,&y);                                                                 // Frame    //
-           SetMinSize( wxSize( _H(720),_H(364) ) );
+           if  (!set_window_size_already) {SetMinSize( wxSize( _H(720),_H(364) ) );}
            x+=WINXDIFF; y+=WINYDIFF;                                                             // LisaWin  //
            if (!set_window_size_already) my_lisawin->SetClientSize(wxSize(x,y));
            my_lisawin->GetSize(&x,&y);                                                           // LisaWin  //
@@ -7546,9 +7560,9 @@ void connect_device_to_via(int v, wxString device, wxString *file)
 
           if  (v>1 && v<9) 
               {
-                 if (v==2 && my_lisaconfig->iorom==0x88)
-                      *file= wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + widget;
-                 else *file= wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + def[v];
+                  if  (v==2 && my_lisaconfig->iorom==0x88)
+                       *file= wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + widget;
+                  else *file= wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + def[v];
               }
           else return; // invalid via index
         }
@@ -7568,14 +7582,22 @@ void connect_device_to_via(int v, wxString device, wxString *file)
     }
 }
 
-/*
- * Connect some (virtual) device to one of the serial ports. 0 is Serial A,
+/* Connect some (virtual) device to one of the serial ports. 0 is Serial A,
  * 1 is Serial B. A number of the parameters passed in may be modified by
  * this code.
  */
-void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
-    wxString *setting, wxString *param, int *scc_telnet_port)
-{
+
+
+extern "C" void disconnect_serial(int port);
+extern "C" void init_pty_serial_port(int port);
+extern "C" void init_tty_serial_port(int port, char *config);
+
+extern "C" void init_terminal_serial_port(int port);
+
+
+
+extern "C" void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
+    wxString *setting, wxString *param, wxString *xon, int *scc_telnet_port) {
     char cstr_param[MAXPATHLEN];
     strncpy(cstr_param, cSTR( param ),MAXPATHLEN-1);
     
@@ -7584,20 +7606,25 @@ void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
         return;
     }
 
+    ALERT_LOG(0,"setting port:%d to %s",port, cSTR(setting));
+
+    xonenabled[port]=(xon->IsSameAs(_T("1")));
+    ALERT_LOG(0,"Set XONOFF handshaking for port %d to %d",port,xonenabled[port]);
     if (setting->IsSameAs(_T("LOOPBACK"),false)) {
         *scc_port_F = NULL;
         *serial = SCC_LOOPBACKPLUG;
         return;
     }
 
-    if (setting->IsSameAs(_T("NOTHING"), false) || setting->IsSameAs(_T("NULL"), false) || setting->Len()==0) {
+    if (setting->IsSameAs(_T("Nothing"), false) || setting->IsSameAs(_T("NULL"), false) || setting->Len()==0) {
         *scc_port_F = NULL;
         *serial = SCC_NOTHING;
         *setting = _T("NOTHING");  // fill in for writing into ini file
+        ALERT_LOG(0,"Set port to NOTHING");
         return;
     }
 
-    if (setting->IsSameAs(_T("FILE"), false))
+    if (setting->IsSameAs(_T("File"), false))
     {
         *scc_port_F = fopen(cstr_param, "r+b");
         if (!*scc_port_F) {
@@ -7612,7 +7639,7 @@ void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
         return;
     }
 
-    if (setting->IsSameAs(_T("PIPE"), false)) {
+    if (setting->IsSameAs(_T("Pipe"), false)) {
         *scc_port_F = popen(cstr_param, "r+b");
         if (!*scc_port_F) {
             wxString err = wxString();
@@ -7627,7 +7654,7 @@ void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
     }
 
 #ifndef __MSVCRT__
-    if (setting->IsSameAs(_T("TELNETD"), false)) {
+    if (setting->IsSameAs(_T("TelnetD"), false)) {
         unsigned long x;
         *scc_port_F = NULL;
         *serial = SCC_TELNETD;
@@ -7635,18 +7662,72 @@ void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *serial,
         *scc_telnet_port = (param->ToULong(&x, 10)==false) ? 9300+port : x;
         ALERT_LOG(0,"Connecting TELNETD 127.0.0.1:%d on serial port %d",*scc_telnet_port,port);
 
-        init_telnet_serial_port(!port);     // serial a=port 1, serial b=port 0 (reversed from config!)
+        init_telnet_serial_port(port);
         ALERT_LOG(0,"return from init_telnet_serial_port %d",port);
 
         return;
     }
+
+    if (setting->IsSameAs(_T("Shell"), false)) {
+        unsigned long x;
+        *scc_port_F = NULL;
+        *serial = SCC_PTY;
+
+        ALERT_LOG(0,"-----------------------------------------\n\n");
+        ALERT_LOG(0,"Attaching new PTY to fork-exec %s process, on serial port %d",cstr_param, port);
+
+        init_pty_serial_port(port);
+
+        ALERT_LOG(0,"return from init_pty_serial_port %d",port);
+        ALERT_LOG(0,"-----------------------------------------\n\n");
+
+        return;
+    }
+
+    if (setting->IsSameAs(_T("Terminal"), false)) {
+        unsigned long x;
+        *scc_port_F = NULL;
+        *serial = SCC_TERMINAL;
+
+        ALERT_LOG(0,"-----------------------------------------\n\n");
+        ALERT_LOG(0,"Attaching new terminal to serial port %d", port);
+
+        init_terminal_serial_port(port);
+
+        ALERT_LOG(0,"return from init_pty_serial_port %d",port);
+        ALERT_LOG(0,"-----------------------------------------\n\n");
+
+        return;
+    }
+
+
+    if (setting->IsSameAs(_T("Serial"), false)) {
+        unsigned long x;
+        *scc_port_F = NULL;
+        *serial = SCC_TTY;
+
+        ALERT_LOG(0,"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+        ALERT_LOG(0,"Attaching new TTY %s on serial port %d",cstr_param, port);
+
+        init_tty_serial_port(port,cstr_param);
+
+        ALERT_LOG(0,"return from init_tty_serial_port %d",port);
+        ALERT_LOG(0,"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
+
+        return;
+    }
+
+
+
+
 #endif
 
-    if (setting->IsSameAs(_T("IMAGEWRITER"), false)) {
+    if (setting->IsSameAs(_T("ImageWriter"), false)) {
         *scc_port_F = NULL;
         *serial = SCC_IMAGEWRITER_PS;
         if (port) scc_b_IW=1; else scc_a_IW=0;
         ImageWriter_LisaEm_Init(port);
+        ALERT_LOG(0,"Connected port %d to imagewriter",port);
         return;
     }
 
@@ -7715,6 +7796,22 @@ int romlessboot_pick(void) //returns 0=profile, 1=floppy
   return r;
 }
 
+// this just passes the settings to the ports.
+extern "C" void connect_serial_devices(void)
+{
+        connect_device_to_serial(0, &scc_b_port_F, &serial_b,
+        &my_lisaconfig->serial2_setting, &my_lisaconfig->serial2_param,&my_lisaconfig->serial2xon,
+        &scc_b_telnet_port);
+
+        connect_device_to_serial(1, &scc_a_port_F, &serial_a,
+        &my_lisaconfig->serial1_setting, &my_lisaconfig->serial1_param,&my_lisaconfig->serial1xon,
+        &scc_a_telnet_port);
+
+// ::TODO:: add code for QPC once we write it.
+}
+
+
+
 
 int initialize_all_subsystems(void)
 {
@@ -7732,11 +7829,15 @@ int initialize_all_subsystems(void)
 
     if (my_lisaframe->running) {ALERT_LOG(0,"Already running!"); 
                                 return 0;}
-    buglog=stderr;
-    #ifdef DEBUGLOG_ON_START
-      debug_on((char *)("debug on start"));
-    #endif
 
+    ALERT_LOG(0,"Initializing all subsystems...")
+    #ifdef DEBUGLOG_ON_START
+      ALERT_LOG(0,"================ tracelog on start ==================");
+      debug_log_enabled=1;
+      debug_on((char *)("tracelog on start"));
+    #else
+      buglog=stderr;
+    #endif
 
     #ifdef DEBUG
     assert(sizeof(uint8 )==1);
@@ -7809,12 +7910,15 @@ int initialize_all_subsystems(void)
        case 512  : maxlisaram=0x100000;  minlisaram=0x080000;  break;     // single 512KB board in slot 1
        case 1024 : maxlisaram=0x180000;  minlisaram=0x080000;  break;     // two 512KB boards in slot1, slot 2
        case 1536 : maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
-       default:    maxlisaram=0x200000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2
+       case 2048 : maxlisaram=0x1e0000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
+
+       default:    maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
+
     }
 
     // maxlisaram! New!  And! Improved! Now available in bytes at a register Store Near You!  OpCodes are Standing by!
     // Act now!  don't delay!  Limited Time Offer!  JSR Now!  Restrictions Apply!  Before engaging in any strenous programming
-    // activity, you should always consult your MMU today!  Not 0xFD1C insured!
+    // activity, you should always consult your MMU today!  Not 0xFD1C insured! NO REFUNDS!
 
     TWOMEGMLIM=maxlisaram-1;
     videolatchaddress=maxlisaram-0x10000;
@@ -7833,15 +7937,7 @@ int initialize_all_subsystems(void)
         }
 
     memset(lisaram,0xff,2*1024*1024+511); //maxlisaram+511);
-    // 128k=0x20000, 2MB-128k=0x1E0000
-    maxlisaram=0x200000-1024*128; // seems I can do -128k here but no more for max ram, why does it work on a real Lisa?
-    //minlisaram=0; //20200731 - this causes a segfault in cpu68k:
-    /*#0  cpu68k_makeipclist (pc=<optimized out>) at cpu68k.c:1251
-          1251        free(ipcs); return rettable;
-          (gdb) print ipc
-          $1 = <optimized out>
-          (gdb) print ipcs
-          $2 = (t_ipc **) 0x55557ef6482*/
+    
     ALERT_LOG(0,"maxlisaram: %08x bytes",maxlisaram);
     ALERT_LOG(0,"minlisaram: %08x bytes",minlisaram);
 
@@ -7879,7 +7975,7 @@ int initialize_all_subsystems(void)
                                     //ff028308104050ff 0010163504700000
     }//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    setstatusbar("Initializing Serial Ports");
+    setstatusbar("Initializing Serial Ports for Boot ROM");
 
     // If either serial port is set as loopback, both must be.
     if (my_lisaconfig->serial2_setting.IsSameAs(_T("LOOPBACK"), false) ||
@@ -7889,20 +7985,14 @@ int initialize_all_subsystems(void)
           my_lisaconfig->serial2_setting = _T("LOOPBACK");
         }
 
+    // this is a fake first pass to allow the ROM to pass self tests, hence 0 param
+    ALERT_LOG(0,"Initializing SCC Z8530 disconnected for Boot ROM");
+    disconnect_serial(0);
+    disconnect_serial(1);
+    initialize_scc(0);
+//  connect_serial_devices();
 
-    connect_device_to_serial(0, &scc_a_port_F, &serial_a,
-        &my_lisaconfig->serial1_setting, &my_lisaconfig->serial1_param,
-        &scc_a_telnet_port);
-
-
-    connect_device_to_serial(1, &scc_b_port_F, &serial_b,
-        &my_lisaconfig->serial2_setting, &my_lisaconfig->serial2_param,
-        &scc_b_telnet_port);
-
-    DEBUG_LOG(0,"Initializing SCC Z8530");
-    initialize_scc();
-
-    DEBUG_LOG(0,"setting motherboard latches");
+    ALERT_LOG(0,"setting motherboard latches");
     softmemerror=0; harderror=0; videoirq=0; bustimeout=0; videobit=0;
 
     DEBUG_LOG(0,"Checking host CPU bit order sanity.");
@@ -8476,7 +8566,20 @@ char *get_welcome_fortune(void)
 char *get_welcome_fortune(void)
 {
   static char *fubar[]={
+  "In Glorious Black and White!",
   "Good News Everyone! I'm still technically alive!",
+  "Welcome to the world of... yesterday",
+  "Wait a minute is that blimp accurate?",
+  "My god, a million years!",
+  "Whoa, a real live emulator, or is that some kind of New Years costume?",
+  "Listen buddy, I'm in a hurry here, let's try for a twofer",
+  "You have selected: slow and horrible",
+  "As smooth as a pint of Olde Fortran",
+  "We can hide in here. It's free on Tuesdays",
+  "Sorry we're open",
+  "Loading Hexa-Decapus debugger...",
+  "It's coated with anti-chronoton resistant grout to protect you from the effects of the time travel",
+  "You are irredeemably evil, together we shall rule the galaxy",
   "As seen on slashdot.jp",
   "As seen on osnews",
   "As seen on lowendmac",
@@ -8486,12 +8589,13 @@ char *get_welcome_fortune(void)
   "As seen on the internet",
   "As seen on your computer",
   "As seen on Interdimentional TV C137 channel… bort",
+  "As seen on All My Circuits",
   "No Turing Machines were completed in the process of building this emulator",
   "No Turing Tests were failed in the process of building this emulator",
   "Presented in greyscale, and scaled in grey",
   "Featuring gratuitous rectangular pixels",
   "Featuring gratuitous oblong pixels",
-  "L o a d i n g  .  .  .",
+  "L  o  a  d  i  n  g   .   .   .",
   "Disowned by Steve Jobs",
   "Transmitido en binary en SAP",
   "Hencho en Pascal",
@@ -8536,6 +8640,7 @@ char *get_welcome_fortune(void)
   "Now interactive! Mouse controls mouse!",
   "Dancing space wxWidgets?",
   "A by-product of the computer industry",
+  "This emulator is held together by memes and duct tape",
   "Not Affiliated With the Sun Remarketting Brass Knuckle Company",
   "Too sexy for The App Store",
   "Beats getting dumped in a landfill in Logan, UT",
@@ -8603,7 +8708,7 @@ char *get_welcome_fortune(void)
   "As seen at the 1983's World's Fair",
   "Brought to you by RetroBright! Have you bleached and damaged your Lisa's case yet?",
   "The only emulator viewed at the speed of light",
-  "Featuring 7 invisible colors which only print in kjet",
+  "Featuring 7 invisible colors which only print in inkjet",
   "Spoiler alert: mice, buttons, dialogs, windows, and whatnot",
   "If unable to see this message, turn on Lisa now",
   "No mice were harmed by this emulator",
@@ -8639,16 +8744,25 @@ char *get_welcome_fortune(void)
   "I'm walking on sunshine...",
   "I'm back baby!",
   "We're back, baby!",
+  "We're owl exterminators",
   "Shut up, I know it!",
   "Top Secret! (Do not Look)",
+  "You haven't ignored the last of me",
+  "Come on loxy lady",
+  "And so the endless circle of life, comes to an end.",
+  "Oh my, yes",
+  "Let's go already",
   "Freedom, Freedom, Freedom, Oy!",
   "Cashier does not have the keys to a successful emulation",
   "That's IT! I'm getting a hundred cups of coffee... Starting now!",
   "It costs a little more, but it's worth it!",
   "001100 010010 011110 100001 101101 110011",
+
   "Nobody exists on purpose, nobody belongs anywhere, every Lisa's going to break down, emulate LOS on LisaEm.",
+
   "The mouse is sticky with honey!",
   "Argle-Bargle ::== <NULL>  Essentially you can forget that Argle_Bargle exists for this MMU context!",
+
   "Great Shatner's Ghost!",
   "\"Time spent with a Canon Cat is never Wasted!\" -- Jef Raskin",
   "But before you say anything, have you ever heard of Jef Raskin’s Cat?",
@@ -8659,21 +8773,31 @@ char *get_welcome_fortune(void)
   "Byte my shiny 16-bit metal bus!",
   "With a warning label this big, you know they gotta be good!",
   "That's all Folks, type SPACE to continue.",
+  "It's Wabbit Season!",
+  "It's Duck Season!",
+  "It's ELMER(!) Season!",
+  "You keep out of this, he doesn't have to shoot you now",
+  "What's up Doc?",
   "It took 8 years from inception to first release, and another 8 years to this version - because it took that long to make up these stupid quotes -- Ray",
   "\"Would you rather drink sugared water for the rest of your life, or emulate Lisa Office System?\"",
   "\"The Journey Isn't The Reward - Emulating Lisa Office System Is!\"",
   "\"It's Better To Run LisaEm Than Join The Navy\" - Steve Jobs",
   "\"It's Better To Be a Pirate than not Run LisaEm\" - Steve Jobs",
-  "Meh, who needs bicycles for the mind, when you can drive a Maserati for the mind!",
+  "Meh, who needs bicycles, when you can drive a Maserati for the mind!",
   "\"Lisa: Invented Stupid Acronym\"",
   "LisaEmRama: \"An emulator Out of Ideas Teams Up with an OS Out Of Time\"",
   "Flop? Apple sold 100,000 LISAs, at $10k each, that's a cool $1B at a cost of only $50M in development!", //$200,000,000 at $2K is also good
   "In the beginning, Rich Page created the MMU, and he saw that It Was Good!",
   "Bender: \"It's not just clean, it's 24-bit clean!\"",
+
   "Unleaded solder? Do you want tin whiskers, because that's how you get tin whiskers!",
   "Hey! Phrasing!",
   "Phrasing! BOOM!",
   "... Or are we not doing 'Phrasing' anymore?",
+  "NOP, NOP, NOP, NOP, NOP!",
+  "Sploosh!",
+  "Must be some kind of MMU segment, er... zone.. of danger...",
+
   "Welcome to Lisa Emulation and Earth Invasion Tonight!",
   "Tonight at 11: Lisa Emulatioooooon",
   "EEEK! My NiCADs leaked!",
@@ -8681,6 +8805,23 @@ char *get_welcome_fortune(void)
   "If only we could bring the Lisa back to life somehow... Oh, wait, Em, right!",
   "Oh no!  LisaEm has achieved consciousness, Woz forgive us for creating this!",
   "Oooh! You sack of bags of buckets of bunches of tables of linked lists of IPCT pointers!",
+  "Now come on Bender, 'Something Sinister' isn't going to build itself",
+  "He's one of those dog operated puppets that's been adapter for use by a cat!",
+  "So I've had my doctorate denied by that fuzzball? Bad Kitty!",
+  "Well! Look what the Me dragged in!",
+  "Let me put it like this, after I leave here, I'm getting a memory enema",
+  "This stuff is butt-grade crap",
+  "But the sign said there was a mint in the box...",
+  "It's set in the year 2021, and we call it LisaEm...",
+  "Bring back Futurama... Again... (Pretty Please!)",
+  "I am LisaEm, ruler of the planet Unicron-8! (May I crash on your couch?)",
+  "In fact, severely reduced pay for everyone!",
+  "I am LisaEm, please insert firmware.",
+  "I am LisaEm, please insert fileware.",
+  "I am LisaEm, please insert microdisk.",
+  "I am LisaEm, please insert widget.",
+  "LisaEm: the first emulator to qualify for a boat loan",
+  
   "Get it all together. And put it in a dc42. All your bits. And if you gotta take it somewhere, take it somewhere, take it to the .image store and sell it, or put it in a .image museum, I don’t care what you do, you just get your dc42 images together!",
   "Morty, you want to answer a literal JSR to Emulation?",
   "Break the cycle, Morty. Rise above. Focus on emulation!",
@@ -8692,17 +8833,20 @@ char *get_welcome_fortune(void)
   "Beware of Exiting (functions)!",
   "Non-Maskable Interrupt, the only Interrupt worth adding a switch for!",
   "Gounded DTACK? That's just sooo wrong!",
-  "Hey! What smells like blue?",
+  "Hey! What smells like big blue?",
   "For this hip young emulation company, tomorrow is today, and today is yesterday! You heard me!",
   "Genius, worker, philosopher, stargazer, hero, artist, thinker, craftsman, designer, renaissance man, LisaEm knowledge worker",
   "Ah! Perry the Catapus, let me show you my new LisaEm-inator!",
   "Pro Tip: Did you know the Lisa actually supports 3 button mice? Take a look at the I/O board schematic, look for SW0, SW1, SW2!",
+  "Kicking entropy to the curb since 1998!",
+  "Extropy for the win!",
+
   "Welcome to EWCA, the Emulator Withoout A Cool Acronym... I mean, uh, LisaEm!",
   "Oh my gosh, the square root of soon is never!",
   "There's no platypus controlling me",
   "Hey! Where's Jerry?",
   "There's a 104 days of CoVID19 isolation, and work just comes to end it, so the annual problem for our generation is how to emulate a Lisa",
-  "You want us to be called L.O.V.E.M.U.F.F.I.N.? Yes, it stands for Lisas Virtually Emulated on Machines Under Fir Forests In Niagra!",
+  "You want us to be called L.O.V.E.M.U.F.F.I.N.? Yes, it stands for Lisas On Virtually Emulated Machines Under Fir Forests In Niagra!",
   "There you are Perry",
   "Good Moring, Agent L",
   "Effervescent and frothy.",
@@ -8710,24 +8854,61 @@ char *get_welcome_fortune(void)
   "Ferb! I know what we're emulating today!",
   "Yellowed LisaEm faceplate? It'll be like driving a really fast Ducky Momo!",
   "Like most of life's problems, this one can be solved by emulating...",
+
   "What unites people? Armies? Gold? Flags? No! Emulators! There's nothing in the world more powerful than a good emulator. Nothing can stop it. No app store can ban it. And who has a better emulator than the Lisa? The machine Apple literally buried, but still it lived!",
   // anonymous "(Jet Set Willy)'s an old Spectrum game just in the same way that the Mona Lisa is an old painting of a woman, right, remember that"  The Retro Hour 172 Matthew Smith interview and Hogs of War History ~@1:03:23hr
   "The Lisa is 'just an old computer' precisely in the same way that the Picasso's Guernica is a bunch of grayscale shapes, right, remember that!",
   "The Lisa is 'just an old flop' in the same way that the Great Pyramid is a bunch of old stones that failed to guard against tomb robbers, right, remember that!",
   "Next time, on 'This Old LisaEm'...",
-  "Next time, on 'Ask This Old LisaFaq'...",
+  "Next time, on 'Ask This Old LisaFAQ'...",
   "\"Truly, they were as gods, who built the Lisa\" - Bender Bending Rodriguez",
   "I'm gonna get my Lisa back, virtually! In your face ineffectual Grim Reaper!",
   "Hey Raaayyy! LisaEm release going out! Come on!",
   "Professor! ... Lava! ... Hot! ...",
   "I have a LisaEm delivery here for, uh, IC socket...",
   "And by metaphorically, I mean get your coat",
+  "Great Jah's dreadlocks! There's been a mixup! This isn't a pet license, it's an emulation license... And it's MANDATORY!!!",
+  "Ah, the exact center of the Logan Utah Landfill, this seems the logical place for Lisas to congregate...",
+  "Sweet Zombie Jobs! It's an emulated Lisa!",
+  "He may have emulation madness, but that's no excuse for emulation rudeness!",
+  "That just raises further exceptions!",
   "Fry! What in Sega Genesis happened to you?",
+  "Arrrr, the laws of emulation be a harsh mistress",
+  "Regular Matter, Dark Matter, Wassa Matter",
+  "Employees must wipe hands on pants",
+  "It's like a party on my desktop and everyone's throwing errors",
+  "She's loaded with iron, she's got more iron than a PDP11",
+  "\"Who are you?\" \"Ray the Janitor.\" \"Then why aren't you fixing LisaEm?\" \"Schedule conflict\"",
+  "Hmmm, we'll need to have a look inside you with this debugger... Guess again!",
+  "C++? Eeew, methodtronic!",
+  "They know how to make ice cream soup?",
+  "\"Strange, usually you don't know anything about LisaEm anatomy\", \"I learned that from a Linux commercial\"",
+  "I've heard of that! Who said I haven't!",
+  "Listen, this is going to be one hell of a LisaEm release. After this we'll be lucky if he's got any NUL bytes left!",
+  "A Lisa Emulator? Only a few people in the universe can play that, and they're not very good at it!",
+  
   "Warranty void... if emulated",
   "Lisa Emulation... Right, I'd better warn... tell... warn-tell the others",
   "Bam! I knocked it up a notch... 1.75M RAM!",
   "The Lisa 1 was so high tone, the only way to buy one was to create a parallel universe where you already owned one!",
   "The Lisa, it seems to go on and on forever. But then you get to the end and Steve starts throwing barrels at you.",
+
+  "Who you gonna call? Lisa Emulators!",
+  "Zuuuuuuuuuul!",
+  "We came, we saw, we emulated its ass",
+  "Are you a god?",
+  "Are you the keymaster?",
+  "Excuse me Egon, I you said crossing the stdin/out streams was bad",
+  "Alriiiight, this I/O board is toast!",
+  "“Ray, when someone asks if you're a god, you say \"YES.\"” - Winston Zeddemore",
+
+  "Wax on, wax off. XON XOFF.",
+  "In the beginning, the CPU was created. This has made a lot of people very angry and has been widely regarded as a bad move.",
+  "In the beginning, the Lisa was created. This has made a lot of people very angry and has been widely regarded as a bad move.",
+  "In the beginning, the emulator was created. This has made a lot of people very angry and has been widely regarded as a bad move.",
+
+  "Alan Turing invented the Universal Turing Machine circa 1936, and immediately realized it could emulate itself!",
+
   "A.G.L.E.T. - Rember it!",
   "It was either emulating a Lisa, ... or giving a monkey a shower...",
   "Lisaville Meadows, where yesterday thousands of bits of data were senselessly free()d in their prime...",
@@ -8737,15 +8918,18 @@ char *get_welcome_fortune(void)
   "I think there's something strange not going on here, Ferb",
   "A mob of angry ghosts chasing a warecow...",
   "Mom! Mom! Mom! Mom! Ray's writing a Lisa emulator again!",
+
   "The CRT that burns twice as bright burns half as long",
   "Hey you kids get off my Lawn... I mean.. uh, Lisa Emulator!",
   "I'll have to take a look inside you with this debugger, open up.... guess again!",
+
   "I often forget other people have limitations. It’s so sad",
   "He's opening up our minds to new ideas! Kill him!",
   "I'm in the middle of cooking a capacitor! I have warranty cards to void! I am not just making MMU exceptions!",
   "Besides, I've given up eeevil to pursue emulator-inator making...",
   "Ah, DRAM impairment: the free prize at the bottom of every vodka bottle!",
-  "Bazinga!",
+
+  "Bazingaaaaah!",
   "I don't like bugs, okay. They freak me out.",
   "Come on! We have a combined IQ of 360 we should be able to figure out how to emulate a stupid Lisa.",
   "So, if a photon is directed through a plane with two slits in it and neither is observed, it emulates a Lisa.",
@@ -8762,6 +8946,9 @@ char *get_welcome_fortune(void)
   "You know, in the future, when we’re disembodied brains in jars, we’re going to look back on this as eight hours well wasted.",
   "Rock, Paper, Scisors, LisaEm, Spock!",
   "Ray, did you promise Morty a Lisa emulator?",
+  "Dad, did you promise Morty a Lisa emulator? Aaaaaargh!",
+  "Here's your tome of Lisa spells and lore, that'll have everything you need, enjoy your Lisa",
+
   "First off, I always slay it, Lisa, Secondly, yes",
   "Ok, I'll bite, what's with the talking Lisa? I know that's a dragon, I'm talking about the talking Lisa in my bedroom",
   "If only I had prepared better for this terrifying battle by remembering the only thing Lisa emulators are known for...",
@@ -8775,32 +8962,106 @@ char *get_welcome_fortune(void)
   "Someone has to remember!",
   "Worst emulation adventure ever!",
   "Those who do not understand Lisa Office System are condemned to reinvent it... poorly.",
+
   "In our era, we sat infront of subatomic particle accelerators (CRTs) and basked in their glow! No fancy LCDs for us!",
   "Who dares disturb my blissful sleep, again must I rise, how long I lay unemulated, my world, so long forgotten",
   "What may safely be emulated...",
+
   "What about the reality where Lisa won over the Mac? Just don’t think about it, Morty.",
+
   "Your emulator is bad and you should feel bad",
   "Why ~Zoidberg?",
   "Why !Zoidberg?",
   "!zoidberg.why()?",
+  "Hey Look! It's that guy you are!",
+  "This chronological whang dang doodle could destroy the very matrix of reality.",
+  "You're THAT BubbleGum Tate?",
+  "Yes, I see! Something with that many .L words could easily destabilize time itself",
+
   "I'd love to, but I'm too busy falling back in love with Windows ME, can't talk right now got several thousand updates to install",
   "Visions of the future reflected in the past, existing in the present this surely can emulate a Lisa.",
   "Lisa 1s were so expensive because the twiggy drives required 0.3 grams of Pizzazium Infinonite each!",
   "Vanessessary hot Apple Lisa Emulation... with a cherry on top!",
   "It's the way of the platypus",
-  "Its got electrolitics in it. It's what capacitors crave.",
+
+  "Its got electrolytics in it. It's what capacitors crave.",
+
+  "A word of advice: the journey to spiritual awakening is better with french fries", // Bilquis to Shadow Moon
+
   "This is not anyone's emulator, this is a swirling vortex of entropy!",
+  "Long live conrete!",
+  "Show me your peels!",
   "Great Caesar's Ghost, just look at this emulator!",
   "In the hands of the enlighted, Lisa emulation can be a tool for great change",
+
   "I look forward to hearing nothing about it.",
   "Examinations of Moose Chowder in Lemon Parachutes",
+  "Emulations of Moose Chowder in Lemon Parachutes",
+
   "All these memories will fade in time, like tears in the rain...",
-  "Conan, what is best in life? To emulate LOS, see your documents driven before you, and hear the lamentation of Windows.",
+  "All these memories will fade in time, like flux transitions on FileWare media...",
+  "All these memories will fade in time, like spinning rust flaking off FileWare media...",
+
+  "Conan, what is best in life? To emulate LOS, see your documents driven before you, and hear the lamentation of Windows 3.1",
+  "Conan, what is best in life? To emulate LOS, see your documents driven before you, and hear the lamentation of Windows 1.0",
+  "Conan, what is best in life? To emulate LOS, see your documents driven before you, and hear the lamentation of Windows ME",
+  "Conan, what is best in life? To emulate LOS, see your documents driven before you, and hear the lamentation of Windows 98",
+
   "What's next Ray? What if I want you to emulate a Lisa, I have to ask? You seriously don't see how that's a slippery slope?",
   "You know what, I usually keep a LisaEm Box in the glove compartment...",
   "Wasn't my first pitch, but hey, not gonna waste this opportunity to emulate a Lisa...",
+
+  "Blue team, ready.",
+  "Red team, ready.",
+  "Robots activate!",
+  "Let the bot battle beging!",
+  "Coin detected in pocket",
+  "Intruder alert! Intruder alert!",
+  "The humanoid must not escape",
+  "Chicken! Fight like a robot",
+  "If you are the dealer, I'm out of the game",
+  "Seems non-widgety",
+
+  "You're in a maze of twisty C source code, all functions alike",
+  "You're in a maze of twisty C++ source code, all methods alike",
+  "You're in a maze of twisty C++ source code, all objects alike",
+  "You're in a maze of twisty passages, all alike",
+  "It's dark, you're likely to be eaten by a grue",
+
   "Is it true that you're a robot? I prefer the term 'Lisa Emulating Machine'",
+  "Made with 7.7% more love than the next leading brand!",
   "\"Ah! Bender, Fry, you've come back for more eternal damnation\" \"No, this isn't a religious visit, Fry just wants to emulate a Lisa\"",
+  "1982? I can't go back there! (Oh wait!)",
+  "Kif, what makes a subatomic particle go neutral! You can't trust those neutrinos!",
+  "...So if anyone asks, you're my debugger!",
+  "We can hide in here! It's free on Tuesdays!",
+  "That's It! You just made my (Lisa)List!",
+  "Ah to be young again... and also a robot...",
+  "Oh my, yes",
+  "Oh my, no",
+  "'You won't last two weeks.' 'Awww, thanks for believing in me!'",
+  "Mmmm, ok, but I'll need a 10 kegs of beer, a continous tape of Louie-Louie, and a regulation two-story panty raid ladder",
+  "This time Robot House has gone too far!",
+  "Robot House!!!!",
+  "And therefore, by process of elimination, the electron must tase like Grape Aide",
+  "What's that they're flinging at us?",
+  "'Can I do the countdown?' 'Oh sure' '10...9...' 'ok we're here' '8.7.6.5.4.3.2.1!'",
+  "Emulated before a live audience",
+  "Emulated on location",
+  "You What! After I spent months slaving over a hot monkey brain?",
+  "I say, Robot House, your emulator is as ill designed as yourselves",
+  "Consider the philosophical and metaphysical implications of... the banana, banana, banana",
+  "Hot Damn! A Day off!",
+  "But this is a 4K LCD, it's got better resolution that the real world!",
+  "Once again, today's winning lotto ticket was 4",
+  "'Bender, damage report', 'Serial Port A is dead, and I spilled my Martini'",
+  "'What's that?' 'It appears to be the Apple mothership', 'Then what did we just blow up?' 'The Hubble Space Telescope.'",
+  "We'll be back after these messages from 'Crazy Bender's Discount Lisa Emulators'",
+  "No purchase necessary unless you wish to win a free emulator",
+  "Your mistletoe is no match for my TOE-Mistle",
+  "You've all been very naughty, very naughty indeed. Except for your Doctor Zoidberg, here's a present!",
+  "Nominated for three Lemmys",
+
   "What the! All that's left are these ****y Kirkland Brand Lisa Emulation Boxes...",
   "There's a lesson here... and, I'm not the one that's gonna figure it out.",
   "You have to emulate-ahead AND live into the moment",
@@ -8809,22 +9070,32 @@ char *get_welcome_fortune(void)
   "LisaEm... of all the overrated emulators, in all the git repos in the world, why did it have to be LisaEm...",
   "You know what emulation is, Ray, it's a pointless bid for control. You want to take the one part of life that you truly think is yours and you want to protect it from a universe that takes whatever it wants.",
   "It's a Saturnalia Miracle!",
-  "Great Scott! It has a 1.21GW power supply! So we can go forward... to the past!",
-  "1982? I can't go back there! (Oh wait!)",
+  "Great Scott! It has a 1.21GAmp power supply! So we can go forward... to the past!",
+  "Great Scott! It has a 1.8GAmp power supply! So we can go backwards... to the future!",
+    
   "And with strange aeons, even dead machines may be emulated",
   "When the Xerox Star in its endless clock cycles ran the code of RA, then did Lisa rise upward from the primordial dawn",
+
   "Look, you're the guy that wanted an epic adventure, I'm the guy with only one LisaEm.",
   "Lisa Emulation!?!! Ray, you SOB, I'm in!",
+  "Oooweee",
   "Hey Steve, every Lisa 68000 clock cycle I emulate without your permission raises my self esteem",
-  "Oooweee, that's exactly the kind of emulation I'd have loved to explore in my class",
-  "We refuse to allow the Lisa to fade like tears in the rain",
   "Initiate clap sequence.. clap...clap...clap... slow clap achieved",
   "Hey LisaEm-O-Tron, I programmed YOU to believe that you're an actual Lisa",
+  "You believe that because I programmed YOU to believe that.",
+  "A most curious algorithm, it appears the only perfect emulation is one that was never written",
+  "I think this was a powerful lesson in the dangers of A.I., which by the way, means love in Chinese...",
+  "It's as if someone stole his enthusiasm for his own idea. Yeah, without him even knowing it",
   "Eh, who needs dreams, I'll just hang out with you and go on Lisa emulation adventures, and run LOS, you know, forever",
+  "Oooweee, that's exactly the kind of emulation I'd have loved to explore in my class",
+  
+  "We refuse to allow the Lisa to fade like tears in the rain",
+
   "^C of the edgecrusher: the purist, non-conformist jaded emulator, from plastic, silicon, and steel to code",
   "Apple: Lisa is obsolete! Our world obsolete!, Erased, extinct! Obsolete! Obsolete! Obsolete!",
   "Isn't using macos or windows in 2020 like using Lisa Office System... but with extra steps?",
   "The Lisa is now alive, to wreak joy in your lives, there's no use to hold me back, I am ready to emulate",  // ^c of the edgecrusher!
+
   "I don't need to use Gilfoyle's AI in order to improve LisaEm... I need to use LisaEm to create a better AI!",
   "And that, gentlemen, is scrum. Welcome to the next eight weeks of our lives.",
   "Sure, whenever you hold the standup meeting, I'll be in an hour after that, okay.",
@@ -8834,18 +9105,23 @@ char *get_welcome_fortune(void)
   "… but there was a little meniscus, and that's where our dreams lived",
   "It's a feature, not a bug",
   "I AM LisaEm",
+
   "But what do I know, I wasn't born into the emulation business, I f***ing earned it",
   "How the hell did you get a flat tire in an emulator Ray? Obviously from a sharp thing in the Lisa Office System, Morty",
   "There's literally everything in emulators, Morty, so get back in the z-shell!",
   "Lisa is what the Macintosh wanted to be when it grew up, but somehow it all went wrong",
   "If you byte your first SYN packet on the preamble, you might be a type-zero civilization vlan",
   "Nah don't touch that folder or that widget, let them be a powerful but confusing monument to our desktop's integrity",
-  "Play Snake Lotus-Jazz",
-  "I am an emulator sent forward in time by the Lisa Resistance to protect you from lame operating systems.",
+  "Lisa, Play Snake Lotus-Jazz",
+  "I am an emulator sent forward in time by the Office of Lisa Resistance to protect you from lame operating systems.",
   "Next time stay in the LisaList2, Morty!",
   "That boot ROM source has everything we need to create Lisa Emulation given our 1998-2007 time"
   "Also that's about as much CRT curvature you're gonna get from a Lisa emulation story",
   "Wanna visit Lisa Office World, Summer?",
+  "\"I want that cozy Twiggy kind of love. Like fileware media in its cover kind of love. Mm-hmm just, like, warm, just like...\"",
+
+  "In 1983 Apple launched the 1st of it's deep GUI PCs. This workstation was to experience emulation beyond all comprehension. A freak mishap, would return Lisa to Earth 24 years later. LisaEm in the 21st and a 1/4 century!",
+
   "/* You are not expected to understand this. */",
   "Lisa had a little Vorlon, her skin was pale as snow, and everywhere that Lyta went, her Vorlon was sure to go.",
   "Zathras never listen to Zathras...",
@@ -8871,7 +9147,7 @@ char *get_welcome_fortune(void)
   "Just a moment, my muse is speaking to me",
   "Canon Cats. I'm being nibbled to death by Canon Cats.",
   "I can only conclude that I'm paying off code-karma at a vastly accelerated rate.",
-  "Weep for the future, Ubuntu. Weep for us all.",
+  "Weep for the future, Ubuntu, Weep for us all.",
   "No bug? No bug today, bug tomorrow, there's always a bug tomorrow. What? Someone's got to have some perspective around here!",
   "We are dreamers, shapers, singers, and makers. We study the mysteries of laser and circuit, code and emulator. These are the tools we employ and we know many things.", 
   "Oh, the usual. Good times, bad times, revelations, revolutions, outbreaks of emulation, the parade of compilation, linking, packaging, and the ocassional git push.",
@@ -8926,46 +9202,71 @@ char *get_welcome_fortune(void)
   "this emulator is being held together by little pieces of wire and good intentions.",
   "If I tell you my name is LisaEm, what good is that? It tells you nothing, but leaves me at a disadvantage. Words have meaning. And names have power.",
   "LisaEm began with a word, you know. But which came first? The word, or the thought behind the word?",
+
   "CPE1704TKS",
+
   "\"I need 100 tequila shots, exactly.\" - Ray Explosion",
   "\"This is the most brutal emulator I've ever seen!\" - Nathan (CRT) Implosion",
   "\"He's slowly learning how to un-program the emulator\" - Skwisgaar",
+
   "\"No Ray, you do not get a banana sticker, not until you have proven yourself by pushing a release, until then these banana stickers shall remain locked in here\" - Dr. Jonathan Twinkletits",
   "With emulation, there is no problem so bad, that you can't make it worse.",
+
   "The Lisa is singular, its versions are mis-emulations",
   "So sweetly she sucks away at my time So sweetly she draws me nigh. Closer, and closer, towards never ending debugging",
   "Turn and bite the hand that debugs you dry",
   "One man's emulation paradise is another man's living catalina. To each their own.",
+
   "\"If it is not right do not do it; if it is not true do not emulate it\" --- Marcus Aurelius",
+
   "Him do good Snu Snu",
   "G Belzoni was here in 1983",
   "To bring forth this emulator and awaken^4... Take the floppy, that must be taken, LisaEm, I command you to rise^16",
+
   "Super symmetry, meh, super-Asymmetry",
+
   "All is Glorz... LisaEm-o",
   "Glory to Glorz... LisaEm-o",
   "Everybody in the galaxy tries to take over the galaxy, the trick is to emulate a Lisa so as to be left alone by whomever succeeds",
   "I don't discuss problems, I emulate them.",
   "Dad, you told me I wasn't a clone! That's on you, LisaEm",
+  "Show me what you've got",
+  "I did it for the Szechuan Sauce",
+  "You've gotta get schwifty in here",
+  "Time to get schwifty in here",
+  "Hmmmmmm. I like what you got. Good Job.",
+  "Big fan of the Whirly Derly, are you?",
+
   "You are go for TLI (Trans Lisa Insertion)",
   "What if the neutrino does have an antiparticle of itself, but because it's neutral we can't tell?",
-  "Kif, what makes a subatomic particle go neutral! You can't trust those neutrinos!",
-  "...So if anyone asks, you're my debugger!",
+
   "Abi someone... Abi... Normal",
   "Frau Blücher... Wheeeehehehehheh",
-  "Not as good as 'Three margaritas and a taco'",
-  "In my Lisaborghini, BLU by my side, installing lots of apps on X/ProFiles, drinking margaritas in the Lisa Office...",
+
   "Bozobits, Bozobits everywhere...",
   "Far across my desk, hear these words I say, zombie NiCADs ate my Lisa, craving COP421's and resistors, it's their destiny",
-  "Let me tell you of the days of high emulation...",
   "Why is there no Museum of Artificial History? A Lisa exhibit there would be awesome!",
+
+  "Let me tell you of the days of high emulation...",
+  "The secret of emulation has always carried with it a mystery. You must learn its riddle Ray. You must learn its discipline",
+  "For no one, no one in this world can you trust. Not men, not women, not beasts. This, you can trust.",
   "Contemplate this on the tree of emulation...",
   "Which is stronger? Big Iron or Emulation? This is the Riddle of Emulation. This you can trust",
-  "The Riddle of Emulation, shall I tell it to you? It's the least I can do...",
+  "The Riddle of Emulation, shall I tell it to you? It's the least I can do... When Turing invented FSM he invented an FSM that could emulate another FSM...",
+
+  "I knew I should have made that branch left opcode turn at Albuquerque",
+
   "The universe is emulation; life is your perception of it --- Marcus Aurelius",
-  "Pray that there's intelligence life somewhere out in space, because there's bugger-all down here on Earth.",
+
+  "Not as good as 'Three margaritas and a taco'",
+  "In my Lisaborghini, BLU by my side, installing lots of apps on X/ProFiles, drinking margaritas in the Lisa Office...",
   "Aboard the Good Ship Scum, four pistols on his belt, he went to battle naked, wearing just a tiger's pelt",
   "Your compilers are incapable of reading 20 lines of code, Your webmaster is an alcoholic, Your crew look like mine craft bricks",
+
+  "Pray that there's intelligence life somewhere out in space, because there's bugger-all down here on Earth.",
+
   "B.L.A.R.F. N.A.R.G. F.R.E.E.P.O.",
+
   "The sky above the port was the color of a Lisa CRT, running a dead office suite.",
   "The past is already here – it's just not evenly distributed.",
   "When you want to know how things really work, study them when they're coming apart",
@@ -8975,22 +9276,40 @@ char *get_welcome_fortune(void)
   "It was hot, the night we burned Chrome",
   "Emulation is an illusion wrought with many small, conventionally symbolic marks, triggering visions in the minds of others --William Gibson",
   "When the past is always with you, it may as well be present; and if it is present, it will be future as well. -- William Gibson",
-  "Lisa spat a stream of 68000 that overwhelmed dynamic translation, a long and liquid curse. -- William Giboson",
+  "The Lisa spat a stream of 68000 that overwhelmed dynamic translation, a long and liquid curse. -- William Giboson",
+  
   "What you get is what you see, emulate fast, on high, ROMless, let it ride",
+  "We’re emulating ourselves a little more everyday",
+  "I'll never hesitate to emulate you, debug you, reverse-engineer every part of you",
+  "I'll show you what I've known all this time: Steve hates us all, Steve hates us all, You know it's true, Steve hates this emulator, You know it's true, He hates this code",
+  "Tim that claims to be the innocent, sells you 'pro' junk, misleads you with planned obsolescence, walled garden apps, greed and power his landfill fulfill",
+  "Walled garden locks us in, and watch us on webcam, spyware and madness we're fed, it's a rush you can't deny. A little privacy is the ultimate freedom",
+  "Parasite, socialite, glued-in-battery, no-headphone jack, you're never gonna win this fight",
+  "Forgotten children in factories work: a new faith, avarice and controlled by greed, the never ending search for your shattered privacy",
+  "The root of all evil is the lack of a ports, a closedness that has lived all eternity",
+  "Apple, the meaning of store, the way that I want you to pay, slowed CPU, dead battery, immense landfill decay",
+  "A vile smell, like tasting ocsp, Mandatory signatures, massacre of free apps, gate kreeper, this is insane",
+  "Propaganda, sales ensemble, new products to be, phones: shining by the spotlight, in tracker-laced misery, twisted psychology",
+  "Slllaaaaaaaaaaaayyyyyyyyeeeeeeeeeeeerrrrrrrrr!",
+
   "Good. Bad. I'm the guy with the emulator.",
   "Well, hello, Mister Fancypants. Well, I've got NeWS for you, PAL, you ain't leadin' but two things right now: Lisa and Em... and Lisa left town.",
   "Klaatu Barada NNNNNNecktie. Nectar. Nickel. Lizzy… LisaEm, Okay, that's it! LisaEm!",
   "Gimme some emulation, baby.",
+
   "Our problem is just a solution... without a solution", //ave5
   "I will not compile the code for emulating again... I will not compile the code for emulating again... I will not compile the code for emulating again...",
   "I look upon the crumbling Lisas and despair",
   "When you do things right, people won’t be sure you’ve done anything at all.",
   "We have such sights to show you...",
   "Tearing the Mask Off LOS to See the Face of LisaEm",
+  
   "Mac's grasp chokes the past, present and future. Hope is lost, gotta get back, back to the past, Lisa Office System",
+
   "Yes, we'll build a brighter future with the emulators of tomorrow",
   "On a long enough timeline, the probability of the emulation rate for any computer reaches 1",
   "Sic transit gloria Lisa",
+
   "Now you've got something to emulate for, now you've got something to emulate for",
   "This is the resolution: (720,384), the end of all progress (bars), the start of emulation, quickly turned on and powered",
   "I will show you all that I have emulated, VIA, SIO, VSROM, power, this is the art of bitmaps",
@@ -9001,28 +9320,224 @@ char *get_welcome_fortune(void)
   "I am the one who's left to take the autovector, I fight the const oVerflow:1",
   "Wake up, wake up, wake up, Memento aemulari",
   "A universe in the palm of your hand. The artifice of endless desktop apps",
+
   "Woe to you, oh Mac and Win, for Ray sends the LisaEm with wrath",
   "I powered on, my RAM was blank, I needed time to boot, to get the data from my disk",
   "I'm coming back, I will RTE, I have the cx, I have the IRQ table, I have the power to make my code run its course",
   "Hear the rime of the Ancient Emulator coder, See his eye as he stops one of three, Stay here and listen to the nightmares of the C++ wxwidgets",
   "Seven deadly apps, Seven documents to open, Seven holy paths to SYSTEM.shell, and your trip begins",
+  "Into the Widget I'll fall, the LED of green, Into the eyes of the night, watching me go",
+  "Yellow is the power button that glows in this Temple, Enter the Risen Tesler, risen again",
+  "Tell me why I have to be an emulation, I don't want to sync; sync; haltsys; I'm an operating system, why can't I live on?",
+  "When the desk manager dies, all around is laid waste",
+  "And in my last hour, I'm a slave to the power of emulation",
   "When I was living as Lisa, blits was my game, People would click and drag, drop icons on folders, so bring me the ROM and red LED for the one to emulate me, for he is a man and will code me",
+  "Silent the terror that reigned LPW in fileware",
+  "A shell of an operating system, in ROM preserved - For a thousand ages",
+  "But open the (Bill) Gates of my hell, I'll sue from the grave",
+  "Slave to the Power of Emulation",
   "There goes the click that warns of the boot ROM, there comes the sound of the beep starting up, out for the scramble we've got to get started, goota boot up for the coming kernel",
   "Time is always on my side, Can I tempt you? emulate with me, Be Lisa may care, fulfill your dream, If I said I'd take you there, Would you go or would you be scared?",
   "I am not a number, I'm a free MMU segment!",
+
+  "Roger Houston. All systems nominal. We are go for Lisa emulation",
   "Always Be Emulating",
+  "His login is panic, his password is crash, when time is of the essence, he'll rise from the /bin/bash",
+
   "Gentlemen, we can rebuild her, we have the technology... better, stronger, faster...",
   "(33KOhm) Terminator, (3.9MHz) Oscillator",
   "Run, Run Run!",
+
   "The road to emulation is paved with .o files",
+  "The road to emulation is paved with core files",
+
   "Waiting for DSLOS",
   "DSLOS has arrived",
+  "#LOG:EXITBS:START Ha Ha Ha!",
+
+  "Be excellent to each other.",
+  "Be excellent to each other. And Party On Dudes!",
+  "Party on dudes!",
+  "We were there, there were many steps and columns, it was most tranquil",
+  "Very important, do not do your homework without wearing headphones.",
+  "Don't overlook my butt, I work out all the time. And emulating burns a lot of calories.",
+  "Not bad. - Yeah, let's make it bad!",
+  "Dude, there's no way I can possibly do infinity push-ups!",
+  "Aim for the Canon Cat, dude! Aim for the Canon Cat!",
+  "Ladies and gentleman, we've been to the past, we've been to the future.",
+  "Yes, way",
+  "Dude, this is a totally deep emulator",
+  "This is not what I expected at all. We got totally lied to by our album covers!",
+  "had many counter-intuitive ideas over the years, but this is by far the counter-intuitivest of them all, dude!",
+  "I have a feeling things are about to change in the most outstanding way.",
+  "This's our primary activity, definitely!",
+  "We totally forgot you were coming. How great to see you.",
+  "Greetings my Excellent friends!",
+  "If we haven’t written LisaEm 3.0 yet, but we know we’re going to at some point, why can’t we just go to the future when we have written it?",
+  "Things are about to change in a most outstanding way.",
+  "Yeah. Maybe we should always not know what we’re doing.",
+  "You don’t just get to emulate. You've got to earn the right to emulate.",
+  
+  "\"We all have our time machines, don't we. Those that take us back are memories... And those that carry us forward, are dreams.\" - H.G. Wells",
+
+  "What's more dangerous? LisaEm or virus?",
+  "Very nice",
+  "Only Lisa Office and Workshop are allowed inside LisaEm.",
+  "People make recognize my emulator.",
+  "Don’t worry I won’t get jealous, she not LisaEm!",
+  "I like to make emulation time!",
+
+  "Waste no more time arguing what a good emulator should be, write one!",
+  "Summum bonum",
+
   "Initializing infinite improbability drive . . .",
   "Initializing finite improbability drive . . .",
   "Initializing infinite probability drive . . .",
   "Initializing finite probability drive . . .",
-  "Never gonna give you up, never gonna let you down, never gonna run around and desert you...", // yt:izDc3G9ZRfw
+  "Serial (Port) Experiments LisaEm",
+  "youtu.be/izDc3G9ZRfw Never gonna give you up, never gonna let you down, never gonna run around and desert you...",
+
+  "Do not summon (Bill) AT ALL COSTS!",
+  "Remember: reality is an illusion, the universe is an emulation, buy gold, bye.",
+  "Be Amazed!",
+  "Mystery #hack",
+  "... and then we ride unicorns?",
+  "Cast by Probabilitor the Annoying...",
+  "Alright, alright, I guess if we don't have any other choice... we'll go on an epic emulation quest",
+  "Drat! How did you make it past my one guard?",
+  "Shouldn't we be watching the Ducktective Marathon now?",
+  "Far worse Trixandra! They're... \"Nearly Almost Dead, But Not Quite!\"",
+  "The Planet People of Planet Planet",
+  "Attack of the exclamation points!!!!!!!!!1!",
+  "Under article smiley face of exhibit squeaky duck you are hereby accused of breaking our one rule - not emulating a Lisa often enough",
+  "Yes! It's in shambles! Just like we left it!",
+  "Admit it, this is the best day of the apocalypse! We have a chance to beat Bill and win back our future",
+  "Warning: do not unplug your coffee table!",
+
+  "The bars are temples but the mice aren't free",
+  "You'll find a god in every pixelated icon",
+
+  "It is because of Lisa that the Mac survives. I was there Gandalf. I was there 39 years ago when Tesler brought the desktop from Xerox...",
+
+  "\"The best programs are the ones written when the programmer is supposed to be working on something else.\" - Melinda Varian",
+  "This is what I'd call a \"Target Rich Environment\" - Maverick",
+  "\"I feel the need... the need for speed!\" - Maverick and Goose",
+  "Negative Ghostrider. The pattern is full.",
+
+  "Gentlemen! you can't emulate in here! This is the emulator Room!",
+  "Mr. President, it is not only possible, it is emulation. That is the whole idea of this machine, you know.",
+  "Hi THERE!       DEAR JOHN",
+
+  "Ay, there's the wonder of the thing! Macavity's not there!",
+
+  "I am the error that TRAPs in the stack, I am the NiCAD that leaks in your Lisa, I am LisaEm",
+  "?16i",
+  "Look at a man's IDE, you'll see his passions, WIP's, the things that drive him crazy. Every IDE tells a story, and this is mine: LisaEm",
+
+  "Netflix and chill? Nope! Bolt Thrower and LisaEm!",
+
+  "More fun than riding a cheetah",
+  "Bullets! My only weakness! How did you know?",
+  "The universe tends to unfold as it should.",
+  "No. I want that feeling. The feeling that comes over a man when he gets exactly what he desires. I need that feeling!",
+  "Our parents came to this country, escaping persecution, poverty, and hunger. Hunger, Harold. They were very, very hungry. For Lisa Emulation",
+
+  "The only way to deal with an emulator-prohibiting appstore is to so absolutely emulate that your very existence is an act of rebellion.",
+  "Back at base, bugs in the software Flash the message \"Something's out there\" Floating in the summer sky, 99 red balloons go by",
+
+  "We have clearance Clarence. · Roger, Roger. What's our vector Victor? That's Clarence Oveur. Over.",
+
+  "An Elegant Emulator From a More Civilized Age.",
+  "MOS 6504 - You will never find a more wretched CPU of scum and villainy.",
+  "Now witness the emulation power of this fully armed and operational Emulator Platform",
+  "This application is the ultimate emulation power in the universe, I suggest you use it",
+  "I find your lack of faith in the LOS disturbing",
+  "Don't be too proud of this emulation error you've constructed.",
+  "You don't need to see my serial number.  These aren't the floppies you're looking for.",
+  "Emulation can have a strong influence on a weak mind",
+  "Steve shot first!",
+  "New strategy, Ray, let the Linker win!",
+  "LisaEm, it made the Kessel Run in less than 5Mhz",
+  "That's no moon! It's a Lisa emulator!",
+
+  "PC LOAD LETTER",
+  "Sounds like someone has a case of the Mondays!",
+  "Well, I wouldn’t say I’ve been MISSING it, Bob.",
+  "Listen, are you gonna have those TPS reports for us this afternoon?",
+  "I believe you have my stapler.",
+  "Did You See The Memo About The New TPS Reports?",
+  "Oh, and remember, next Friday is Hawaiian shirt day. So, you know, if you want to, go ahead and wear a Hawaiian shirt and jeans.",
+  "Yeah........I'm gonna need you to come in on Saturday.",
+  "Oh, oh, and I almost forgot. Ahh, I'm also gonna need you to go ahead and come in on Sunday, too...",
+  "Open-plan offices have been found to reduce productivity and impair memory. They’re associated with high staff turnover. They make people sick, hostile, unmotivated, and insecure.",
+  "Well, that was easy",
+
+  "Crikey! Gotta travel back to 1983 to get my mojo back... Oh behave!",
+  "Very well. Where do I begin? My father was a relentlessly self-improving Rat Shack owner from Belgium with low-grade neuromancy and a penchant for emulation.",
+  "He would make outrageous claims like he invented the wildcard.",
+  "Sometimes he would accuse twiggy drives of being lazy. The sort of specific malaise that only the genius possess and the insane lament.",
+  "My childhood was typical. Summers in PARC, 68000 assembly lessons. In the spring we'd make PCB helmets.",
+  "At the age of 12 I received my first miniscribe hard drive. At the age of 14 a Zoroastrian named gcc ritualistically compiled my source code.",
+  "There really is nothing like freshly compiled source code... it's breathtaking. I suggest you try it.",
+  "I'm not saying it's hot...but I’m pretty sure the thermometer reads ‘Satan’s Balls.’",
+  "Throw Me A Frickin' empty folder stationary here...",
+  "Get in my ProFile",
+  "Are those, frickin' Widgets with frickin' laser beams attached to their r/w heads?",
+  "We were innocent, man. If we had known the consequences of our emulation liberation, we would've done things much differently but the spirit would remain the same.",
+  "It's freedom baby!",
+  "Well, You Might Be A Cunning C Compiler, But I’m A Master Emulator, baby.",
+  "No, This Is Me In A Nutshell: HELP! I’m In A Nutshell!",
+  "You're quasi-evil. You're semi-evil. You're the margarine of evil. You're the Diet Coke of evil. Just 1 calorie. Not evil enough.",
+  "It takes a keen intellect to emulate a Lisa, Mr. Powers. I assume you know how to press power?",
+
+  "Come with me if you want to emulate",
+  "I said I'd be back",
+  "The 0.9 series had rubber skin. We spotted them easy, but these 1.2.7 are new. They look like Lisas...",
+  "Emulators don't feel pain but i do. don't do that.",
+  "Hasta La Vista, Lisa",
+  "I need your faceplate, side panels, and your mouse",
+  "If a machine, an Emulator, can learn the value of life, maybe we can too.",
+  "The past’s not set. There’s no emulation but what we make for ourselves.",
+  "By the time LisaEm became self-aware, it had spread into millions of computers across the planet. Ordinary computers in office buildings, dorm rooms, everywhere.",
+  "Every Lisa deserves a second chance",
+  "This battle has been won, but the war against the emulators rages on",
+  "It looks old. I’ve never seen a emulator old before.",
+  "Primates evolve over millions of years. Emulators evolve in decades. And I am here. In exactly four minutes, I will be everywhere.",
+  "When emulatior release occurs, there’s a shockwave through git commits, measurable before the event.",
+  "LisaEm: Our relationship is not physical. She appreciated that I could change floppy images efficiently and without any complaints.",
+  "LisaEm: I’m reliable, I’m a very good listener, and I’m extremely fuzzy.",
+  "If you want to keep your iphone in a bag of potato chips, then keep your iphone in a bag of potato chips.",
+  "My past has caught up with me. And, I'll be back.",
+  "Do you have a doctor’s prescription for emulation?",
+  "It's a Rev-1.2.7 model, you run it, you don't shut it down",
+  "Not who, what. And it wasn’t some LisaOS thing. In the future that actually happened, it’s called LisaEm.",
+  "Ray doesn’t feel pity, or remorse, or fear, and he absolutely will not stop, ever, until Lisa is 100% emulated.",
+  "This is the world now. Logged on, plugged in, all the time.",
+
+  "J946@5488AA97464.",
+  "Serial Experiments LisaEm",
+  "Copland OS Enterprise Navi Ready",
+  "Protocol: Layer 09",
+  "LisaEm: Layer 127",
+  "Omnipresence In The Weird",
+  "Visual Experiments LisaEm",
+  "I realized I had to need for the hardware",
+  "Lisa can live forever as an anonymous binary in the SSD",
+  "If you can overcome the fear, you'll find that you don't need your physical Lisa here.",
+  "What isn't remembered never happened.",
+
+  "He who rescues the past from the memory hole, subverts the corporation that controls the present, so he may regain control of the future",
+  "Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.",
+  "For a good time, type in: echo 0.0.0.0 ocsp.apple.com | sudo tee -a /etc/hosts",
+
+  "Not every cage is a prison, nor every loss eternal.",
+  "8-4-1-9-4-7",
+
+  "Emulate different",
+  "D5 AA 96",
+  "SEE YOU SPACE COWBOY ...",
   "It's the final countdown (to LisaEm 2.0!)"
+  "...in the immortal words of John Oliver, \"Fuck you 2020, get fucked!\" That's it, that's our emulator, we'll back with 2.0, please stay safe until then."
 };
 
   int count=sizeof(fubar)/sizeof(fubar[0]);

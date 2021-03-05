@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                   A part of the Apple Lisa 2 Emulator Project                        *
 *                                                                                      *
-*                  Copyright (C) 1998, 2019 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                            All Rights Reserved                                       *
 *                                                                                      *
 *                     Release Project Name: LisaFSh Tool                               *
@@ -10,6 +10,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include <libdc42.h>
 
@@ -25,7 +26,7 @@ char cmd_line[8192];                        // command line
 typedef struct
 {
   int sector;                               // which sector is this?
-  char *tagptr;
+  uint8 *tagptr;
 } sorttag_type;
 
 
@@ -38,10 +39,21 @@ char volumename[32];
 uint16 fsversion=0;
 uint32 firstmddf=65536;
 
-char filenames[65536][2][64];         // [fileid][size of file name][2] 0=Lisa name 1=sanitized name
+char directory[65536];
+// these arrays are super inefficient, but wtf
+char filenames[65536][3][64];         // [fileid][size of file name][2] 0=Lisa name 1=sanitized name
                                       // cached file names for all the tags - kind of big, I know.
 
-char directory[65536];
+uint32 size1[65536]; // one of these is physical size, the other logical
+uint32 size2[65536];
+uint32 fileflags[65536];
+uint16 bozo[65536];
+uint32 serialized[65536];
+uint32 creationdate[65536];
+uint32 modificationdate[65536];
+uint32 accesstime[65536];
+uint8  passworded[65536];
+uint8  proccessed[65536];
 // the first few sectors of a disk are reserved for the boot sector + os loader
 #define RESERVED_BLOCKS 28
 
@@ -276,7 +288,7 @@ int tagcmp(const void *p1, const void *p2)
 // Dump the data in the MDDF - Thanks to Chris McFall for this info.  :)
 void dump_mddf(FILE *out, DC42ImageType *F)
 {
- char *sec;
+ uint8 *sec;
  int i,j ;
  uint32 sector, sect;
 
@@ -287,7 +299,7 @@ void dump_mddf(FILE *out, DC42ImageType *F)
        sect=sorttag[sector];
 
 
-       sec=(char *)dc42_read_sector_data(F,sect); //&(sectors[sect*sectorsize]);
+       sec=(uint8 *)dc42_read_sector_data(F,sect); //&(sectors[sect*sectorsize]);
 
        if (TAGFILEID(sect)==TAG_MDDF)
        {
@@ -326,7 +338,7 @@ void get_allocation_bitmap(DC42ImageType *F)
  uint32 sector, i;
  unsigned int as=RESERVED_BLOCKS    ;   // sector is the search for the allocation bitmap, as is the active sector
  uint16 thistagfileid;
- char *sec;
+ uint8 *sec;
 
  if (!allocated) allocated=malloc(F->numblocks*sizeof(int));
 
@@ -340,7 +352,7 @@ void get_allocation_bitmap(DC42ImageType *F)
    if (tagfileid(F,sector)==TAG_FREEBITMAP)                  // is this a bitmap block?
    {
      printf("Found allocation bitmap block at sector #%04x(%d)\n",sector,sector);
-     sec=(char *)dc42_read_sector_data(F,sector);
+     sec=(uint8 *)dc42_read_sector_data(F,sector);
      // do all the bits in this block until we go over the # of max sectors.
      for (i=0; i<F->datasize; i++)              // ??? might need to change this to match offsets ????
      {
@@ -391,7 +403,7 @@ char *getfileid(int sector)
 
   snprintf(fileidtext,63,"file-%04x",fileid);
 
-  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",~(fileid+1));
+  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",(~fileid) & 0xffff);
   else if (fileid >TAG_MAXTAG) snprintf(fileidtext,63,"UnKnowN-%04x",fileid);
   if (fileid==TAG_ERASED_BLK)  snprintf(fileidtext,63,"deleted-blocks-7fff");
   if (fileid==TAG_BOOTSECTOR)  snprintf(fileidtext,63,"bootsect-aaaa");
@@ -408,7 +420,7 @@ char *getfileidbyid(uint16 fileid)
 {
   static char fileidtext[64];            // needs to be static so it doesn't fall off the heap when this fn exits
   snprintf(fileidtext,63,"file-%04x",fileid);
-  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",~(fileid+1));
+  if (fileid >0xefff        )  snprintf(fileidtext,63,"extent-%04x",(~fileid) & 0xffff);
   else if (fileid >TAG_MAXTAG) snprintf(fileidtext,63,"UnKnowN-%04x",fileid);
   if (fileid==TAG_BOOTSECTOR)  snprintf(fileidtext,63,"bootsect-aaaa");
   if (fileid==TAG_OS_LOADER )  snprintf(fileidtext,63,"OSLoader-bbbb");
@@ -421,92 +433,253 @@ char *getfileidbyid(uint16 fileid)
 }
 
 
+char *get_bozo(uint16 b) {
+  static char bozo[12];
+  memset(bozo,0,11);
+  if (!b) return bozo;
+
+  snprintf(bozo,11,"bozo:%04x",b);
+  return bozo;
+}
+
+char *get_fileflags(uint16 f)
+{
+    static char attr[17];
+    // as seen in LPW file manager attributes
+    attr[0]  = (f & 0x0020) ? 'C' : ' '; // either C or O means read only, not sure
+    attr[1]  = (f & 0x0008) ? 'O' : ' ';
+    attr[6]  = (f & 0x0002) ? 'B' : ' '; // bozo (DRM flag)
+
+    // unknown possible flags
+    attr[2]  = (f & 0x0010) ? 'a' : ' ';
+    attr[3]  = (f & 0x0040) ? 'b' : ' ';
+    attr[4]  = (f & 0x0080) ? 'd' : ' ';
+    attr[5]  = (f & 0x0001) ? 'e' : ' ';
+    attr[7]  = (f & 0x0004) ? 'g' : ' ';
+    attr[8]  = (f & 0x0100) ? ' ' : '-'; // - all seem to have this one turned on, maybe it means file, or maybe not deleted?
+    attr[9]  = (f & 0x0200) ? 'i' : ' ';
+    attr[10] = (f & 0x0400) ? 'j' : ' ';
+    attr[11] = (f & 0x0800) ? 'k' : ' ';
+    attr[12] = (f & 0x1000) ? 'l' : ' ';
+    attr[13] = (f & 0x2000) ? 'm' : ' ';
+    attr[14] = (f & 0x4000) ? 'n' : ' ';
+    attr[15] = (f & 0x8000) ? 'p' : ' ';
+
+    attr[16]=0;
+    return attr;
+}
+
 
 void get_dir_file_names(DC42ImageType *F)
 {
- uint32 sector, mysect, i,j,k,ti,ts;                           // sector is the search for the allocation bitmap, as is the active sector
+ uint32 sector, mysect, i,j,k,l,m,ti,ts;                           // sector is the search for the allocation bitmap, as is the active sector
  uint16 fileid;
- char *sec, *f;
-
+ uint8 *sec, *f;
  //int offset=0x10;                                            // start offset
-
  char filename[128];                                           // current file name I'm working on
 
+ /* DEBUG */ fprintf(stderr,"initializing directory names\n");
  for (i=0; i<65536; i++)                                       // set default file names
-  {
-   f=getfileidbyid(i);
-   strncpy(filenames[i][0],f,63);
-   filenamecleanup(filenames[i][0],filenames[i][1]);
-  }
-
- // Walk all (sorted) sectors until we find the directory entries.
-   
- i=0x10;                                                       // initial filename position for 1st dir block
- for (sector=0; sector<F->numblocks; sector++)
  {
-   mysect=sorttag[sector];
+      f=getfileidbyid(i);
+      strncpy(filenames[i][0],f,63);
+      filenamecleanup(filenames[i][0],filenames[i][1]);
+      size1[i]=0;
+      size2[i]=0;
+      fileflags[i]=0;
+      serialized[i]=0;
+      bozo[i]=0;
+      creationdate[i]=0;
+      accesstime[i]=0;
+      modificationdate[i]=0;
+      proccessed[i]=0;
+ }
 
-   if (TAGFILEID(mysect)==TAG_DIRECTORY)                       // is this a directory block? /////////////////////////////////////////
-   {                                                           // Yes? Walk it for filenames and extract tag id's.
-     
-     sec=(char *)dc42_read_sector_data(F,mysect);
-     while(i+=64)                                              // every 64 bytes is a directory entry.
-     {
-       if (i>511)                                              // check to see if we went over sector boundary for dirs
-       {  sector++; i-=512;                                    // advance to the next sector, fix index.
-          mysect=sorttag[sector];                              // get the sorted sector
-          sec=(char *)dc42_read_sector_data(F,mysect);         // get next data pointer
-          if (TAGFILEID(mysect)!=TAG_DIRECTORY) return;        // done, we've gone out of the last dir.
-       }
+/*
+*** redo this code ***
+directory entries don't always start at a fixed position, not sure.
+we can search for 24 00 00 [filename]
+if the file name starts with a zero we can skip
 
-       if (sec[i]==0 && sec[i+1]>31)                           // do we have a null in [0] and text byte in [1]?
-       {                                                       // file name starts on the 1st byte, not the zeroth byte.
-         for (j=0,k=i+1;j<32; j++,k++) filename[j]=sec[k];     // copy the file name
-         filename[31]=0;                                       // make sure it's terminated
-         // get the file ID for this sector.
-         fileid=(sec[i+32+4]<<8)|sec[i+32+5];                  // get the tag for this file
+24 00 starts at 0x0e, filename starts at 0x11, file id is at offset 0x34
+maybe can figure out the other fields as well such as dates and so on.
+need to find the logical file size.
+
+-----------------------------------------------------------------------------
+Sec 61:(0x003d)   Used Block Part of file directory-0004:"directory-0004"
+-----------------------------------------------------------------------------
+            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b +c +d +e +f+10+11+12+13
+tags:       00 00 25 00 00 04 82 00 00 00 . 17 f5 00 00 00 00 18 ff ff ff
+           |volid|????|fileid||absnext|   ?   |    ?   |    next|previous
+-----------------------------------------------------------------------------
+      +0 +1 +2 +3 +4 +5 +6 +7 . +8 +9 +a +b +c +d +e +f
+-----------------------------------------------------------------------------
+0000: 24 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |  $
+0010: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+0020: 00 00 00 00 08 00 ff ff . 00 94 00 51 00 a4 00 44   |      (  4 Q $ D
+0030: 00 64 00 0d 00 1a 00 0d . 00 f7 6f 52 00 8a 24 6a   |   d - : - woR *$j
+
+0040: 6f ce 00 f7 00 03 00 f7 . 6e be 00 f7 6e 8a 24 00   |  oN w # wn> wn*$
+0050: 00 41 73 73 65 6d 62 6c . 65 72 2e 4f 62 6a 00 00   |   Assembler.Obj
+0060: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+0070: 00 00 03 00[00 2a|9d 27 . f9 96|a2 02 25 3a|00 00   |    #  *='y6""%:
+                |fileid|creationdate|modification|
+0080: a6 00|00 00 a6 00 00 01 . 00 00 00 00 00 00 24 00   |  &   &  !      $
+      size |      size?|   ??
+0090: 00 43 6f 64 65 2e 4f 62 . 6a 00 00 00 00 00 00 00   |   Code.Obj
+
+00a0: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+00b0: 00 00 03 00 00 2b 9d 27 . f9 db a2 02 25 3a 00 00   |    #  +='y[""%:
+00c0: ca 00 00 00 ca 00 00 01 . 00 00 00 00 00 00 24 00   |  J   J  !      $
+
+00d0: 00 45 64 69 74 2e 4d 65 . 6e 75 73 2e 54 65 78 74   |   Edit.Menus.Text
+00e0: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+00f0: 00 00 03 00[00 2c}9c 25 . 53 36|a2 02 25 3a|00 00   |    #  ,<%S6""%:
+                |fileid|creationdate |lastmoddate|size?
+0100:[0c 00]00 00 0c 00|00 01 . 20 00 00 00 00 00 24 00   |  ,   ,  !      $
+      size |size?      |        ^^=C flag?
+
+Pascal size=size/512
+
+search for 24 00 00 - after this is the file name.
+          @4e ^       @51 filename,  @72 is a 03 00 (what's that?)
+          @74->2 byte file id
+          @76+4=creation date
+          @7a+4=modification date
+          @7e+4=size1
+          @82+4=size2
+          @86+2=00 01 ???
+          @88="C" flag if 0x20
+
+What sets that "C" flag? Edit.Menus.Text has it, but not Assembler.obj
+
+from PHP: creation date: Monday, January 5, 1987 12:10:30 PM  https://www.epochconverter.com/mac?
+From LPW:                        January 6, 1984 12:10:xx PM
+PHP: $currenttimestamp = 2082844800+time();  but this is off by 3 years and one day.
+86400=1 day
+31536000=1 year (365)
+94608000=3 years
+94694400=3 years+1 day.
+
+2082844800-94694400=
+-94694400 for website
+time()+1988150400 - adjust to unix epoch time.
+
+24 00 00: 0filename: 3
+fileid    38
+creadate: 40
+moddate : 44
+size1   : 48
+size2   : 52
+flags   : 56
+
+*/  
+
+for (mysect=0; mysect<F->numblocks; mysect++)
+    {
+     if (TAGFILEID(mysect)==TAG_DIRECTORY) {
+        sec=(uint8 *)dc42_read_sector_data(F,mysect);
+
+        for  (int k=0; k<512-58; k++) {
+           if  ((sec[k]==0x24 && sec[k+1]==0) && sec[k+2]==0) 
+                {
+                  i=k;
+                  fileid=(sec[38+i]<<8)|sec[39+i];
+                  for (int n=0; n<32; n++) filenames[fileid][0][n]=sec[i+n+3]; // copy filename from directory entry
+                  filenamecleanup(filenames[fileid][0],filenames[fileid][1]);
+                  creationdate[fileid]     = (sec[40+i]<<24)|(sec[41+i]<<16)|(sec[42+i]<<8)|(sec[43+i]);
+                  modificationdate[fileid] = (sec[44+i]<<24)|(sec[45+i]<<16)|(sec[46+i]<<8)|(sec[47+i]);
+                  size1[fileid]            = (sec[48+i]<<24)|(sec[49+i]<<16)|(sec[50+i]<<8)|(sec[51+i]);
+                  size2[fileid]            = (sec[52+i]<<24)|(sec[53+i]<<16)|(sec[54+i]<<8)|(sec[55+i]);
+                  fileflags[fileid]        =                 (sec[56+i]<<16)|(sec[57+i]<<8)|(sec[58+i]);
+
+                  for (l=0; l<F->numblocks; l++)  // find the extent/inode block for this file id, and fill the rest of the fields.
+                  {
+                       char temp[1024], buf1[128], buf2[128], buf3[128];
+
+                       uint16 fid=TAGFILEID(l);
+                       uint16 nfid=(0x10000-fid) & 0xffff;
+                       if  ((nfid==fileid) && (fileid>4 && fileid<0x8000) && !proccessed[fileid]) { // check filename for match, then get the rest of the fields.
+                           uint8 *fsec=(uint8 *)dc42_read_sector_data(F,l);
+                           char inodename[33];
+                           uint8 len=fsec[0];
+
+                           time_t t;
+                           struct tm *ts;
+
+                           int match=1;
+
+                           memset(inodename,0,32);
+                           proccessed[fileid]=1;
+                           for (int n=1; n<=len; n++) {
+                                inodename[n-1]=fsec[n]; 
+                                if (fsec[n]!=filenames[fileid][0][n-1]) match=0;
+                           }
+                           if  (!match) {
+                               fprintf(stderr,"Warning: filename (%s) in extent for file %04x does not match directory entry %04x (%s)\n",inodename,nfid,fileid,filenames[nfid][0]); 
+                           }
+                           creationdate[fileid]    =(fsec[0x2e]<<24) | (fsec[0x2f]<<16) | (fsec[0x30]<<8) | fsec[0x31];
+                           accesstime[fileid]      =(fsec[0x32]<<24) | (fsec[0x33]<<16) | (fsec[0x34]<<8) | fsec[0x35];
+                           modificationdate[fileid]=(fsec[0x36]<<24) | (fsec[0x37]<<16) | (fsec[0x38]<<8) | fsec[0x39];
+                           serialized[fileid]      =(fsec[0x42]<<24) | (fsec[0x43]<<16) | (fsec[0x44]<<8) | fsec[0x45];
+                           bozo[fileid]=(fsec[0x48]<<8) | fsec[0x49];
+                           passworded[fileid]=fsec[0x62]; // 62=passwd length 0-7 actual length 8=(8-20 bytes), 63-6B hash
 
 
-         // If the file id tag isn't a reserved fileid type *AND*
-         // it exists in the sectors, then we likely have a real
-         // file name, so save it.
+                           // epoc adjust b/w Lisa and unix time
+                           #define ADJUST 2177452800
 
-         if (fileid!=TAG_BOOTSECTOR && fileid!=TAG_OS_LOADER && fileid!=TAG_FREE_BLOCK &&
-             fileid!=TAG_ERASED_BLK && fileid!=TAG_MDDF      && fileid!=TAG_FREEBITMAP &&
-             fileid!=TAG_S_RECORDS  && fileid!=TAG_DIRECTORY                              )
-            for (ti=0; ti<F->numblocks; ti++)
-            {
-             ts=sorttag[ti];
-             if (TAGFILEID(ts)==fileid)
-              {// associate the file name with the tag file id.
-               char temp[1024];
+                           t=(time_t)((time_t)(creationdate[fileid])    - (time_t)(ADJUST)); ts=localtime(&t);
+                           strftime(buf1, sizeof(buf1), "%Y.%m.%d-%H:%M",ts);
+                           t=(time_t)((time_t)(modificationdate[fileid])- (time_t)(ADJUST)); ts=localtime(&t);
+                           strftime(buf2, sizeof(buf2), "%Y.%m.%d-%H:%M",ts);
+                           t=(time_t)((time_t)(accesstime[fileid])      - (time_t)(ADJUST)); ts=localtime(&t);
+                           strftime(buf3, sizeof(buf3), "%Y.%m.%d-%H:%M",ts);
 
-               strncpy(filenames[fileid][0],filename,63);      // add Lisa File name to generic file id name
-               filenamecleanup(filenames[fileid][0],           // clean it up, now output name is set
-                               filenames[fileid][1]);
-               
-               snprintf(temp,1023,"%04x     %-32s    %04x(%d)\n",fileid,filename,ts,ts);
-               strncat(directory,temp,65535);                  // add filename to directory.
+                          if (serialized[fileid])
+                              snprintf(temp,1023,"%04x    %-32s     %s %s %s  %10ld %10ld  %s %s %s branded:%08x\n",
+                                              fileid,filenames[fileid][0],buf1,buf2,buf3,
+                                              (long)size1[fileid],(long)size2[fileid],
+                                              (passworded[fileid] ? "PASSWD":""),
+                                              get_fileflags(fileflags[fileid]),
+                                              get_bozo(bozo[fileid]),
+                                              serialized[fileid]);
+                          else
+                              snprintf(temp,1023,"%04x    %-32s     %s %s %s  %10ld %10ld  %s %s %s\n",
+                                              fileid,filenames[fileid][0],buf1,buf2,buf3,(long)size1[fileid],(long)size2[fileid],
+                                              (passworded[fileid] ? "PASSWD":""),
+                                              get_fileflags(fileflags[fileid]),
+                                              get_bozo(bozo[fileid]));
 
-               break;                                          // quit searching
-              }
-            }
+                           strncat(directory,temp,65535);                  // add filename to directory.
 
-       } 
+                           filenamecleanup(filenames[fileid][0],           // clean it up, now output name is set
+                                           filenames[fileid][1]);
 
+                           //aliasname=63 chars max starts at 0x182 (what's 180-181? set to 00 02, what are the fields following?)
+                           if (fsec[0x182]) {
+                              int len=fsec[0x182];
+                              for (int x=0; x<len; x++) filenames[fileid][3][x]=fsec[0x183+x];
+                              filenames[fileid][3][len]=0;
+                              snprintf(temp,1023,"        (%04x) +->DocumentName: %s\n",
+                                        (uint16)((fsec[0x180]<<8)|(fsec[0x180]<<8)),
+                                        filenames[fileid][3]);
+                              strncat(directory,temp,65535);
+                           }
+                           else {filenames[fileid][3][0]=0;}
 
-     }///for sector size /////////////////////////////////////////////////////////////////////////////////////////
+                           l=F->numblocks;
+                       }
+                  }
+                }
+        }
+     }
    }
-   else if ( TAGFILEID(mysect)>TAG_DIRECTORY) break;  // don't bother looking for more dirs, these are sorted.
- } // for sector loop ///////////////////////////////////////////////////////////////////////////////////////////
-
-
 }
 
 
 // Sort the tags by the keys above, then extract information that's tag sensitive.
-void sorttags(DC42ImageType *F)
-{
+void sorttags(DC42ImageType *F) {
  unsigned int i;
 
  if (!sorttag) sorttag=malloc(F->numblocks*sizeof(int));
@@ -620,7 +793,7 @@ void extract_files(DC42ImageType *F)
 
   char newdir[1024];                    // name of new directory to create
   char *sub;                            // substring search to chop extension
-  char *sec;                            // pointer to sector data
+  uint8 *sec;                            // pointer to sector data
 
   int chop0xf0=0;                       // type of file ID, and whether there's a metadata attached.
   uint16 fileid, oldfileid=0xffff;
@@ -673,7 +846,7 @@ void extract_files(DC42ImageType *F)
        {
         sect=sorttag[sector];        // dump files from sectors in sorted order
         fileid=TAGFILEID(sect);
-        sec=(char *)dc42_read_sector_data(F,sect);
+        sec=(uint8 *)dc42_read_sector_data(F,sect);
 
         if (fileid!=oldfileid)          // we have a file id we haven't seen before. open new file handles
         {
@@ -689,7 +862,9 @@ void extract_files(DC42ImageType *F)
           else                              snprintf(newfile,63,"%s",   getfileid(sect)                     );
           printf("Extracting: %s -> %s (.bin/.txt)\n",filenames[fileid][0],newfile);
 
-          chop0xf0=1;                 // default for normal files is to have a header
+          // 2021.02.24 meh seems we don't need to chop off the meta - esp for LPW files
+          // might revisit this later to see what needs it.
+          chop0xf0=0;                 // default for normal files is to have a header
                                       // but special files do not, so catch those
                                       // and don't chop the first 0xf0 bytes
 
@@ -715,6 +890,7 @@ void extract_files(DC42ImageType *F)
 
           //printf("File:%s starts at sector %d %s metadata\n",newfile, sect, chop0xf0 ? "has":"has no ");
 
+
           if (chop0xf0)                 // deal with meta data bearing files----------------------
           {
               // We need to chop off the 1st 0xf0 bytes as they're part of the metadata of the file.
@@ -724,14 +900,14 @@ void extract_files(DC42ImageType *F)
               if (!fh)                  {fprintf(stderr,"Couldn't create file %s\n",newfilemb);
                                          perror("\n"); int i=chdir(".."); return;}
               //sec=&(sectors[sect*sectorsize]);
-              //sec=(char *)dc42_read_sector_data(F,sect);
+              //sec=(uint8 *)dc42_read_sector_data(F,sect);
               fwrite(sec,0xf0,1,fh); fclose(fh); fh=NULL;
               if (errno) {fprintf(stderr,"An error occured on file %s",newfile); perror("");
                          fclose(fb); fclose(fx); int i=chdir(".."); return;}
 
               //write remainder of sector to the binary file
               //sec=&(sectors[sect*sectorsize+0xf0]);
-              sec=(char *)dc42_read_sector_data(F,sect);
+              sec=(uint8 *)dc42_read_sector_data(F,sect);
               //fwrite(sec,(F->datasize-0xf0),1,fb);     // bug found by Rebecca Bettencourt
               fwrite(sec+0xf0,(F->datasize-0xf0),1,fb);  // bug found by Rebecca Bettencourt
               if (errno) {fprintf(stderr,"An error occured on file %s",newfileb); perror("");
@@ -741,7 +917,8 @@ void extract_files(DC42ImageType *F)
               snprintf(newfilemh,1024,"%s.meta.txt",newfile);
               fh=fopen(newfilemh,"wb");
               if (!fh)                  {fprintf(stderr,"Couldn't create file %s\n",newfilemh);
-                                         fclose(fb); fclose(fx); perror("\n"); int i=chdir(".."); return;}
+                                         fclose(fb); fclose(fx); perror("\n"); int i=chdir(".."); return;
+                                         }
               printsector(fh,F,sect,0xf0); fclose(fh); fh=NULL;
               if (errno) {fprintf(stderr,"An error occured on file %s",newfileb); perror("");
                          fclose(fb); fclose(fx); int i=chdir(".."); return;}
@@ -749,6 +926,8 @@ void extract_files(DC42ImageType *F)
               // dump the data to the hex file, but add a banner warning about metadata.
               fprintf(fx,"\n\n[Metadata from bytes 0x0000-0x00ef]\n");
               printsector(fx,F,sect,F->datasize);
+
+
 
               oldfileid=fileid;             // set up for next round
               continue;                 // skip to the next sector, this one is done ----------------
@@ -788,7 +967,7 @@ void extract_file_extents_from_tags(DC42ImageType *F)
   // is get the sector extents.
 
   char *sub;                            // substring search to chop extension
-  char *sec;                            // pointer to sector data
+  uint8 *sec;                            // pointer to sector data
 
   int chop0xf0=0;                       // type of file ID, and whether there's a metadata attached.
   uint16 fileid, oldfileid=0xffff;
@@ -805,11 +984,10 @@ void extract_file_extents_from_tags(DC42ImageType *F)
        {
         sect=sorttag[sector];           // dump files from sectors in sorted order
         fileid=TAGFILEID(sect);
-        sec=(char *)dc42_read_sector_data(F,sect);
+        sec=(uint8 *)dc42_read_sector_data(F,sect);
 
         if (fileid!=oldfileid)          // we have a file id we haven't seen before. open new file handles
         {
-
           printf("file id: %04x %s:\n",fileid,filenames[fileid][0]);
 
           chop0xf0=1;                              // default for normal files is to have a header
@@ -826,11 +1004,10 @@ void extract_file_extents_from_tags(DC42ImageType *F)
           if (fileid==TAG_DIRECTORY ) chop0xf0=0;  // directory
           if (fileid >TAG_MAXTAG    ) chop0xf0=0;  // catch other unknown file id's
 
-	  if (is_range) 
-	     {printf(" - %04x(%d)\n",lastsector);} //output any dangling extent range ends
+          if (is_range) 
+	           {printf(" - %04x(%d)\n",lastsector);} //output any dangling extent range ends
 
-	  is_range=0; lastsector=-1;
-
+          is_range=0; lastsector=-1;
         } // end of new file comparison on oldfileid/fileid  ----------------------------------------
 
 
@@ -1166,9 +1343,9 @@ void version_banner(void)
   //   ..........1.........2.........3.........4.........5.........6.........7.........8
   //   012345678901234567890123456789012345678901234567890123456789012345678901234567890
   puts("  ---------------------------------------------------------------------------");
-  puts("    Lisa File System Shell Tool  v0.98     http://lisaem.sunder.net/lisafsh  ");
+  puts("    Lisa File System Shell Tool  v0.99     http://lisaem.sunder.net/lisafsh  ");
   puts("  ---------------------------------------------------------------------------");
-  puts("         Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.");
+  puts("         Copyright (C) MMXXI, Ray A. Arachelian, All Rights Reserved.");
   puts("              Released under the GNU Public License, Version 2.0");
   puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
   puts("  ---------------------------------------------------------------------------\n");
@@ -1259,15 +1436,15 @@ while (1)
        case DIR_CMD:
             if (!havetags) {puts("I can't do that, this image doesn't have tags."); break;}
             if (!tagsaresorted) {sorttags(F);    tagsaresorted=1;}
-            //                 01234567890123456789012345678912
-            printf("\nFileID   FileName                           start sector\n");
-            printf("----------------------------------------------------------\n%s\n",directory);
+            //             01234567890123456789012345678912
+            printf("\nExtent   File Name                           Date Created     Date Modified    Last Access Date        filesizes        attr DRM\n");
+            printf("------------------------------------------------------------------------------------------------------------------------------\n%s\n",directory);
             break;
 
        case DIRX_CMD:
             if (!havetags) {puts("I can't do that, this image doesn't have tags."); break;}
             if (!tagsaresorted) {sorttags(F);    tagsaresorted=1;}
-	    extract_file_extents_from_tags(F);
+	          extract_file_extents_from_tags(F);
 	    break;
 
        case  VERSION_CMD: version_banner(); break;
@@ -1507,7 +1684,7 @@ while (1)
                  printf("Converting DART image %s to DiskCopy42 Image:%s\n",cargs[0],dc42filename);
                  i=dart_to_dc42(cargs[0],dc42filename);
                  if (!i)   i=dc42_open(&F2, dc42filename, "w");
-                           if (i) {perror("Couldn't open the disk image."); break;}
+                 if ( i)   {perror("Couldn't open the disk image."); break;}
                 }
                 else  if (dc42_is_valid_image(cargs[0]))
                 {
@@ -1543,31 +1720,32 @@ while (1)
               secsize=MIN(F2.datasize,F->datasize);
 
               if (F2.tagsize==F->tagsize)
-               for (sec=0; sec<count; sec++)
-               {
-                 if (tagsize)
+                 for (sec=0; sec<count; sec++)
                  {
-                  img1=dc42_read_sector_tags(F,sec);
-                  img2=dc42_read_sector_tags(&F2,sec);
-                  if (img1!=NULL && img2!=NULL)
-                     for (i=0; i<tagsize; i++)
-                       if (img1[i]!=img2[i]) {printf("sec:%4d tag offset #%2d <%02x >%02x\n",sec,i,img1[i],img2[i]); differs=1;}
-                 }
+                   if (tagsize)
+                   {
+                      img1=dc42_read_sector_tags(F,sec);
+                      img2=dc42_read_sector_tags(&F2,sec);
+                      if (img1!=NULL && img2!=NULL)
+                       for (i=0; i<tagsize; i++)
+                         if (img1[i]!=img2[i]) {printf("sec:%4d tag offset #%2d <%02x >%02x\n",sec,i,img1[i],img2[i]); differs=1;}
+                   }
 
-                 if (secsize)
-                 {
-                  img1=dc42_read_sector_data(F,sec);
-                  img2=dc42_read_sector_data(&F2,sec);
-                  if (img1!=NULL && img2!=NULL)
-                     for (i=0; i<secsize; i++)
-                       if (img1[i]!=img2[i]) {printf("sec:%4d data offset #%03x <%02x >%02x and more...\n",sec,i,img1[i],img2[i]);
-                                              i=secsize; differs=1;}}
+                   if (secsize)
+                   {
+                      img1=dc42_read_sector_data(F,sec);
+                      img2=dc42_read_sector_data(&F2,sec);
+                      if (img1!=NULL && img2!=NULL)
+                         for (i=0; i<secsize; i++)
+                           if (img1[i]!=img2[i]) {printf("sec:%4d data offset #%03x <%02x >%02x and more...\n",sec,i,img1[i],img2[i]);
+                                                  i=secsize; differs=1;
+                                                 }}
                  }
 
                dc42_close_image(&F2);
                if (!differs) puts("Sectors and tags between these images are identical.");
-               }
-               break;
+            }
+            break;
        case VOLNAME_CMD :
               {
                 int i;

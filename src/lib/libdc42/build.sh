@@ -89,6 +89,7 @@ CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h sr
 #echo parsing options
 for i in $@
 do
+ i=`echo "$i" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
 
  case "$i" in
   estimate)   cd ${XTLD}/src  # estimate compile count, we only have one file, but have to build library so return 2 units
@@ -169,10 +170,14 @@ do
  -arch=*)                      export ARCH="$(echo ${i} | sed -e 's/=/ /g') $ARCH"
                                export SARCH="$i $SARCH"                ;;
 
- --without-debug)              WITHDEBUG=""
+ --no-debug)                   WITHDEBUG=""
                                WARNINGS=""                               ;;
+ --profile)
+                               export WITHDEBUG="$WITHDEBUG -p"
+                               export LIBGENOPTS="$LIBGENOPTS --with-profile"
+                               export WITHPROFILE="yes"                                 ;;
 
- --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
+ --debug)                      WITHDEBUG="$WITHDEBUG -g"
                                WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
 
  --no-banner)                  NOBANNER="1";                             ;;

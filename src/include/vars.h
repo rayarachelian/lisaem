@@ -61,7 +61,7 @@
 
 // If this is disabled the Generator CORE will calculate the status flags on every opcode
 // hack for LisaEm to see if there are flag calculation issues.
-//:TODO: 2020.07.06 for-testing only define NORMAL_GENERATOR_FLAGS 1
+#define NORMAL_GENERATOR_FLAGS 1
 
 // This forces each executed opcode to have it's IPC re-created - used to see if IPC cache
 // isn't working properly, or if we're hitting self-modifying code  -- very slow, do not use
@@ -138,6 +138,7 @@
 // switches to fn's that log memory calls, if undefined, these are macros, so they're much faster.
 // only turn this on if you need it.
 #define DEBUGMEMCALLS 1
+
 // this 2nd one also enables mmu table output
 //#define DEBUGMEMCHKMMU
 
@@ -941,6 +942,7 @@ GLOBAL(int,has_lisa_xl_screenmod,0);
 #define LISA_MACWORKS_RUNNING 3
 #define LISA_MONITOR_RUNNING  4
 #define LISA_XENIX_RUNNING    5
+#define LISA_UNIPLUS_RUNNING  6
 #define UNKNOWN_OS_RUNNING    100
 
 GLOBAL(int,running_lisa_os,LISA_ROM_RUNNING);
@@ -1056,11 +1058,10 @@ typedef struct _t_ipc_table
 // Note that the IPC's point to the virtual, not physical pages.
 
 typedef struct _mmu_trans_t
-{    int32 address;         /* quick ea translation. Just add to lower bits  - needs to be signed     */
-    //uint32 sor9;
+{   int32 address;         /* quick ea translation. Just add to lower bits  - needs to be signed */
     lisa_mem_t readfn;   /* index to read and write fn's for that segment, that way I            */
-    lisa_mem_t writefn;  /* can have read only segments without doing special checking.        */
-    t_ipc_table *table;  /* Pointer to a table of IPC's or NULL if one hasn't been assigned.    */
+    lisa_mem_t writefn;  /* can have read only segments without doing special checking.          */
+    t_ipc_table *table;  /* Pointer to a table of IPC's or NULL if one hasn't been assigned.     */
 } mmu_trans_t;
 
 
@@ -1068,12 +1069,9 @@ typedef struct _mmu_trans_t
 typedef struct
 {
     uint16 sor, slr;          // real sor, slr
-    //uint16 newsor, newslr;    // used when updating - won't change to this until both are written to.
-    uint8  changed;             // this is a flag to let us know that an mmu segment has changed.
-                                // come back later to correct it. bit 0=newslr set, bit 1=newsor set.
+    uint8  changed;           // this is a flag to let us know that an mmu segment has changed.
+                              // come back later to correct it. bit 0=newslr set, bit 1=newsor set.
 } mmu_t;
-
-
 
 
 GLOBAL(uint8,lastsflag,0);
@@ -1439,9 +1437,6 @@ DECLARE(char,_msg_alert2[1024]);
    extern void dumpmmu(uint8 c, FILE *out);
    extern void dumpmmupage(uint8 c, uint8 i, FILE *out);
 
-
-
-
   /*define check_iib() {my_check_iib(__FILE__,__FUNCTION__,__LINE__);}
      ifndef IN_CPU68K_C
      extern void my_check_iib(char *filename, char *function, long line);
@@ -1507,27 +1502,28 @@ extern void on_lisa_exit(void);
 
 // this is needed because gdb doesn't tell you where your program quit from, just gives you the octal version of the exit
 // parameter which is chopped to 9 bits for some oddball reason.
-#define EXIT(x,cmd,fmt,args...) \
-                   {            \
-                      char msg[1024], msg2[1024-100];                                                                      \
-                      snprintf(msg2,1024-100, fmt, ## args);                                                               \
-                      snprintf(msg,1024,"We've encountered a problem!\n%s\nStopped at %s:%s:%d with code :%d", msg2,       \
-                            __FILE__,__FUNCTION__,__LINE__,x);                                                             \
-                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                               \
-                      fprintf(buglog,"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);          \
-                      messagebox(msg,"Emulation aborted!");                                                                \
-                      fflush(buglog); if (!cmd) on_lisa_exit();                                                            \
-                      return;                                                                                              \
+#define EXIT(x,cmd,fmt,args...)                                                                                                                   \
+                   {                                                                                                                              \
+                      char msg[1024], msg2[1024-100];                                                                                             \
+                      snprintf(msg2,1024-100, fmt, ## args);                                                                                      \
+                      snprintf(msg,1024,"We've encountered a problem!\n%s\nStopped at %s:%s:%d with code :%d", msg2,                              \
+                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                    \
+                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
+                      fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
+                      messagebox(msg,"Emulation aborted!");                                                                                       \
+                      fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
+                      return;                                                                                                                     \
                     }
 
 #define EXITR(x,cmd,fmt,args...)                                                                                                                  \
                     {                                                                                                                             \
-                      char msg[1024], msg2[1024-100];                                                                                             \
-                      snprintf(msg2, 1024-100, fmt, ## args);                                                                                     \
-                      snprintf(msg,1024,"I'm sorry, the emulation has aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2, \
+                      char msg[2048], msg2[2048-100];                                                                                             \
+                      fprintf(stderr,"exitr called from:%s:%s:%d",__FILE__,__FUNCTION__,__LINE__);                                                \
+                      snprintf(msg2, 2048-100, fmt, ## args);                                                                                     \
+                      snprintf(msg,1024,"Sorry, the emulation aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2,         \
                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
                       if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
-                      fprintf(buglog,"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);                                 \
+                      fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
                       messagebox(msg,"Emulation aborted!");                                                                                       \
                       fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
                       return cmd-1;                                                                                                               \
@@ -1540,10 +1536,10 @@ extern void on_lisa_exit(void);
                       snprintf(msg,1024,"I'm sorry, the emulation has aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2, \
                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
                       if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
-                      fprintf(buglog,"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);                                 \
+                      fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
                       messagebox(msg,"Emulation aborted!");                                                                                       \
                       fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
-                      return NULL;                                                                                                               \
+                      return NULL;                                                                                                                \
                     }
 
 
@@ -1727,7 +1723,7 @@ extern void dumpram(char *reason);
 extern void    dumpvia(void);
 extern void fdumpvia1(FILE *out);
 extern void fdumpvia2(FILE *out);
-extern void fliflo_dump(FLIFLO_QUEUE_t *b,char *s);
+extern void fliflo_dump(FILE *log, FLIFLO_QUEUE_t *b,char *s);
 
 
 #ifdef DEBUG
@@ -1895,8 +1891,10 @@ GLOBAL(uint8,serial_b,SCC_NOTHING);
 
 GLOBAL(FILE,*scc_a_port_F,NULL);
 GLOBAL(FILE,*scc_b_port_F,NULL);
+DECLARE(int,xonenabled[2]);
+DECLARE(int,baudoverride[2]);
 
-// USed by memory diag tests
+// Used by memory diag tests
 GLOBAL(uint8,*mem_parity_bits1,NULL);
 GLOBAL(uint8,*mem_parity_bits2,NULL);
 GLOBAL(uint32,last_bad_parity_adr,0);
@@ -2516,8 +2514,10 @@ extern void init_Profiles(void);
 extern void profile_unmount(void);
 
 extern void init_sounds(void);
-extern void initialize_scc(void);
-extern void init_telnet_serial_port(int portnum);
+extern void initialize_scc(int actual);
+extern void init_pty_serial_port(int port);
+extern void init_telnet_serial_port(int port);
+
 extern uint16 crc16(uint16 crc, uint8 data);
 extern void seek_mouse_event(void);
 extern void init_floppy(long iorom);
@@ -2656,92 +2656,18 @@ GLOBAL(uint32,minlisaram,0);
 #define RAM1536K (1536*1024)
 #define RAM2048K (2048*1024)
 
-#ifdef BULLSHYTE_ALLOW_1536K_RAM
-   inline static uint32 RAMWARP(uint32 a, uint32 b, int c)
-   {
 
+//2020.11.21
+#define GET_MMU_EFFECTIVE_ADDRESS(seg17,sorg9) (  (int32)(int64)(-((int32)(seg17))+((int32)(sorg9)) )  )
 
-    #ifdef OFFOFFOFFF20051205DEBUG
-    uint32 sgn, usgn, xadd1, xadd2, slrchk;
+#define RAW_MMU_TRANSLATE(addr)       (addr & 0x0001ffff)+(mmu[        (addr & 0x00fe0000)>>17].sor<<9)
+#define RAW_MMU_TRANSLATE_CX(cx,addr) (addr & 0x0001ffff)+(mmu_all[cx][(addr & 0x00fe0000)>>17].sor<<9)
 
-    sgn=  ((int32)( (int32)(b & 0x00ffffff)+(int32)(mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address))    & 0x1fffff);
-    usgn= ((uint32)(        (b & 0x00ffffff)+      (mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address)))   & 0x1FFFFF;
-    xadd1=CHK_MMU_A_REGST(c,b);
-    xadd2= 0x1FFFFF & (((mmu_all[c][b>>17].sor<<9) + (b & 0x1fe00))|(b &511));
-    slrchk=0x1FFFFF & (((mmu_all[c][b>>17].slr & 0xff)<<9) + (b & 0x1fe00));
-
-    if (sgn!=usgn)   ALERT_LOG(0,"DANGER - Signed MMU addition not the same as unsigned %d/%08x!=%08x(unsigned)",c,sgn,usgn);
-    if (xadd1!=usgn) ALERT_LOG(0,"DANGER - Unsigned MMU addition not the same as CHK_MMU_A_REGST%d/%08x!=%08x(unsigned)",c,xadd1,usgn);
-    if (xadd2!=usgn) ALERT_LOG(0,"DANGER - Unsigned MMU addition not the same HWG83 p 36 pdf %d/%08x!=%08x(unsigned)",c,xadd2,usgn);
-    if (slrchk>0x1FFFFF) DEBUG_LOG(0,"SLR>1FFFFF");
-
-    //if (maxlisaram==RAM2048K) return a;                                    // fast exit
-
-
-    DEBUG_LOG(0," Current context=%d, context passed to me:%d slrchk:%08x >1FFFFF:%d",context,c,slrchk, (slrchk>0x1FFFFF));
-    DEBUG_LOG(0," a=%08x inputaddr:%08x 2mblim s/b 001fffff:%08x mmu-delta:%d signed addition:%08x, normal addition:%08x via mmureg:%08x seg:%d sor:%04x slr:%04x",
-    a,b,TWOMEGMLIM ,
-    mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address,
-    ( (int32)(b & 0x00ffffff)+(int32)(mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address)),
-    (        (b & 0x00ffffff)+       (mmu_trans_all[c][(b & MMUEPAGEFL)>>9].address)),
-
-    CHK_MMU_A_REGST(c,b),
-    ((b & MMUSEGFILT)>>17 ),
-    mmu_all[c][(b & MMUSEGFILT)>>17].sor,
-    mmu_all[c][(b & MMUSEGFILT)>>17].slr
-                                               );
-    #endif
-
-    #ifdef BULLSHYTE
-    switch (maxlisaram)
-    {
-        case (RAM512K ):   // single 1/2MB board
-                         if (a<RAM512K ) return a;                         // inside 512K
-                         //20051109 if (a<RAM1024K) return (a & (RAM512K-1)); // warp
-                         memset(&lisaram[maxlisaram],0xff,128);
-                         return maxlisaram;                   // above 1MB is junk - return highest and hope for best
-
-        case (RAM1024K):   // two 1/2 MB boards //
-                        if (a<=RAM1024K) return a;
-                        else return maxlisaram;
-                        //20060106
-                        // if (a<RAM512K)    {
-                        //                       DEBUG_LOG(0,"<512KB");
-                        //                       memset(&lisaram[maxlisaram],0xff,16); return maxlisaram;} //20051109
-                        // if (a>=RAM1536K)  {
-                        //                       DEBUG_LOG(0,">1536KB");
-                        //                       memset(&lisaram[maxlisaram],0xff,16); return maxlisaram;} //20051109
-                        //
-                        // return a-RAM512K;                                                // 1st board 1MB
-                         //20051109 return a-RAM1024K;                                    // 2nd warp
-
-        case (RAM1536K):  // one 1MB board and one 1/2mb board
-                         if (a<RAM1536K) return a;                                       // first board 1.5M
-                         {memset(&lisaram[maxlisaram],0xff,128); return maxlisaram;}                  // 2nd board junk
-
-
-        default:          return (a & 0x00ffffff);
-    }
-    #endif
-   return a;
-   }
-                                                            //12345678
- #define RAM_MMU_TRANS(addr)     ((lisaram+RAMWARP((((addr) & 0x00ffffff) +mmu_trans[       (addr & MMUEPAGEFL)>>9].address),addr,context))               )
- #define RAM_MMU_A_TRANS(c,addr) ((lisaram+RAMWARP((((addr) & 0x00ffffff) +mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address),addr,c ))               )
- #define CHK_MMU_TRANS(addr)     ((        RAMWARP((((addr) & 0x00ffffff) +mmu_trans[       (addr & MMUEPAGEFL)>>9].address),addr,context)) & (TWOMEGMLIM))
- #define CHK_MMU_A_TRANS(c,addr) ((        RAMWARP((((addr) & 0x00ffffff) +mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address),addr,c )) & (TWOMEGMLIM))
-
-#else
-
-  // these first two are very dangerous! - need to deprecate their use!
-                                                            //12345678
-  #define RAM_MMU_TRANS(addr)            (lisaram+(((addr & 0x00ffffff) +mmu_trans[       (addr & MMUEPAGEFL)>>9].address)  ))
-  #define RAM_MMU_A_TRANS(c,addr)        (lisaram+(((addr & 0x00ffffff) +mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address)  ))
-  #define CHK_MMU_TRANS(addr)            (        (((addr & 0x00ffffff) +mmu_trans[       (addr & MMUEPAGEFL)>>9].address)  ))
-  #define CHK_MMU_A_TRANS(c,addr)        (        (((addr & 0x00ffffff) +mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address)  ))
-
-#endif
-
+                                                          //12345678
+#define RAM_MMU_TRANS(addr)            (lisaram+( (uint32)((  (int32)(addr & ADDRESSFILT)+mmu_trans[      (addr & MMUEPAGEFL)>>9].address) )  & 0x1fffff ) )
+#define RAM_MMU_A_TRANS(c,addr)        (lisaram+( (uint32)((  (int32)(addr & ADDRESSFILT)+mmu_trans[      (addr & MMUEPAGEFL)>>9].address) )  & 0x1fffff ) )
+#define CHK_MMU_TRANS(addr)            (        ( (uint32)((  (int32)(addr & ADDRESSFILT)+mmu_trans[      (addr & MMUEPAGEFL)>>9].address) )  & 0x1fffff ) )
+#define CHK_MMU_A_TRANS(c,addr)        (        ( (uint32)((  (int32)(addr & ADDRESSFILT)+mmu_trans[      (addr & MMUEPAGEFL)>>9].address) )  & 0x1fffff ) )
 
 #define RFN_MMU_TRANS(addr)     (mmu_trans[        (addr & MMUEPAGEFL)>>9].readfn )
 #define WFN_MMU_TRANS(addr)     (mmu_trans[        (addr & MMUEPAGEFL)>>9].writefn)
@@ -2755,24 +2681,34 @@ GLOBAL(uint32,minlisaram,0);
 // WCHK-Write check - call bus error
 // QCHK_RAM_LIMITS - check and quit emulator
 
+#ifdef EXTRA_DEBUG_MMU
+#define ALERTOVERFLOW(s) { \
+  ALERT_LOG(0,"physram %s: in addr:%08x max/min:%08x/%08x translated:%08x ea/-ea:%08x/%08x",(s),addr,maxlisaram,minlisaram,  \
+                         physaddr,mmu_trans[(addr & MMUEPAGEFL)>>9].address,-mmu_trans[(addr & MMUEPAGEFL)>>9].address);     \
+  ALERT_LOG(0,"sor:%04x slr:%04x",mmu[(addr & MMUEPAGEFL)>>9].sor,mmu[(addr & MMUEPAGEFL)>>9].slr );                         \
+}
+#else
+#define ALERTOVERFLOW(s) {;}
+#endif
+
 // can call CHK_RAM_LIMITS, then check for -1, else do lisaram[physaddr] for a pointer
+// phys=   (uint32)( (int32)(addr    ) + ea );  //2020.11.22 9pm
+//physaddr=( (uint32)((  (int32)(addr & ADDRESSFILT)+mmu_trans[   (addr & MMUEPAGEFL)>>9].address) )  & 0x1fffff);     
 #define CHK_RAM_LIMITS(addr)                                                                                                 \
-{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
-        if (physaddr<(signed)minlisaram)                                                                                     \
-           {DEBUG_LOG(100,"physram underflow, addr:%08x min:%08x translated:%10x",addr,minlisaram,physaddr); physaddr=-2;}     \
-        else if (physaddr>(signed)maxlisaram)                                                                                \
-           {DEBUG_LOG(100,"physram overflow, addr:%08x max:%08x translated:%10x",addr,maxlisaram,physaddr); physaddr=-2;}      \
+{       physaddr=RAW_MMU_TRANSLATE(addr);                                                                                    \
+        if      (physaddr<(signed)minlisaram)  {ALERTOVERFLOW("underflow"); physaddr=-2;}                                    \
+        else if (physaddr>(signed)maxlisaram)  {ALERTOVERFLOW("overflow");  physaddr=-1;}                                    \
 }
 
 #define CHK_RAM_A_LIMITS(c,addr)                                                                                             \
-{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address) ));                        \
+{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans_all[c][(addr & MMUEPAGEFL)>>9].address) ));                       \
         if (physaddr<(signed)minlisaram) physaddr=-2;  else if (physaddr>(signed)maxlisaram) physaddr=-1;                    \
 }
 
 
 // check, and quit if error
 #define QCHK_RAM_LIMITS(addr)                                                                                                \
-{       physaddr=(        (((addr & ADDRESSFILT)+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                        \
+{       physaddr=RAW_MMU_TRANSLATE(addr);                                                                                    \
         if (physaddr<0||physaddr>(signed)maxlisaram)                                                                         \
            {fprintf(buglog,"*** %s:%s:%d:: mem out of range! @ %d/%08x :: @mmu=%08x\n\n",                                    \
                            __FILE__,__FUNCTION__,__LINE__,context,addr,physaddr); EXIT(2); }                                 \
@@ -2784,7 +2720,7 @@ GLOBAL(uint32,minlisaram,0);
 // if ((physaddr<minlisaram||((uint32)(physaddr))>maxlisaram))
 
 #define RCHK_RAM_LIMITS(addr)                                                                                                \
-{          physaddr=(        ((addr+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                                    \
+{          physaddr=RAW_MMU_TRANSLATE(addr);                                                                                 \
            if (physaddr<minlisaram) return 0x75;  else if (physaddr>(signed)maxlisaram) physaddr=-1;                         \
            if ((((uint32)(physaddr))>=maxlisaram))                                                                           \
            {fprintf(buglog,"*** %s:%s:%d:: mem out of range! @ %d/%08x :: @mmu=%08x\n\n",                                    \
@@ -2793,13 +2729,12 @@ GLOBAL(uint32,minlisaram,0);
 
 
 #define WCHK_RAM_LIMITS(addr)                                                                                                \
-{          physaddr=(        ((addr+mmu_trans[       (addr & MMUEPAGEFL)>>9].address) ));                                    \
+{          physaddr=RAW_MMU_TRANSLATE(addr);                                                                                 \
            if (physaddr<minlisaram) return;       else if (physaddr>(signed)maxlisaram) physaddr=-1;                         \
            if ((((uint32)(physaddr))>=maxlisaram))                                                                           \
            {fprintf(buglog,"*** %s:%s:%d:: mem out of range! @ %d/%08x :: @mmu=%08x\n\n",                                    \
            __FILE__,__FUNCTION__,__LINE__,context,addr,physaddr);  CPU_READ_MODE=0; lisa_mmu_exception(addr); return;}       \
 }                                                                     //lisa_mmu_exception(addr);
-
 
 #define XRCHK_RAM_LIMITS(addr) {}
 #define XWCHK_RAM_LIMITS(addr) {}

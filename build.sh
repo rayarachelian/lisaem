@@ -37,14 +37,14 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="RC3a"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2020.08.24"                # release date.  must be YYYY.MM.DD
+    STABILITY="NOT-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2021.03.05"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
           URL="http://lisaem.sunder.net"  # url to website of package
-COPYRIGHTYEAR="2020"
+COPYRIGHTYEAR="2021"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR, All Rights Reserved"
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
@@ -117,6 +117,7 @@ function CLEAN() {
             cd "${TLD}"
             CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
             subbuild src/lib/libGenerator --no-banner clean
+            subbuild src/lib/TerminalWx   --no-banner clean
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
             rm -rf bin/LisaEm.app bin/lisaem bin/${MACOSX_MAJOR_VER}/*.dSYM # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
@@ -324,18 +325,22 @@ for j in $@; do
             #LIBGENOPTS="$LIBGENOPTS --with-reg-ipc-comments"
             #WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
 
+ --debug-memcalls|debug-mem-calls)
+            export WITHDEBUG="$WITHDEBUG -DDEBUGMEMCALLS"            ;;
+
  --profile)
             export WITHDEBUG="$WITHDEBUG -p"
-            export LIBGENOPTS="$LIBGENOPTS --with-profile"           ;;
+            export LIBGENOPTS="$LIBGENOPTS --with-profile"
+            export WITHPROFILE="yes"                                 ;;
 
  --static)
-            STATIC="-static"                                  ;;
+            STATIC="-static"                                         ;;
 
  --no-static)
-            STATIC=""                                         ;;
+            STATIC=""                                                ;;
 
- --debug*-on-start)
-            export LIBGENOPTS="$LIBGENOPTS --with-debug-on-start"
+ --trace*on-start)
+            export LIBGENOPTS="$LIBGENOPTS --debug --trace-on-start -DDEBUGLOG_ON_START"
             export WARNINGS="-Wall -Wextra -Wno-write-strings -g"
             export WITHDEBUG="$WITHDEBUG -DDEBUGLOG_ON_START -DDEBUG"
             export WITHOUTSTRIP="nostrip"
@@ -343,7 +348,8 @@ for j in $@; do
             export WARNINGS="-Wall -Wno-write-strings"
             #LIBGENOPTS="$LIBGENOPTS --with-ipc-comments"
             #LIBGENOPTS="$LIBGENOPTS --with-reg-ipc-comments"
-            export LIBGENOPTS="$LIBGENOPTS --with-debug"             ;;
+            #export LIBGENOPTS="$LIBGENOPTS --with-debug"             
+            ;;
 
  --no-optimize)
             export LIBGENOPTS="$LIBGENOPTS --without-optimize"
@@ -405,28 +411,27 @@ if [[ -n "$UNKNOWNOPT" ]]; then
 
 Commands:
   clean                 Removes all compiled objects, libs, executables
+                        (does not build unless you also add build)
   build                 Compiles lisaemm, libraries, and tools (default)
   clean build           Remove existing objects, compile everything cleanly
   install               Not yet implemented on all platforms
   uninstall             Not yet implemented on all platforms
   package               Build a package (Not yet implemented everywhere)
 
-Options:
+Options:                (can skip with- and use no- instead of without)
 --without-debug         Disables debug and profiling
 --with-debug            Enables symbol compilation
 --with-tracelog         Enable tracelog (needs debug on, not on win32)
 --with-debug-mem        Enables debug and tracelog and memory fn debugging
---with-debug-on-start   Enable debug output as soon as libGenerator is invoked
+--with-trace-on-start   Tracelog on as soon as powered on
 --valgrind              Same as debug but runs valgrind instead of gdb/lldb
 --drmemory              Same as debug but runs drmemory instead of gdb/lldb
 --no-color-warn         don't record color ESC codes in compiler warnings
 --no-tools              don't compile dc42 tool commands
-
 --with-static           Enables a static compile
 --without-static        Enables shared library compile (not recommended)
 --without-optimize      Disables optimizations
---without-upx           Disables UPX compression (no upx on OS X)
-
+--without-upx           Disables UPX compression (no upx on some macos x)
 --without-strip         Disable strip when compiling without debug
 
 -DFOO                   Pass extra defines to C/C++ compilers
@@ -439,8 +444,7 @@ Options:
 
 Environment Variables you can pass:
 
-CC                      Path to C Compiler
-CPP                     Path to C++ Compiler
+CC,CPP,GDB              Paths to C/C++ Compiler tools
 WXDEV                   Cygwin Path to wxDev-CPP 6.10 (win32 only)
 PREFIX                  Installation directory
 NUMCPUS                 override the number of CPUs - Set to 1 to only use 1
@@ -469,7 +473,10 @@ export  PHASE1LIST="\
         src/lisa/motherboard/glue         \
         src/lisa/motherboard/fliflo_queue \
         src/lisa/io_board/cops            \
-        src/lisa/io_board/zilog8530       \
+        src/lisa/io_board/z8530           \
+        src/lisa/io_board/z8530-telnetd   \
+        src/lisa/io_board/z8530-pty       \
+        src/lisa/io_board/z8530-tty       \
         src/lisa/io_board/via6522         \
         src/lisa/cpu_board/irq            \
         src/lisa/cpu_board/mmu            \
@@ -485,7 +492,8 @@ export  PHASE2LIST="\
         src/host/wxui/LisaConfigFrame:src/host/wxui/include/LisaConfigFrame.h \
         src/host/wxui/LisaSkin:src/host/wxui/include/LisaSkin.h \
         src/lisa/crt/hqx/hq3x-3x:src/lisa/crt/hqx/include/common.h:src/lisa/crt/hqx/include/hqx.h \
-        src/printer/imagewriter/imagewriter-wx:./src/printer/imagewriter/include/imagewriter-wx.h"
+        src/printer/imagewriter/imagewriter-wx:./src/printer/imagewriter/include/imagewriter-wx.h \
+	src/host/wxui/z8530-terminal"
 # change ^- hq3x vs hq3x-3x here as needed as well as the #define
 
 
@@ -559,6 +567,8 @@ export CXXFLAGS="$CXXFLAGS $NODEPRECATEDCPY $NOWARNFORMATTRUNC $NOUNKNOWNWARNING
 
 ESTLIBGENCOUNT=$(  subestimate src/lib/libGenerator --no-banner $LIBGENOPTS    $SIXTYFOURBITS $THIRTYTWOBITS  )
 ESTLIBDC42COUNT=$( subestimate src/lib/libdc42      --no-banner                $SIXTYFOURBITS $THIRTYTWOBITS  ) 
+ESTLIBDC42COUNT=$( subestimate src/lib/libdc42      --no-banner                $SIXTYFOURBITS $THIRTYTWOBITS  ) 
+ESTLIBTERMCOUNT=$( subestimate src/lib/TerminalWx   --no-banner                $SIXTYFOURBITS $THIRTYTWOBITS  ) 
 [[ -z "$NODC42TOOLS" ]] && ESTTOOLSCOUNT=$( subestimate src/tools  --no-banner $SIXTYFOURBITS $THIRTYTWOBITS  ) || ESTTOOLSCOUNT=0
 ESTPHASE1COUNT=$( INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COUNTNEEDED ${PHASE1LIST} )
 ESTPHASE2COUNT=$( INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiling COUNTNEEDED ${PHASE2LIST} )
@@ -577,14 +587,16 @@ ESTLIBDC42COUNT=$(( $ESTLIBDC42COUNT * 100 / $ESTIMATETOTALS ))
  ESTPHASE1COUNT=$(( $ESTPHASE1COUNT  * 100 / $ESTIMATETOTALS ))
  ESTPHASE2COUNT=$(( $ESTPHASE2COUNT  * 100 / $ESTIMATETOTALS ))
 
-#(echo "Estimates:"
-#echo "libgen:   $ESTLIBGENCOUNT"
-#echo "libdc42:  $ESTLIBDC42COUNT"
-#echo "tools:    $ESTTOOLSCOUNT"
-#echo "Phase1:   $ESTPHASE1COUNT"
-#echo "Phase2:   $ESTPHASE2COUNT"
-#) 1>&2
-#read x
+#---------------------------------------------------------------------------------------------------------------------------
+# (echo "Estimates:"
+# echo "libgen:   $ESTLIBGENCOUNT"
+# echo "libdc42:  $ESTLIBDC42COUNT"
+# echo "tools:    $ESTTOOLSCOUNT"
+# echo "TermWx:   $ESTLIBTERMCOUNT"
+# echo "Phase1:   $ESTPHASE1COUNT"
+# echo "Phase2:   $ESTPHASE2COUNT"
+# ) 1>&2
+# read x
 #---------------------------------------------------------------------------------------------------------------------------
 echo "* Building prerequisites..."
 echo
@@ -605,6 +617,8 @@ fi
 
 cd ${TLD}
 # Build libraries and tools using subbuild
+
+export OWARNINGS="$WARNINGS"
 
 export PERCENTPROGRESS=0 PERCENTCEILING=${ESTLIBGENCOUNT}
 if [[ $ESTLIBGENCOUNT -gt 0 ]]; then
@@ -628,9 +642,20 @@ export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTTOOLSCOUNT ))
 if  [[ $ESTTOOLSCOUNT -gt 0 ]]; then
     export COMPILEPHASE="tools"
     export REUSESAVE="yes"
-    subbuild src/tools            --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS $SARCH $EXTRADEFINES
+    subbuild src/tools            --no-banner           $SIXTYFOURBITS $THIRTYTWOBITS $SARCH $EXTRADEFINES
     unset LIST
 fi
+
+export PERCENTPROGRESS=${PERCENTCEILING}
+export PERCENTCEILING=$(( $PERCENTPROGRESS + $ESTLIBTERMCOUNT )) 
+if  [[ $ESTLIBTERMCOUNT -gt 0 ]]; then
+    export COMPILEPHASE="TerminalWx"
+    export REUSESAVE="yes"
+    subbuild src/lib/TerminalWx  --no-banner             $SIXTYFOURBITS $THIRTYTWOBITS $SARCH $EXTRADEFINES
+    unset LIST
+fi
+
+export WARNINGS="$OWARNINGS"
 
 echo "* Building LisaEm..."
 echo
@@ -707,11 +732,9 @@ export COMPILECOMMAND="$CXX -W -Wno-write-strings $WARNINGS $WITHDEBUG $WITHTRAC
 LIST=$( WAIT="yes" INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiled COMPILELIST ${PHASE2LIST} )
 waitqall
 
-#echo "LIST:$LIST" >/tmp/slot.list.2
 
 # restore warnings
 [ -n "$OWARNINGS" ] && WARNINGS="$OWARNINGS"
-
 
 for i in `echo $LIST`; do WXLIST="$WXLIST `echo $i|grep -v lisaem_wx`"; done
 
@@ -720,13 +743,13 @@ echo '---------------------------------------------------------------' >> $BUILD
 waitqall
 cd "${TLD}"
 
-(
-    echo "PHASE1LIST: $PHASE1LIST"
-    echo "PHASE2LIST: $PHASE2LIST"
-    echo "LIST: $LIST"
-    echo "LIST1: $LIST1"
-    echo "WXLIST: $WXLIST"
-) >/tmp/slot.lists.txt
+#(
+#    echo "PHASE1LIST: $PHASE1LIST"
+#    echo "PHASE2LIST: $PHASE2LIST"
+#    echo "LIST: $LIST"
+#    echo "LIST1: $LIST1"
+#    echo "WXLIST: $WXLIST"
+#) >/tmp/slot.lists.txt
 
 if [[ $(echo "$PHASE2LIST" | wc -w ) -ne  $(echo "$LIST" | wc -w )  ]]; then
     echo "Stopping due to failure..." 1>&2
@@ -737,7 +760,7 @@ export COMPILEPHASE="linking"
 export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 waitqall
-qjob  "!!* Linked ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a \
+qjob  "!!* Linked ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a src/lib/TerminalWx/lib/terminalwx.a \
       src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS
 waitqall
 
@@ -803,7 +826,7 @@ if  [[ -f "$LISANAME" ]]; then
             [[ -n "$( echo $GDB | grep lldb )" ]] && $GDB -o "run -p" -f "$LISANAME"
         fi
         #if we turned on profiling, process the results
-        if [[ -n "$(echo $WITHDEBUG | grep p >/dev/null 2>/dev/null)" ]];then
+        if [[ -n "$WITHPROFILE" ]];then
           $GPROF "${LISANAME}" >lisaem-gprof-out
           echo lisaem-gprof-out created.
         fi

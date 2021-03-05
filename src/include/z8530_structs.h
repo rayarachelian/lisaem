@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2020.09.30                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2020 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -31,7 +31,7 @@
 #ifndef GOT_Z8530_REGS_H
 #define GOT_Z8530_REGS_H 1
 
-#define SCC_NOTHING         10
+#define SCC_NOTHING          0
 #define SCC_LOCALPORT       11
 #define SCC_IMAGEWRITER     12
 #define SCC_LOOPBACKPLUG    13
@@ -42,11 +42,11 @@
 #define SCC_TELNETTO        18  // not yet implemented
 #define SCC_IMAGEWRITER_PS  19
 #define SCC_IMAGEWRITER_PCL 20
+#define SCC_PTY             21  // pseudo terminal/shell
+#define SCC_TTY             22  // physical serial port
+#define SCC_TERMINAL        23  // terminal window
 
-
-
-
-#define SCC_BUFFER_SIZE 512
+#define SCC_BUFFER_SIZE 32768
 
 #define SERIAL_PORT_A_DATA    0xFCD247
 #define SERIAL_PORT_A_CONTROL 0xFCD243
@@ -1086,24 +1086,25 @@ typedef struct
 // SCC function hooks/(method overrides) to external device drivers
 typedef struct
 {
- void (*send_break)(unsigned int port);
- void (*set_dtr)(unsigned int port, uint8 value);
- void (*set_rts)(unsigned int port, uint8 value);
- int  (*get_dcd)(unsigned int port);
- int  (*get_cts)(unsigned int port);
- int  (*get_break)(unsigned int port);
- void (*signal_parity_error)(unsigned int port);
- void (*signal_crc_error)(unsigned int port);
- void (*set_even_parity)(unsigned int port);
- void (*set_odd_parity)(unsigned int port);
- void (*set_no_parity)(unsigned int port);
- void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
- void (*set_stop_bits)(unsigned int port,uint8 stopbits);
- char (*read_serial_port)(unsigned int port);
- void (*write_serial_port)(unsigned int port, char data);
- void (*scc_hardware_reset_port)(unsigned int port);
- void (*scc_channel_reset_port)(unsigned int port);
- void (*set_baud_rate)(int port, uint32 baud);
+  void (*send_break)(unsigned int port);
+  void (*set_dtr)(unsigned int port, uint8 value);
+  void (*set_rts)(unsigned int port, uint8 value);
+  int  (*get_dcd)(unsigned int port);
+  int  (*get_cts)(unsigned int port);
+  int  (*get_break)(unsigned int port);
+  void (*signal_parity_error)(unsigned int port);
+  void (*signal_crc_error)(unsigned int port);
+  void (*set_even_parity)(unsigned int port);
+  void (*set_odd_parity)(unsigned int port);
+  void (*set_no_parity)(unsigned int port);
+  void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
+  void (*set_stop_bits)(unsigned int port,uint8 stopbits);
+  char (*read_serial_port)(unsigned int port);
+  void (*write_serial_port)(unsigned int port, char data);
+  void (*read_port_if_ready)(unsigned int port);
+  void (*scc_hardware_reset_port)(unsigned int port);
+  void (*scc_channel_reset_port)(unsigned int port);
+  void (*set_baud_rate)(int port, uint32 baud);
 } sccfunc_t;
 
 
@@ -1145,11 +1146,12 @@ extern char read_serial_port(unsigned int port);
 extern void write_serial_port(unsigned int port, char data);
 extern void scc_hardware_reset_port(unsigned int port);
 extern void scc_channel_reset_port(unsigned int port);
-extern void initialize_scc(void);
+extern void initialize_scc(int actual);
 extern void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);
 extern void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data);
 extern void scc_control_loop(void);
 extern void dump_scc(void);
+
 #endif
 
 

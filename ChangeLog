@@ -8,6 +8,97 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+
+2021.03.03 - added uniplus-set-profile-size tool that modifies the uniplus
+             unix kernel to allow much larger ProFile compatible hard disks
+             (i.e. on X/ProFile, IDE:File, Aphid/Cameo devices.)
+             
+2021.02.21 - UniPlus no longer crashes with double panic, starts up and
+             now complains about the profile handshaking.
+           - added timestamps, sizes, flags to lisafsh-tool dir command
+
+2020.02.20 - fixed rom.c merging/stitching when 341-17[5|6]-?.bin is used
+
+2020.02.19 - fixed some bugs with lisafsh-tool where not all directory blocks
+             are listed, replaced it with a lot more detail including desktop
+             names, sizes, dates, flags
+
+2020.01.12 - adding capture, xmodem to TerminalWx for interfacing with BLU
+
+2020.01.11 - TerminalWx functioning now
+
+2020.01.09 - switched Preferences for serial ports to pull down menu as it
+             now has too many items
+
+2020.12.22 - added TerminalWx code as library to endpoint for serial ports
+
+2020.12.09 - added host serial port support, either wired or USB adapter for
+             linux, should work on macos and freebsd as well, but as of yet
+             untested. The text parameter is the device name such as
+             /dev/ttyS0 or /dev/ttyUSB0. When used by itself, the guest OS and
+             its applications can set the port parameters such as baud rate,
+             stop bits, and parity. In some applications it would be more
+             useful to override this, for example by setting a high baud rate
+             or hadware handshaking (which LisaTerminal does not support).
+             To do this append a pipe character followed by the settings
+             and options using commas as separators. i.e.:
+             "/dev/ttyUSB0|38400,n,8,1,hw" additionally ,sw is allowed for
+             xon/xoff software handshaking, or ,-sw or ,-hw is allowed to
+             disable those. Host serial and shell are not available on
+             windows yet. Future releases may add these features, possibly
+             by using WinPTY.
+
+2020.11.28 - more testing of Serial Port A
+
+2020.11.27 - attempting to get Serial port A to not hang, under Lisa Office
+             System, but didn't get any useful results, so disabling the 
+             Serial A port for now.
+
+2020.11.26 - more guard code around xon/xoff handling
+           - rewrote SCC reconnect/disconnect code for ROM SCC tests vs LOS
+           - SCC port B xon/xoff now works properly
+
+2020.11.22 - found a bug in the EXITR macro and fixed it
+           - using the new MMU code MacWorks XL starts up
+           - verified + fixed high contrast turns display yellow in MonitorOS
+
+2020.11.19 - rewrote 3 MMU ea code candidates + wrote testers
+
+2020.11.08 - found a possible MMU bug where stack space is incorrect via
+             debugging uniplus crashing
+           - monitor OS was crashing on boot
+           - MacWorks was crashing on boot
+             
+2020.11.06 - fixed Xenix pfcmd bad state: 0306 but Xenix still doesn't start
+           - enabled illegal instructions to follow the ILLEGAL trap, this
+             got UniPlus to get further along, but double panics on startup
+
+2020.10.23 - more work on Xenix profile access
+
+2020.10.22 - added dc42-to-tar to extract tar archives from multi-floppy xenix
+             tar archives, but needs more work to complete
+
+2020.10.24 - informix for xenix deserialization + tool
+
+2020.10.17 - attempting to get Xenix to accept LisaEm profile emulation
+
+2020.09.15 - debugging mouse clicks in LOS - behaves as if LOS is not
+             receiving mouse up events, though they are being sent, making
+             windows drag. Also it seems it only notices mouse movement
+             on mouse down rather than all mouse move events.
+           - even though pty code uses a 32K buffer for serial ports, we get
+             cut off after about 30 or so chars, so ls -l on host via
+             LisaTerm gets cut off. Need some way to limit number of times
+             we send IRQ 6 to let LOS know that SCC has received data
+
+2020.09.14 - debugging hangs caused by PTY
+
+2020.09.12 - added PTY support, ran/fixed into a bug in fliflo queue
+
+2020.09.06 - investigating a serial A issue that causes freezing issues in LOS
+
+2020.08.28 - fixed crash on reboot caused by freeing lisaram
+
 2020.08.23 - fixed lisaem.sh CPU name on PowerPC
            - fixed crash on ROMless boot when user selects ProFile but cancels
              ProFile creation.

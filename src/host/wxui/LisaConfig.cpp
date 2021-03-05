@@ -113,8 +113,10 @@ void LisaConfig::Load(wxFileConfig *config, uint8 *floppy_ram)
    cheat_ram_test=(int)config->Read(_T("/cheatromtests"),1);
 
    serial1_setting = config->Read(_T("/seriala/connecta"));;
+   serial1xon      = config->Read(_T("/seriala/xon"), "1");
    serial1_param   = config->Read(_T("/seriala/parama"));;
    serial2_setting = config->Read(_T("/serialb/connectb"));;
+   serial2xon      = config->Read(_T("/serialb/xon"), "1");
    serial2_param   = config->Read(_T("/serialb/paramb"));;
 
    ioromstr = config->Read(_T("ioromver"));
@@ -124,7 +126,7 @@ void LisaConfig::Load(wxFileConfig *config, uint8 *floppy_ram)
    floppy_iorom=(iorom & 0xff);
    ioromstr.sprintf(_T("%02x"),(uint8)iorom);
 
-   mymaxlisaram=config->Read(_T("/MemoryKB"),1024l);
+   mymaxlisaram=config->Read(_T("/MemoryKB"),1536l);
    saw_3a_warning=config->Read(_T("/no_warn_xl_rom"),0L);
    config->Read(_T("/ROMFILE"), &rompath);
    config->Read(_T("/DUALPARALLELROM"), &dualrom);
@@ -216,8 +218,10 @@ void LisaConfig::Save(wxFileConfig *config, uint8 *floppy_ram)
 
 
    config->Write(_T("/seriala/connecta"),   serial1_setting );
+   config->Write(_T("/seriala/xon"),        serial1xon      );
    config->Write(_T("/seriala/parama") ,    serial1_param   );
    config->Write(_T("/serialb/connectb"),   serial2_setting );
+   config->Write(_T("/serialb/xon"),        serial2xon      );
    config->Write(_T("/serialb/paramb") ,    serial2_param   );
    config->Write(_T("/ioromver"),ioromstr);
    config->Write(_T("/MemoryKB"),(long)mymaxlisaram);

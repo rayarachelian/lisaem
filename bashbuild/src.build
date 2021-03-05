@@ -171,7 +171,7 @@ function strip_and_compress() {
   sync
   for app in $@; do
       #echo "  Compiled size:        $(du -h ${app} 2>/dev/null)" 1>&2
-      echo  "  Compiled size:        $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+      echo  "  Compiled size:        $( printf '%-5s %s ' $(ls -lah ${app}  2>/dev/null | awk '{print $5,$9}' ))" 1>&2
   done
 
   # strip is fast, don't bother producing output
@@ -202,7 +202,7 @@ function strip_and_compress() {
   sync
   for app in $@; do
       #echo "  Final size   :        $(du -h ${app} 2>/dev/null)" 1>&2
-      echo  "  Final size   :        $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+      echo  "  Final size   :        $( printf '%-5s %s ' $(ls -lah ${app}  2>/dev/null | awk '{print $5,$9}' ))" 1>&2
   done
 }
 

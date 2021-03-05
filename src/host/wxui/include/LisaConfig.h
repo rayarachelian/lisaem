@@ -39,6 +39,8 @@ public:
     wxString serial2_setting;
     wxString serial2_param;
     wxString ioromstr;
+    wxString serial1xon, serial2xon;
+ 
 
     wxString iw_png_path;        // path to directory to store printouts if png is on
     int      iw_png_on;          // do we save printouts as PNG's or to the host printer?

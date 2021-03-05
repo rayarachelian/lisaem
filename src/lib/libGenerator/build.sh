@@ -83,8 +83,6 @@ WITH68KFLAGS="-dNORMAL_GENERATOR_FLAGS"
 WITHOPTIMIZE="-O2 -ffast-math -fomit-frame-pointer"
 
 
-# turn this on by default.
-
 for opt in $@; do [[ "$opt" == "--no-banner" ]] && NOBANNER=1; done
 
 if [[ -z "$NOBANNER" ]]
@@ -169,7 +167,7 @@ for j in $@; do
   --no-debug)                   WITHDEBUG=""
                                 WARNINGS=""                               ;;
 
-  --debug*)                     WITHDEBUG="$WITHDEBUG -g"
+  --debug*)                     WITHDEBUG="$WITHDEBUG -g -DDEBUG"
                                 WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" 
                                 WITHTRACE="-DDEBUG"
                                 ;;
@@ -179,7 +177,7 @@ for j in $@; do
  #--reg-ipc-comments)           WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS -DIPC_COMMENT_REGS"
  #                              WARNINGS="-Wall"                          ;;
 
-  --debug-on-start)             WITHDEBUG="$WITHDEBUG -g -DDEBUGLOG_ON_START"
+  --trace*on-start)             WITHDEBUG="$WITHDEBUG -g -DDEBUGLOG_ON_START"
                                                                           ;;
   -D*)                          EXTRADEFINES="${EXTRADEFINES} ${opt}";;
 
@@ -187,9 +185,9 @@ for j in $@; do
   --*mem)                       WITHDEBUG="$WITHDEBUG -g -DDEBUGMEMCALLS"
                                 WARNINGS="-Wall"                          ;;
 
-  --with-profile)               WITHDEBUG="$WITHDEBUG -p"                 ;;
+  --profile)                    WITHDEBUG="$WITHDEBUG -p"                 ;;
 
-  --without-optimize)           WITHOPTIMIZE=""                           ;;
+  --no-optimize)                WITHOPTIMIZE=""                           ;;
   --no-68kflag-optimize)        WITH68KFLAGS=""                           ;;
 
 
@@ -203,27 +201,25 @@ done
 
 
 
-if [ -n "$UNKNOWNOPT" ]
-then
+if [[ -n "$UNKNOWNOPT" ]]; then
  echo
  echo "Unknown options $UNKNOWNOPT"
  cat <<ENDHELP
 
 Commands:
  clean                    Removes all compiled objects, libs, executables
+                          (will not build unless you also specify build)
  build                    Compiles lisaem (default)
- clean build              Remove existing objects, compile everything cleanly
+ clean build              Remove existing objects, recompile everything cleanly
  install                  Not yet implemented on all platforms
  uninstall                Not yet implemented on all platforms
 
-Debugging Options:
+Debugging Options:        (you can skip with, and replace no for without)
 --without-debug           Disables debug and profiling
 --with-debug              Enables symbol compilation
 --with-debug-mem          Enable memory call debugging
---with-ipc-comments       Enable IPC comments facility
---with-reg-ipc-comments   Enable IPC comments and register recording
 --with-tracelog           Enable tracelog debugging
---with-debug-on-start     Turn on debug log as soon as libGenerator is started.
+--with-tracelog-on-start     Turn on debug log as soon as libGenerator is started.
 
 Other Options:
 --without-optimize        Disables optimizations
@@ -231,11 +227,10 @@ Other Options:
 --no-banner               Suppress version/copyright banner
 
 Environment Variables you can pass:
-
-CC                        Path to C Compiler
-CPP                       Path to C++ Compiler
-WXDEV                     Cygwin Path to wxDev-CPP 6.10 (win32 only)
-PREFIX                    Installation directory
+ CC,CPP,GDB                Paths to C Compiler tools
+ CPP                       Path to C++ Compiler
+ WXDEV                     Cygwin Path to wxDev-CPP 6.10 (win32 only)
+ PREFIX                    Installation directory
 
 i.e. CC=/usr/local/bin/gcc ./build.sh ...
 

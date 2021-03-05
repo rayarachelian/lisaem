@@ -87,7 +87,6 @@ enum {
 };
 
 BEGIN_EVENT_TABLE(LisaConfigFrame, wxFrame)
-
   EVT_NOTEBOOK_PAGE_CHANGED(ID_NOTEBOOK,  LisaConfigFrame::OnNoteBook)
   EVT_NOTEBOOK_PAGE_CHANGING(ID_NOTEBOOK, LisaConfigFrame::OnNoteBook)
   EVT_BUTTON(ID_SERNO_INFO,               LisaConfigFrame::OnSernoInfo)
@@ -125,27 +124,37 @@ LisaConfigFrame::LisaConfigFrame(const wxString& title, LisaConfig *lisaconfig)
 {
 
   my_lisaconfig = lisaconfig;
+  serialabox = NULL;
+  serialbbox = NULL;
 
   pportopts[0] = wxT("ProFile");
   pportopts[1] = wxT("ADMP");
   pportopts[2] = wxT("Nothing");
+
   wpportopts[0] = wxT("Widget-10");
   wpportopts[1] = wxT("ADMP");
   wpportopts[2] = wxT("Nothing");
 
-  serportopts[0]=_T("NOTHING");
-  serportopts[1]=_T("LOOPBACK");
-  serportopts[2]=_T("PIPE");
-  serportopts[3]=_T("FILE");
+  nothingonly[0]=_T("Nothing");
+  nothingonly[1]=_T("Loopback");
+
+  serportopts[0]=_T("Nothing");
+  serportopts[1]=_T("Loopback");
+  serportopts[2]=_T("Pipe");
+  serportopts[3]=_T("File");
   serportopts[4]=_T("ImageWriter");
+  serportopts[5]=_T("Terminal");
+
   #ifndef __MSVCRT__
-   serportopts[5]=_T("TELNETD");
-   serialopts=6;
+   serportopts[6]=_T("TelnetD");
+   serportopts[7]=_T("Shell");
+   serportopts[8]=_T("Serial");
+   serialopts=9;
   #else
-   serialopts=5;
+   serialopts=6;
   #endif
 
-  slotcard[0]=_T("DualParallel");
+  slotcard[0]=_T("Dual Parallel");
   slotcard[1]=_T("Nothing");
 
 //  SetMinSize(wxSize(800,700)); //700,500));
@@ -160,6 +169,8 @@ void LisaConfigFrame::OnNoteBook(wxNotebookEvent& WXUNUSED(event))
      {
       // The LisaTest loopback adapter attaches to both serial ports at once.
       // if one is set to loopback so, must the other follow.
+      if (!serialabox || !serialbbox) return;
+
       if (serialabox->GetSelection()==1 || serialbbox->GetSelection()==1)
       {
        serialabox->SetSelection(1);
@@ -326,6 +337,8 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  if (!kbbox)               return;
  if (!serialabox)          return;
  if (!serialbbox)          return;
+ if (!serialaxon)          return;
+ if (!serialbxon)          return;
  if (!m_propath)           return;
  if (!pportbox)            return;
 
@@ -340,6 +353,9 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  my_lisaconfig->rompath = m_rompath->GetValue();
  my_lisaconfig->dualrom =m_dprompath->GetValue();
 
+ my_lisaconfig->serial1xon=serialaxon->GetValue() ? "1":"0";
+ my_lisaconfig->serial2xon=serialbxon->GetValue() ? "1":"0";
+ 
  /*
  fprintf(stderr,"myserial number:%s\n",my_lisaconfig->myserial.c_str());
  fprintf(stderr,"rompath        :%s\n",my_lisaconfig->rompath.c_str());
@@ -349,17 +365,13 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  uint16 kbids[]={ 0xBF2f, 0xAF2f, 0xAD2d, 0xAE2e };
  my_lisaconfig->kbid=kbids[kbbox->GetSelection()];
 
- //fprintf(stderr,"keyboard id    :%04x\n",my_lisaconfig->kbid);
-
 
  uint8 ioromids[]={ 0xa8, 0x88, 0x89, 0xa9, 0x40 };
  my_lisaconfig->iorom=ioromids[iorombox->GetSelection()];
 
- //fprintf(stderr,"I/O ROM version:%02x\n",my_lisaconfig->iorom);
 
-
- //int memsizes[]={512,1024,1536,2048};
- //mymaxlisaram=memsizes[ramsizebox.GetSelection()];
+ int memsizes[]={512,1024,1536,2048};
+ my_lisaconfig->mymaxlisaram=memsizes[cpurambox->GetSelection()];
 
  cheat_ram_test=cheats->GetValue() ?1:0;
  sound_effects_on = soundeffects->GetValue()?1:0;
@@ -375,10 +387,6 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
 
 
  // --- ports ------------------------------------------------------------
-
-
-
-
  my_lisaconfig->serial1_setting=serportopts[serialabox->GetSelection()];
  my_lisaconfig->serial2_setting=serportopts[serialbbox->GetSelection()];
  my_lisaconfig->serial1_param  =serialaparam->GetValue();
@@ -497,7 +505,7 @@ wxPanel *LisaConfigFrame::CreateSlotConfigPage(wxNotebook *parent, int slot)
     // using wxID_ANY for lower for some reason(why?), idbl - button lower line ~493
 
 
-    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), wxPoint(420* HIDPISCALE,  400* HIDPISCALE), wxDefaultSize );
+    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );
 
     return panel;
 }
@@ -512,7 +520,22 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
    // Tell the user what config file we're using.
    wxString t;
    t=_T("Prefs file: ") + get_config_filename();
-   (void)new wxStaticText(panel,wxID_ANY,   t,      wxPoint( 10* HIDPISCALE,  y), wxSize(500* HIDPISCALE, 30* HIDPISCALE));    y+=ya; y+=ya/2;
+
+   (void)new wxStaticText(panel,wxID_ANY,   t,      wxPoint( 10* HIDPISCALE,  y), wxSize(500* HIDPISCALE, 30* HIDPISCALE));    y+=ya/2; //y+=ya/2;
+
+    wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"), wxT("2 MB*") };
+    cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 4, ramsize, 0, wxRA_SPECIFY_COLS,
+       wxDefaultValidator, wxT("radioBox"));
+    switch(my_lisaconfig->mymaxlisaram)
+    {
+     case 0x512  : cpurambox->SetSelection(0); break;
+     case 0x1024 : cpurambox->SetSelection(1); break;
+     case 0x1536:  cpurambox->SetSelection(2); break;
+     case 0x2048:  cpurambox->SetSelection(3); break;
+     default:      cpurambox->SetSelection(2);
+    }
+
+   y+=ya; y+=ya/2;
 
    (void)new wxStaticText(panel, wxID_ANY, _T("Lisa Serial Number:"),      wxPoint( 10* HIDPISCALE,  y), wxSize(400 * HIDPISCALE, 30 * HIDPISCALE));    y+=(ya/2);
 
@@ -566,7 +589,8 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
     cheats = new wxCheckBox(panel, wxID_ANY, wxT("Boot ROM speedup hacks"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize,wxCHK_2STATE);
     cheats->SetValue( (bool)(cheat_ram_test) );
 
-    (void) new wxButton( panel, ID_APPLY,    wxT("Apply"), wxPoint(420 * HIDPISCALE,  yz+ya), wxDefaultSize );
+    applypoint=wxPoint(420 * HIDPISCALE,  yz+ya);
+    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );
 
     (void)new wxStaticText(panel, wxID_ANY,  _T("PRAM:"),  wxPoint(320 * HIDPISCALE, (yz)-ya/2), wxSize(400 * HIDPISCALE, 30 * HIDPISCALE));
     (void) new wxButton( panel, ID_SAVE_PRAM, wxT("Save"), wxPoint(320 * HIDPISCALE,  yz), wxDefaultSize );
@@ -581,31 +605,53 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
 {
     wxPanel *panel = new wxPanel(parent);
     //wxPanel *panel = new wxPanel(parent,wxID_ANY,wxDefaultPosition,wxSize(320,200),wxT("ports"));
-    int y=10 * HIDPISCALE, ya=50 * HIDPISCALE;
+    int y=10 * HIDPISCALE, ya=35 * HIDPISCALE;
     int i;
 
-    serialabox = new wxRadioBox(panel, wxID_ANY,
-        wxT("Serial A:"), wxPoint(10 * HIDPISCALE, y), wxDefaultSize, serialopts, serportopts, 2, wxRA_SPECIFY_COLS,
-        wxDefaultValidator, wxT("radioBox"));                             y+=ya+ya;
 
-    for (i=0; i<serialopts; i++)
-        if (my_lisaconfig->serial1_setting.IsSameAs(serportopts[i],false) ) serialabox->SetSelection(i);
+   (void)new wxStaticText(panel, wxID_ANY, _T("Serial A:"),  wxPoint( 10,  y+10), wxSize(100 * HIDPISCALE, 30 * HIDPISCALE));
+    serialabox = new wxChoice(panel, wxID_ANY, wxPoint(100 * HIDPISCALE, y), wxDefaultSize, 1 /* serialopts */, nothingonly); y+=ya;
+//    serialabox = new wxRadioBox(panel, wxID_ANY,
+//        wxT("Serial A:"), wxPoint(10 * HIDPISCALE, y), wxSize(380 * HIDPISCALE,128 * HIDPISCALE), serialopts, serportopts, 2, wxRA_SPECIFY_COLS,
+//        wxDefaultValidator, wxT("radioBox"));                                                      y+=ya+ya;
+    serialabox->SetSelection(0);
+//    for (i=0; i<serialopts; i++)
+//        if (my_lisaconfig->serial1_setting.IsSameAs(serportopts[i],false) ) serialabox->SetSelection(i);
 
-    y+=ya/4;
+    //#define BROKEN_SERIAL_A
+    // 2020.11.27 until we fix serial port a, disable it.
+    //#ifdef BROKEN_SERIAL_A
+    //serialabox->Enable(0,true); serialabox->SetSelection(0);
+    //for (i=1; i<serialopts; i++) serialabox->Enable(i,false);
+    //#endif
+
+    //y+=ya/8;
     serialaparam = new wxTextCtrl(panel, wxID_ANY,  my_lisaconfig->serial1_param  ,
-                         wxPoint(10 * HIDPISCALE, y), wxSize(400 * HIDPISCALE,30 * HIDPISCALE) , 0);
-                                                                          y+=ya/2+ya/4;
+                         wxPoint(10 * HIDPISCALE, y), wxSize(380 * HIDPISCALE,30 * HIDPISCALE) , 0);
 
-    serialbbox = new wxRadioBox(panel, wxID_ANY,
-        wxT("Serial B:"), wxPoint(10 * HIDPISCALE, y), wxDefaultSize, serialopts, serportopts, 2, wxRA_SPECIFY_COLS,
-        wxDefaultValidator, wxT("radioBox"));                             y+=ya+ya;
+    serialaxon = new wxCheckBox(panel,wxID_ANY,  wxT("Xon/off"),
+                        wxPoint(430 * HIDPISCALE, y-(HIDPISCALE*8)), wxSize(300 * HIDPISCALE,50 * HIDPISCALE) , 0);
+    serialaxon->SetValue((bool) (my_lisaconfig->serial1xon.IsSameAs(_T("1"), false)) );            y+=ya*2;
+
+
+   (void)new wxStaticText(panel, wxID_ANY, _T("Serial B:"),  wxPoint( 10,  y+10), wxSize(100 * HIDPISCALE, 30 * HIDPISCALE));
+    serialbbox = new wxChoice(panel, wxID_ANY, wxPoint(100 * HIDPISCALE, y), wxDefaultSize, serialopts, serportopts); y+=ya;  //wxSize(380 * HIDPISCALE,128 * HIDPISCALE)
+//    serialbbox = new wxRadioBox(panel, wxID_ANY,
+//        wxT("Serial B:"), wxPoint(10 * HIDPISCALE, y), wxSize(380 * HIDPISCALE,128 * HIDPISCALE), serialopts, serportopts, 2, wxRA_SPECIFY_COLS,
+//        wxDefaultValidator, wxT("radioBox"));                                                       y+=ya+ya;
+
+   // y+=ya/8;
+    serialbparam = new wxTextCtrl(panel, wxID_ANY,  my_lisaconfig->serial2_param  , wxPoint(10, y), wxSize(380 * HIDPISCALE,30 * HIDPISCALE) , 0);
+
+    serialbxon = new wxCheckBox(panel,wxID_ANY, wxT("Xon/Off"),
+                        wxPoint(430 * HIDPISCALE, y-(HIDPISCALE*12)), wxDefaultSize,  0); // wxSize(300 * HIDPISCALE, 60 * HIDPISCALE) 
+    serialbxon->SetValue((bool) (my_lisaconfig->serial2xon.IsSameAs(_T("1"), false)));             
 
     for (i=0; i<serialopts; i++)
         if (my_lisaconfig->serial2_setting.IsSameAs(serportopts[i],false) ) serialbbox->SetSelection(i);
+    
+    y+=ya*2;
 
-    y+=ya/4;
-    serialbparam = new wxTextCtrl(panel, wxID_ANY,  my_lisaconfig->serial2_param  , wxPoint(10, y), wxSize(400,30) , 0);
-                                                                          y+=ya/2+ya/4;
 
 
     if (floppy_iorom!=0x88)
@@ -622,7 +668,7 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
             wxDefaultValidator, wxT("radioBox"));                             
             my_lisaconfig->parallelp.Replace(_T("profile"),_T("widget"),true);
     }
-    y+=ya;
+    y+=ya*2;
 
     // default to profile for builtin parallel port
     if      (my_lisaconfig->parallel.IsSameAs(_T("Nothing"),false)) pportbox->SetSelection(2);
@@ -630,10 +676,12 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
     else                                                            pportbox->SetSelection(0);
     
     m_propath = new wxTextCtrl(panel, wxID_ANY,  my_lisaconfig->parallelp  ,
-                               wxPoint(10 * HIDPISCALE, y), wxSize(400 * HIDPISCALE, 30 * HIDPISCALE) , 0);
+                               wxPoint(10 * HIDPISCALE, y), wxSize(380 * HIDPISCALE, 30 * HIDPISCALE) , 0);
     b_propath = new wxButton  (panel, ID_PICK_PROFILE, wxT("browse"),  wxPoint(420 * HIDPISCALE, y), wxDefaultSize );
 
-    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), wxPoint(420 * HIDPISCALE,  400 * HIDPISCALE), wxDefaultSize );
+
+    ya+=ya*2;
+    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );
 
     return panel;
 }
@@ -642,7 +690,7 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
 wxPanel *LisaConfigFrame::CreatePrinterConfigPage(wxNotebook *parent)
 {
     wxPanel *panel = new wxPanel(parent);
-    int y=10, ya=50;
+    int y=10, ya=45;
 
     (void)new wxStaticText(panel, wxID_ANY, _T("ImageWriter/ADMP DIP Switch 1:"),      
                    wxPoint( 10 * HIDPISCALE,  y), wxSize(400 * HIDPISCALE, 30 * HIDPISCALE));    y+=(ya/2);
@@ -700,7 +748,7 @@ wxPanel *LisaConfigFrame::CreatePrinterConfigPage(wxNotebook *parent)
     iw_img_path_b = new wxButton  (panel, ID_PICK_IWDIR, wxT("browse"),  wxPoint(420 * HIDPISCALE, y), wxDefaultSize );
 
 
-    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), wxPoint(420 * HIDPISCALE,  400 * HIDPISCALE), wxDefaultSize );
+    (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );
     return panel;
 }
 

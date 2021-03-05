@@ -1,5 +1,6 @@
 [[ -z "$CXX" ]] && export CXX="g++"
 [[ -z "$CC"  ]] && export CC="gcc" 
+[[ -z "$GPROF" ]] && export GPROF="gprof"
 
 export   GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g')"
 export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g')"

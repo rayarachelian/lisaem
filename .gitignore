@@ -28,6 +28,7 @@ go-*
 *valgrind*
 .env-*
 *.bak
+*.log
 *.exe
 *.dll
 *.dSYM
