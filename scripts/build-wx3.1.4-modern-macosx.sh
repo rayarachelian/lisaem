@@ -41,11 +41,11 @@ XLIBS='LIBS="-lstdc++.6 -L /usr/lib"
 CPUS="x86_64,i386"
 CCXXFLAGS='CXXFLAGS="-std=c++0x"
 
-[[ "$OSVER" < "macOS-10.09" ]] export XLIBS="" CCXXFLAGS=""
+[[ "$OSVER" < "macOS-10.09" ]] && export XLIBS="" CCXXFLAGS=""
 
 # macos 10.14-10.15 build only x86_64, 11.0+ build for both x86_64 and arm64.
-[[ "$OSVER" > "macOS-10.14" ]] export CPUS="x86_64"       XLIBS=""
-[[ "$OSVER" > "macOS-11.00" ]] export CPUS="x86_64,arm64" XLIBS="" CCXXFLAGS='CXXFLAGS="-std=c++0x"
+[[ "$OSVER" > "macOS-10.14" ]] && export CPUS="x86_64"       XLIBS=""
+[[ "$OSVER" > "macOS-11.00" ]] && export CPUS="x86_64,arm64" XLIBS="" CCXXFLAGS="-std=c++0x"
 
 TYPE=cocoa-${OSVER}-${CPUS}
 ../configure --enable-monolithic --enable-unicode --with-cocoa ${CCXXFLAGS} ${XLIBS} \
