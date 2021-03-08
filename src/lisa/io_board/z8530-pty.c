@@ -70,7 +70,7 @@ static int fdm[NUMSERPORTS],   // file descriptor master
            mypid=0,            // child's pid
            parentpid=0;        // parent pid
 
-char input[NUMSERPORTS][150];  // data buffer
+static char input[NUMSERPORTS][150];  // data buffer
 
 pid_t child_pid[NUMSERPORTS];  // pid of children
 

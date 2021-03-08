@@ -74,7 +74,7 @@
 static int fd[NUMSERPORTS];
 struct termios options;
 
-char input[NUMSERPORTS][150];  // data buffer
+static char input[NUMSERPORTS][150];  // data buffer
 
 extern int verifybaud(int baud);
 
