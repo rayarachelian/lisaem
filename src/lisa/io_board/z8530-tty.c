@@ -81,6 +81,8 @@ extern int verifybaud(int baud);
 // config string:  "/dev/ttyUSBS0:9600N81"
 // if baud rate isn't pinned, then let LisaTerminal set it, etc.
 
+extern void disconnect_serial(int port);
+extern uint32 get_baud_rate(unsigned int port);
 
 
 void set_port_baud_tty(int port, int baud)
