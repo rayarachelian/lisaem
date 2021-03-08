@@ -54,7 +54,7 @@ int diss68k_gettext(t_ipc * ipc, char *text)
 
     *text = '\0';
 
-    if (ipc->opcode==0x4e7a) { sprintf(text,"MOVEC VBR,D0 [UNI+ 68010 TESt - ILLEGAL on 68000]"); return; }
+    if (ipc->opcode==0x4e7a) { sprintf(text,"MOVEC VBR,D0 [UNI+ 68010 TESt - ILLEGAL on 68000]"); return 0; }
 //    DEBUG_LOG(1,"getting iib for opcode:%04x",ipc->opcode);
     iib = cpu68k_iibtable[ipc->opcode];
 //    printiib(iib);
