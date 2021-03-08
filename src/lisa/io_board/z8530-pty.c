@@ -262,7 +262,7 @@ void init_pty_serial_port(int port)
   scc_r[port].s.rr0.r.cts=1;
 
   // Check arguments is O_NDELAY something we want?                 // 2020.12.07 added
-  ALERT_LOG(0,"openpt");   fdm[port] = posix_openpt(O_RDWR, O_NONBLOCK,   O_NDELAY);  if (fdm[port] < 0 )  { fprintf(stderr, "Error %d on posix_openpt()\n", errno); return; }
+  ALERT_LOG(0,"openpt");   fdm[port] = posix_openpt(O_RDWR| O_NONBLOCK|   O_NDELAY);  if (fdm[port] < 0 )  { fprintf(stderr, "Error %d on posix_openpt()\n", errno); return; }
   ALERT_LOG(0,"grantpt");  rc        = grantpt(fdm[port]);                            if (rc       != 0 )  { fprintf(stderr, "Error %d on grantpt()\n", errno);      return; }
   ALERT_LOG(0,"unlockpt"); rc        = unlockpt(fdm[port]);                           if (rc       != 0 )  { fprintf(stderr, "Error %d on unlockpt()\n", errno);     return; }
 
