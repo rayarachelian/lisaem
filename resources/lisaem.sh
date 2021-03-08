@@ -39,7 +39,7 @@ EXEC=""
 # fallback to x86_64 if we're on M1 but don't have any ARM binaries, but Rosetta2 is installed.
 if [[ "$MACHINE" == "arm64" ]]; then
    if [[ -n "$(pkgutil --pkgs 2>/dev/null | grep Rosetta )" ]]; then
-      [[ -z "$( ls -1 lisaem-arm64* 2> /dev/null)" && MACHINE="arm64"]] && export MACHINE="x86_64"
+      [[ -z "$( ls -1 lisaem-arm64* 2> /dev/null)" && MACHINE="arm64" ]] && export MACHINE="x86_64"
    fi
 fi
 
