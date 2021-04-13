@@ -469,16 +469,16 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
       /* low 8 bits of current instruction are addr+1 */
       //ipc->src = (sint32)(*(sint8 *)(addr + 1));
       MMU_TRY( ipc->src = (sint32)((sint8)(fetchbyte(addr68k+1))) )
-      DEBUG_LOG(100,"i_Bcc @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      //DEBUG_LOG(100,"i_Bcc @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
 
       if (ipc->src == 0) {
         MMU_TRY(  ipc->src = (sint32)(sint16)(fetchword(addr68k + 2)) );
-        DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+        //DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
         ipc->wordlen++;
       }
 
       ipc->src += addr68k + 2;    /* add PC of next instruction */
-      DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      //DEBUG_LOG(100,"i_Bcc2 @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
       return;
     }
 
@@ -489,7 +489,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
       RESUME_DEBUG_MESSAGES();
       ipc->src += addr68k + 2;    /* add PC of next instruction */
       ipc->wordlen++;
-      DEBUG_LOG(100,"i_DBcc/DBRA @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
+      //DEBUG_LOG(100,"i_DBcc/DBRA @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)ipc->src,(long)ipc->opcode);
       return;
     }
 
@@ -529,7 +529,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if ( type == tp_src ) {MMU_TRY( ipc->sreg=fetchbyte(addr68k) );} 
         else                  {MMU_TRY( ipc->dreg=fetchbyte(addr68k) );}
 
-        DEBUG_LOG(100,"dt_Adix @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_Adix @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
 
         ipc->wordlen++;
         addr += 2;
@@ -542,7 +542,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         MMU_TRY( *p = (sint32)(sint16)fetchword(addr68k)  );
         RESUME_DEBUG_MESSAGES();
         ipc->wordlen++;
-        DEBUG_LOG(100,"dt_AbsW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_AbsW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         addr += 2;
         addr68k += 2;
         break;
@@ -552,7 +552,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         //*p = (uint32)((LOCENDIAN16(*(uint16 *)addr) << 16) +
         //              LOCENDIAN16(*(uint16 *)(addr + 2)));
         MMU_TRY(  *p=fetchlong(addr68k)  );
-        DEBUG_LOG(100,"dt_AbsL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_AbsL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen += 2;
         addr += 4;
         addr68k += 4;
@@ -564,7 +564,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         MMU_TRY( *p = (sint32)(sint16)fetchword(addr68k) );
         RESUME_DEBUG_MESSAGES();
         *p += addr68k;   /* add PC of extension word (this word) */
-        DEBUG_LOG(100,"dt_Pdis @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_Pdis @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -587,7 +587,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         if ( type == tp_src ) {MMU_TRY( ipc->sreg=fetchbyte(addr68k) );}
         else                  {MMU_TRY( ipc->dreg=fetchbyte(addr68k) );}
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(100,"dt_Pidx @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_Pidx @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -599,7 +599,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES();
         MMU_TRY(  *p = (uint32)fetchbyte(addr68k + 1)  );
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(100,"dt_ImmB @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_ImmB @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -610,7 +610,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES();
         MMU_TRY(  *p = (uint32)fetchword(addr68k)  );
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(100,"dt_ImmW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_ImmW @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen++;
         addr += 2;
         addr68k += 2;
@@ -620,7 +620,7 @@ void cpu68k_ipc(uint32 addr68k, t_iib * iib, t_ipc * ipc)
         PAUSE_DEBUG_MESSAGES(); 
         MMU_TRY(  *p = (uint32)fetchlong(addr68k)  ); // ((LOCENDIAN16(*(uint16 *)addr) << 16) +  LOCENDIAN16(*(uint16 *)(addr + 2)));
         RESUME_DEBUG_MESSAGES();
-        DEBUG_LOG(100,"dt_ImmL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
+        //DEBUG_LOG(100,"dt_ImmL @ %08lx target:%08lx opcode:%04lx",(long)addr68k,(long)*p,(long)ipc->opcode);
         ipc->wordlen += 2;
         addr += 4;
         addr68k += 4;
@@ -825,6 +825,8 @@ void free_all_ipcts(void)
   for (int c=0; c<4; c++)
     for (int a9=0; a9<32768; a9++)
           mmu_trans_all[c][a9].table=NULL;
+ 
+  if (ipcs) {free(ipcs); ipcs=NULL;}
 }
 
 
@@ -1039,7 +1041,9 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
     checkcontext(context,"pre-entry to cpu68k_makeipc");
     #endif
 
-    ipcs=(t_ipc **)calloc(sizeof(t_ipc *) , ipcs_to_get); if (!ipcs) EXITN(0,0,"Out of memory in makeipclist trying to get ipc pointers!");
+    if (ipcs==NULL) {
+       ipcs=(t_ipc **)calloc(sizeof(t_ipc *) , ipcs_to_get); if (!ipcs) EXITN(0,0,"Out of memory in makeipclist trying to get ipc pointers!");
+    }
 
     mmu_trn=&mmu_trans[( (pc )>>9) ];  if (mmu_trn->readfn==bad_page) {free(ipcs); return NULL;}
 
@@ -1080,18 +1084,18 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
         abort_opcode=2; opcode=fetchword((pc));
         if (abort_opcode==1)     // flush mmu and retry once
         {   mmuflush(0x2000); abort_opcode=2; opcode=fetchword((pc));
-            if (abort_opcode==1) {DEBUG_LOG(200,"DANGER! GOT abort_opcode=1 the 2nd time!"); free(ipcs);  NULL;}
+            if (abort_opcode==1) {DEBUG_LOG(200,"DANGER! GOT abort_opcode=1 the 2nd time!"); free(ipcs); ipcs=NULL; return NULL;}
         }
         abort_opcode=0;
         iib=cpu68k_iibtable[opcode]; // iib =  myiib ? myiib : illegaliib;  *** REMOVED DUE TO ILLEGAL OPCODES *****
         if (!iib) { DEBUG_LOG(200,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08x\n",opcode,pc);
-                    free(ipcs); return NULL;}
+                    free(ipcs); ipcs=NULL; return NULL;}
 
         if (!iib ) {EXITR(53,NULL,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08lx\n",opcode,(long)pc);}
         if (!ipc)  {EXITR(54,NULL,"Have a cow man! ipc=NULL\n"); }
 
         cpu68k_ipc((pc), iib, ipc);
-        if (abort_opcode==1) {free(ipcs); return rettable;}   // got MMU Exception, but return what we have.
+        if (abort_opcode==1) {free(ipcs); ipcs=NULL; return rettable;}   // got MMU Exception, but return what we have.
 
         DEBUG_LOG(200,"******* for next ip at instrs %ld, pc=%08lx, opcode=%04lx",(long)instrs,(long)pc,(long)opcode);
         //cpu68k_printipc(ipc);
@@ -1232,7 +1236,8 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
     DEBUG_LOG(200,"out of ix-- loop, ix=%ld ipc is now %p at pc %06lx max %06lx **** corrected ipc's: %ld instructions **** \n\n",(long)ix,
               ipc,(long)pc,(long)xpc,(long)instrs);
 
-    free(ipcs); return rettable;
+    if (ipcs) {free(ipcs); ipcs=NULL;}
+    return rettable;
 }
 
 void cpu68k_endfield(void)  { /* cpu68k_clocks = 0; */ }

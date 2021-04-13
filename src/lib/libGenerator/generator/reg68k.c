@@ -242,10 +242,17 @@ int get_exs1_pending_irq_empty(void) {return 0;}
 int get_exs0_pending_irq_empty(void) {return 0;}
 
 
-int get_exs0_pending_irq_2xpar(void) { return (via[3].via[IFR]&via[3].via[IER])||((via[4].via[IFR]&via[4].via[IER]));}
-int get_exs1_pending_irq_2xpar(void) { return (via[5].via[IFR]&via[5].via[IER])||((via[6].via[IFR]&via[6].via[IER]));}
-int get_exs2_pending_irq_2xpar(void) { return (via[7].via[IFR]&via[7].via[IER])||((via[8].via[IFR]&via[8].via[IER]));}
+int get_exs0_pending_irq_2xpar(void) { if (via[3].via[IFR]&via[3].via[IER]) via[3].via[IFR] |=0x80;
+                                       if (via[4].via[IFR]&via[4].via[IER]) via[4].via[IFR] |=0x80;
+                                       return (via[3].via[IFR]&via[3].via[IER])||((via[4].via[IFR]&via[4].via[IER]));}
 
+int get_exs1_pending_irq_2xpar(void) { if (via[5].via[IFR]&via[5].via[IER]) via[5].via[IFR] |=0x80;
+                                       if (via[6].via[IFR]&via[6].via[IER]) via[6].via[IFR] |=0x80;
+                                       return (via[5].via[IFR]&via[5].via[IER])||((via[6].via[IFR]&via[6].via[IER]));}
+
+int get_exs2_pending_irq_2xpar(void) { if (via[7].via[IFR]&via[7].via[IER]) via[7].via[IFR] |=0x80;
+                                       if (via[8].via[IFR]&via[8].via[IER]) via[8].via[IFR] |=0x80;
+                                       return (via[7].via[IFR]&via[7].via[IER])||((via[8].via[IFR]&via[8].via[IER]));}
 
 
 // These is here in this file because they are shared IRQs, it belongs more in the via6522.c file but there is a
@@ -254,11 +261,11 @@ int get_exs2_pending_irq_2xpar(void) { return (via[7].via[IFR]&via[7].via[IER])|
 int get_irq1_pending_irq(void )
 {
             // this is just a fixup for the COPS VIA, doesn't affect the rest of this.
-            if (via[1].via[IER] & via[1].via[IFR] & 0x7f) via[1].via[IFR] |=0x80; else  via[1].via[IFR] &=0x7f;
+            if (!!(via[1].via[IER] & via[1].via[IFR] & 0x7f)) via[1].via[IFR] |=0x80; else  via[1].via[IFR] &=0x7f;
 
             // IRQ1 is the only shared IRQ - Vertical Retrace, Floppy FDIR, and VIA2 (Parallel Port) all use it.
             // fix via IFR bit 0x80's so bit 7 is properly reflecting enabled IRQ's.  Correct these bits before checking.
-            if (via[2].via[IER] & via[2].via[IFR] & 0x7f) via[2].via[IFR] |=0x80; else  via[2].via[IFR] &=0x7f;
+            if (!!(via[2].via[IER] & via[2].via[IFR] & 0x7f)) via[2].via[IFR] |=0x80; else  via[2].via[IFR] &=0x7f;
 
             DEBUG_LOG(0,"IRQ1: vertical:%d fdir:%d VIA2-IFR bits:%s%s%s%s%s%s%s%s returning:%d",
                (verticallatch && (videoirq & 1)), floppy_FDIR ,
@@ -272,8 +279,6 @@ int get_irq1_pending_irq(void )
                (via[2].via[IFR] &  VIA_IRQ_BIT_SET_CLR_ANY ? "7:ANY ": "None"),
 
                ((verticallatch && (videoirq & 1)) || floppy_FDIR || (via[2].via[IFR] & 0x80)));
-
-
 
             return ((verticallatch && (videoirq & 1)) || floppy_FDIR || (via[2].via[IFR] & 0x80)); //was vertical, not verticallatch
 }
@@ -300,26 +305,25 @@ static inline int get_cops_pending_irq(void )
      return 0;
 }
 
-
-
-
+int get_irq_mask(void) {return ((regs.sr.sr_int>>8) & 7);}
 
 static inline uint8 get_pending_vector(void)
 {
   int highest=0;
 
+  int mask=get_irq_mask();
 
   //---- recalculated pending vector bitmap, and find the highest IRQ to be serviced  ------------
+  // 2021.03.29 skip lower tests when mask is high, all it does is slow emulation down and then
+  // it fills the log with tons of noise.
+  if (get_nmi_pending_irq()  ) {highest=7; pending_vector_bitmap=BIT7; }   if (mask==7) return highest;
+  if (get_scc_pending_irq()  ) {highest=6; pending_vector_bitmap=BIT6; }   if (mask==6) return highest;
+  if (get_exs0_pending_irq() ) {highest=5; pending_vector_bitmap=BIT5; }   if (mask==5) return highest;
+  if (get_exs1_pending_irq() ) {highest=4; pending_vector_bitmap=BIT4; }   if (mask==4) return highest;
+  if (get_exs2_pending_irq() ) {highest=3; pending_vector_bitmap=BIT3; }   if (mask==3) return highest;
+  if (get_cops_pending_irq() ) {highest=2; pending_vector_bitmap=BIT2; }   if (mask==2) return highest;
+  if (get_irq1_pending_irq() ) {highest=1; pending_vector_bitmap=BIT1; }   
 
-  if       (get_nmi_pending_irq()  ) {highest=7;pending_vector_bitmap=BIT7;}
-  else if  (get_scc_pending_irq()  ) {highest=6;pending_vector_bitmap=BIT6;}
-  else if  (get_exs0_pending_irq() ) {highest=5;pending_vector_bitmap=BIT5;}
-  else if  (get_exs1_pending_irq() ) {highest=4;pending_vector_bitmap=BIT4;}
-  else if  (get_exs2_pending_irq() ) {highest=3;pending_vector_bitmap=BIT3;}
-  else if  (get_cops_pending_irq() ) {highest=2;pending_vector_bitmap=BIT2;}
-  else if  (get_irq1_pending_irq() ) {highest=1;pending_vector_bitmap=BIT1;}
-
-  DEBUG_LOG(0,"Highest IRQ: %d",highest);
   return highest;
 }
 
@@ -335,8 +339,6 @@ int is_vector_available(int avno)
    if (insetjmpland) return (IS_VECTOR_AVAILABLE_INT(avno));
    return IS_VECTOR_AVAILABLE_EXT(avno);
 }
-
-
 
 
 static inline void fire_pending_external_autovector(void)
@@ -357,12 +359,13 @@ static inline void fire_pending_external_autovector(void)
     }
 }
 
+
 static inline void fire_pending_internal_autovector(void)
 {
  uint8 i=get_pending_vector();
- if (!i) { DEBUG_LOG(0,"No pending IRQs"); return; }
+ if (!i) return;
 
- DEBUG_LOG(0,"Firing pending IRQ:%d if it meets the mask",i);
+// DEBUG_LOG(0,"Firing pending IRQ:%d if it meets the mask",i);
  if (IS_VECTOR_AVAILABLE_INT(i))
      {
        #ifdef DEBUG
@@ -1028,34 +1031,6 @@ void reg68k_exec_debug_block(int32 clocks, mmu_trans_t *mt, int k, t_ipc *ipc,ch
   }
   #endif
 
-
-
-  // dump disassembly roughly around the equivalent of where pro.c fn's would be.
-  if (running_lisa_os == LISA_UNIPLUS_RUNNING && pc24==0x0000c188)
-    {
-      debug_on("prouni+");
-      ALERT_LOG(0,"profile code disassembly for da win.");
-      for (pc24=0x20400; pc24<0x21000; pc24=pc24) {
-        char dumpline[1024];
-        char text[1024];
-        if (!mt->table) {abort_opcode=2; mt->table=get_ipct(pc24);}  //we can skip free_ipct since there's one already here.
-        abort_opcode=2; 
-        
-        if (!mt->table->ipc) cpu68k_makeipclist(pc24 & ADDRESSFILT);
-        ipc=&(mt->table->ipc[(pc24 & 0x1ff)>>1]);
-        diss68k_getdumpline(pc24,dumpline);
-        diss68k_gettext(ipc, text);
-        if (buglog)
-            fprintf(buglog,"%ld/%08lx (%ld %ld/%ld/%ld) %s  SRC:clk:%016llx +%ld clks\n",(long)context,(long)pc24,
-                (long)(segment1|segment2),(long)segment1,(long)segment2,(long)start,dumpline,(long long)cpu68k_clocks, (long)ipc->clks);
-        pc24+=ipc->wordlen;
-        if (!ipc->wordlen) pc24+=2;
-    }
-    dumpram("uniplus");
-    dumpallmmu();
-    EXIT(0,0,"kthx bye");
-  }
-
   // if the tracelog is not enabled, skip this
   if  (debug_log_enabled)
       {
@@ -1162,7 +1137,7 @@ void reg68k_exec_debug_block(int32 clocks, mmu_trans_t *mt, int k, t_ipc *ipc,ch
 //} // end of reg68k_exec_debug_block fn
 
 
-#ifdef XXXDEBUG
+#ifdef DEBUG
 void reg68k_ext_exec_various_dbug(void) 
 {
 /*
@@ -1212,6 +1187,10 @@ void reg68k_ext_exec_various_dbug(void)
 //                        );
 //                   
 //                  }
+
+
+          if (reg68k_pc==0x00fe0084) {ALERT_LOG(0,"Return to ROM");          debug_off();} // 2021.03.31
+          if (reg68k_pc==0x00fe1fde) {ALERT_LOG(0,"Return to ROM - PROERR"); debug_off();} // 2021.03.31
 
           if  (reg68k_pc==0x00020000)
               {
@@ -1497,11 +1476,16 @@ void a_line(void) {
 #endif
 }
 
+XTIMER entry;
+XTIMER entry_stop;
+XTIMER clks_stop;
+
+
 int32 reg68k_external_execute(int32 clocks)
 {
-  XTIMER entry=cpu68k_clocks;
-  XTIMER entry_stop=cpu68k_clocks+clocks;
-  XTIMER clks_stop=cpu68k_clocks+clocks;
+  entry_stop=cpu68k_clocks+clocks;
+  clks_stop=cpu68k_clocks+clocks;
+  clks_stop=cpu68k_clocks+clocks;
 
   int i,j,k=0;
 
@@ -1746,7 +1730,7 @@ static uint32 last_pc;
                         PAUSE_DEBUG_MESSAGES();
                         ipc->function=cpu68k_functable[fetchword(reg68k_pc) * 2 + 1];
                         if (!ipc->function) ipc->function=cpu68k_functable[0x4afc*2];
-                        if (!ipc->function) ALERT_LOG(0,"Failed to get function for illegal opcode %04x", cpu68k_functable[0x4afc]);
+                        if (!ipc->function) ALERT_LOG(0,"Failed to get function for illegal opcode %04x", 0x4afc); //(unsigned int)cpu68k_functable[0x4afc]);
 
                         PAUSE_DEBUG_MESSAGES();
 
@@ -1782,7 +1766,7 @@ static uint32 last_pc;
                       reg68k_ext_core_tester_post();
                     #endif
 
-                    #if defined(DEBUG) && defined(XXXDEBUG)
+                    #if defined(DEBUG)
                       reg68k_ext_exec_various_dbug();
                     #endif
 
@@ -2048,6 +2032,93 @@ static uint32 lastoldpc;
 static int32  lastclk;
 static int lastvno;
 
+#ifdef DISABLEDXXXDEBUG
+void find_uniplus_partition_table(void) {
+/* find partition table in kernel - should be something like this:
+                        a-start      a-size     b-start
+RAM 0a6b50: 04 03 02 01]00 00 09 c5[00 00 42 3b]00 00 00 65]|..........B;...e 09c5=2501 (astart) 423b=16955 (asize);  0x65=101=b-start
+RAM 0a6b60: 00 00 09 60]00 00 09 c5[00 00 1c 3b]00 00 26 00 |...`.......;..&. 0960=2400 (b-sizeswapsize), 09c5: c-start, 0x13cb=7227=c-size, 0x2600=9728 (dstart)
+RAM 0a6b70: 00 00 26 00 00 00 00 00:00 00 00 00 00 00 00 00 |..&............. 0x2600=9728 (dsize), estart=0,esize=0, fstart=0, 
+RAM 0a6b80: 00 00 1c 00 00 00 1c 00:00 00 09 c0 00 00 00 65 |...............e 0x1c00=7168 (fsize), gstart=7168=0x1c00, 0065=g_size
+RAM 0a6b90: 00 00 4b 9b]00 00 00 00:00 00 00 00 00 00 00 00 |..K............. 4b9b=h_size (whole disk -100)
+RAM 0a6ba0: 00 02 d0 ea 00 02 d0 ea:00 00 00 00 00 00 00 00 |................ 02d0ea=184554 not sure what drive that is. 92MB? so priam?
+
+{
+   astart = 101+swap;  a_size =   16955; //  root on 10MB disk
+   bstart =  101;      b_size =    swap; //  swap (2400 blks normal
+   cstart = 101+swap;  c_size =    7227; //  root on 5MB disk
+   dstart = 9728;      d_size =    9728; //  2nd fs on 10MB disk
+   estart =    0;      e_size =       0; //  unused
+   fstart =    0;      f_size =    7168; //  old root - a
+   gstart = 7168;      g_size =    2496; //  old swap -b
+   hstart =  101;      h_size =   19355; //  whole disk (blocks 0-100 reserved for boot loader)
+}
+
+0x000009c5 0x0000423b 
+0x00000065 0x00000960
+0x000009c5 0x00001c3b
+0x00002600 0x00002600 
+0x00000000 0x00000000 
+0x00000000 0x00001c00
+0x00001c00 0x000009c0 
+0x00000065 0x00004b9b 
+*/
+
+    for (uint32 addr=0x100; addr<0x00fbffff; addr+=2) {
+
+        abort_opcode=2; 
+        uint32 val=fetchlong(addr);                            //a-start
+
+        fprintf(stderr,"Searching: %08x\r",addr);
+        if (val==0x000009c5) {
+                abort_opcode=2; uint32 val1=fetchlong(addr +      ( 1*4));     //a-size
+            fprintf(stderr,"\n found 0x000009c5 %08x at %08x (want 0x0000423b)\n",val1,addr);
+            if (val1==0x0000423b) {
+                abort_opcode=2; uint32 val2=fetchlong(addr +  ( 2*4))==0x00000065; // b-start 2501
+                abort_opcode=2; uint32 val3=fetchlong(addr +  ( 3*4))==0x00000960; // b-size
+                abort_opcode=2; uint32 val4=fetchlong(addr +  ( 4*4))==0x000009c5; // c-start
+                abort_opcode=2; uint32 val5=fetchlong(addr +  ( 5*4))==0x00001c3b; // c-size
+                abort_opcode=2; uint32 val6=fetchlong(addr +  ( 6*4))==0x00002600; // d-start
+                abort_opcode=2; uint32 val7=fetchlong(addr +  ( 7*4))==0x00002600; // d-size
+                abort_opcode=2; uint32 val8=fetchlong(addr +  ( 8*4))==0x00000000; // e-start
+                abort_opcode=2; uint32 val9=fetchlong(addr +  ( 9*4))==0x00000000; // e-size
+                abort_opcode=2; uint32 vala=fetchlong(addr +  (10*4))==0x00000000; // f-start
+                abort_opcode=2; uint32 valb=fetchlong(addr +  (11*4))==0x00001c00; // f-size
+                abort_opcode=2; uint32 valc=fetchlong(addr +  (12*4))==0x00001c00; // g-start
+                abort_opcode=2; uint32 vald=fetchlong(addr +  (13*4))==0x000009c0; // g-size
+                abort_opcode=2; uint32 vale=fetchlong(addr +  (14*4))==0x00000065; // h-start
+                abort_opcode=2; uint32 valf=fetchlong(addr +  (15*4))==0x00004b9b; // h-size
+                int count= val2+val3+val4+val5+val6+val7+val8+val9+vala+valb+valc+vald+vale+valf;
+                if (count > 6)
+                   fprintf(stderr, "**** Possible partition table found at address 1/%08x count:%d****\n",addr,count);
+                else
+                   fprintf(stderr, "**** Low likelyhood partition table found at address 1/%08x count:%d****\n",addr,count);
+
+                for (int i=0; i<16; i++) {
+                     val=fetchlong(addr  + (i*4) );
+                     if ((i & 1)==0) fprintf(stderr,"1/%08x: %08x ", addr + (i*4),val);
+                     else            fprintf(stderr," %08x\n", addr + (i*4),val);
+                }
+                fprintf(stderr,"\n\n");
+            }
+        }
+     }
+     EXIT(0,0,"Partition table location");
+}
+#endif
+
+extern void apply_uniplus_hacks(void);
+
+
+
+#define SEND_STATUS_BYTES_STATE    12    // Let Lisa read the status bytes after the write is done, then return to idle.
+
+extern void  hle_intercept(void);
+
+extern int line15_hle_intercept(void);
+
+
+
 void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
 {
     uint16 saved_sr=reg68k_sr.sr_int;
@@ -2058,48 +2129,7 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
     uint16 busfunctioncode;
     uint8 old_supervisor=reg68k_sr.sr_struct.s;
 
-    if (vno==V_LINE15)
-    { 
-      uint16 opcode,fn;
-
-      if (romless && (reg68k_pc & 0x00ff0000)==0x00fe0000)
-      {
-        if (romless_entry()) return;
-      }
-
-      abort_opcode=2; opcode=fetchword(reg68k_pc);          //if (abort_opcode==1) fn=0xffff;
-      abort_opcode=2; fn=fetchword(reg68k_pc+2);            //if (abort_opcode==1) fn=0xffff;
-      abort_opcode=0;
-
-      if (opcode == 0xfeed)
-      {
-        ALERT_LOG(0,"F-Line-Wormhole %04lx",(long)fn);
-        switch(fn)
-        {
-          #ifdef DEBUG
-
-            case 0:   if (debug_log_enabled) { ALERT_LOG(0,"->debug_off");                              debug_off(); reg68k_pc+=4; return; }
-                      else                   { ALERT_LOG(0,"->debug_off, was already off!!!");          debug_off(); reg68k_pc+=4; return; }
-
-            case 1:   if (debug_log_enabled) { ALERT_LOG(0,"->tracelog, was already on! turning off!"); debug_off(); reg68k_pc+=4; return; }
-                      else                   { ALERT_LOG(0,"->tracelog on");            debug_on("F-line-wormhole"); reg68k_pc+=4; return; } 
-          #else
-
-            case 0:
-            case 1:   reg68k_pc+=4; 
-                      ALERT_LOG(0,"tracelog -> but emulator wasn't compiled in with debuggin enabled!"); 
-                      return;
-          #endif
-          default: ALERT_LOG(0,"Unknown F-Line-wormhole:%04x or actual F-Line trap, falling through a LINE15 exception will occur.",fn);
-          // anything unimplemented/undefined should fall through and generate an exception.
-        }
-      }
-      if (opcode==0xfeef) {
-                              ALERT_LOG(0,"Executing blank IPC @ %08lx",(long)reg68k_pc);
-                              EXIT(99,0,"EEEK! Trying to execute blank IPC at %08lx - something is horribly wrong!",(long)reg68k_pc);
-                          }
-      ALERT_LOG(0,"Unhandled F-Line %04lx at %08lx",(long)opcode,(long)reg68k_pc);
-    }
+    if (vno==V_LINE15) { if (line15_hle_intercept()) return;}
 
     /*-----------------12/8/2003 9:56PM-----------------
      * needs to do this: RA
@@ -2122,8 +2152,20 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
 
     lastclk =cpu68k_clocks;   lastvno =vno;   lastoldpc =oldpc;
 
-    #ifdef DEBUG
 
+    if (avno>0 && avno<8)                // If it's an autovector, check the IRQ mask before allowing it to occur.
+      {
+        if (! (IS_VECTOR_AVAILABLE_INT(avno))) {
+            clks_stop=cpu68k_clocks+8192;   // reschedule checking later instead of after every instruction. 5MHz/60Hz=83,333 cpu cycles/ video frame
+            DEBUG_LOG(0,"Vector requested is not available (INTMASK too low)"); // otherwise this code slows down to a crawl checking after evern opcode
+            return;
+        }
+        DEBUG_LOG(0,"PC:%08lx AutoVector is:%ld vector:%ld curlevel is %ld cpu stop status is:%ld",(long)reg68k_pc,(long)avno,(long)vno,(long)curlevel,(long)regs.stop);
+      }
+    else avno=0;                         // clear avno since it wasn't an autovector - this saves time later on the avno check.
+
+
+    #ifdef DEBUG
       DEBUG_LOG(0,"Entering: internal_vector - VECTOR:%ld (%s), addr_err:%08lx oldpc:%08lx, pc24:%08lx, reg68k_pc:%08lx",
                   (long)vno,getvector(vno), (long)addr_error,(long)oldpc,(long)pc24,(long)reg68k_pc);
 
@@ -2134,13 +2176,6 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
       printregs(buglog,"irqdone");
 
     #endif
-
-   if (avno>0 && avno<8)                // If it's an autovector, check the IRQ mask before allowing it to occur.
-      {
-        DEBUG_LOG(0,"PC:%08lx AutoVector is:%ld vector:%ld curlevel is %ld cpu stop status is:%ld",(long)reg68k_pc,(long)avno,(long)vno,(long)curlevel,(long)regs.stop);
-        if (! (IS_VECTOR_AVAILABLE_INT(avno))) {DEBUG_LOG(0,"Vector requested is not available (INTMASK too low)");return;}
-      }
-   else avno=0;                         // clear avno since it wasn't an autovector - this saves time later on the avno check.
 
 
     if (!GETSUPERVISOR()) {
@@ -2220,6 +2255,8 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
             }
         }
 
+    if (uniplus_hacks && vno==4 && InstructionRegister==0x4e7a) apply_uniplus_hacks();
+
     DEBUG_LOG(0,"PUSH PC %08lx context:%ld",(long)oldpc,(long)context);  
 
     // this fails, if oldpc points to a page that's lisa_wl_bad_page - it will recursively call bus error and crash.
@@ -2281,6 +2318,7 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
 
     abort_opcode=2;  reg68k_pc=GETVECTOR(vno);    // should turn this into vector 15 - spurious IRQ
     if (abort_opcode==1) {EXIT(58,0,"Doh got abort_opcode=1 on vector fetch in %s - BYE BYE\n",__FUNCTION__); }
+    if (reg68k_pc &1)    {EXIT(58,0,"Doh odd PC value (%08x) on vector (%d) fetch in %s - BYE BYE\n",reg68k_pc,vno,__FUNCTION__); }
 
     abort_opcode=0;
 

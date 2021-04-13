@@ -70,7 +70,9 @@ public:
     wxRadioBox *cpurambox;         
 
     wxCheckBox *cheats;            // startup BOOT ROM cheats
+    wxCheckBox *hle_cheats;
     wxCheckBox *soundeffects;
+    wxCheckBox *doublesided;
     wxCheckBox *skinson;
     wxRadioBox *pportbox;          // Motherboard Parallel Port Connection type
     wxTextCtrl *m_propath;         // ProFile file path attached to parallel Port.

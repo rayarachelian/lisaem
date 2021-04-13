@@ -1,8 +1,8 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-RC4_2020.09.18                    *
-*                  Copyright (C) 2020 Ray Arachelian                                   *
+*              The Lisa Emulator Project  1.2.7-PRE-RC4-UNSTABLE_2021.03.23                    *
+*                  Copyright (C) 2021 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *
 *                        Reset Global Variables .c file                                *
@@ -26,6 +26,11 @@ void unvars(void)
 
 REASSIGN(int,cheat_ram_test,1);  // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
 REASSIGN(int,romless,0);
+REASSIGN(int,uniplus_hacks,1);        // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
+REASSIGN(int,uniplus_loader_patch,1); // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
+REASSIGN(int,uniplus_sunix_patch,1);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+REASSIGN(uint32,rom_profile_read_entry,0); // ROM entry to profile read block
+REASSIGN(int,double_sided_floppy,0);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 REASSIGN(int,sound_effects_on,1);
 REASSIGN(int,profile_power,127);
 REASSIGN(int32,video_scan,0);

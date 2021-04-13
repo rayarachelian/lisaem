@@ -37,8 +37,8 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="NOT-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2021.03.05"                # release date.  must be YYYY.MM.DD
+    STABILITY="PRE-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+  RELEASEDATE="2021.03.23"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -468,6 +468,7 @@ export  PHASE1INEXT=c PHASE1OUTEXT=o PHASE2OBJDIR=obj
 export  PHASE1LIST="\
         src/lisa/io_board/floppy          \
         src/storage/profile               \
+        src/storage/hle                   \
         src/lisa/motherboard/unvars       \
         src/lisa/motherboard/vars         \
         src/lisa/motherboard/glue         \
@@ -757,7 +758,7 @@ if [[ $(echo "$PHASE2LIST" | wc -w ) -ne  $(echo "$LIST" | wc -w )  ]]; then
 fi
 
 export COMPILEPHASE="linking"
-export PERCENTPROCESS=98 PERCENTCEILING=99 PERCENTJOB=0 NUMJOBSINPHASE=1
+export PERCENTPROCESS=97 PERCENTCEILING=98 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 waitqall
 qjob  "!!* Linked ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a src/lib/TerminalWx/lib/terminalwx.a \

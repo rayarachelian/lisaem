@@ -725,28 +725,44 @@ void romless_vfychksum(void)
   //ALERT_LOG(0,"Checksum verify done.  Result:%08x prev:%08x",reg68k_regs[3],reg68k_regs[2]);
 }
 
+extern int get_vianum_from_addr(long addr);
 
 void romless_proread(void)
 {
-  ProFileType *P=via[2].ProFile;
+  ProFileType *P;
+
+  // default to motherboard parallel port
+  if (reg68k_regs[8+0]==0) reg68k_regs[8+0]=0xfcd901;
+
+  uint32 addr=reg68k_regs[8+0];
+
+  int vianum=get_vianum_from_addr(addr);
+  ALERT_LOG(0,"address is %08x vianum:%d",addr,vianum);
+  if (vianum<2 || vianum>8) vianum=2;
+
+  P=via[vianum].ProFile;
+
   int i;
   uint8 *blk=NULL;
   uint32 sectornumber=reg68k_regs[1];
   uint8 *sectordata=&P->DataBlock[4]; 
 
-  if (!P) {ALERT_LOG(0,"Can't access profile!"); return;}
+  if (P==NULL)        {ALERT_LOG(0,"ProFile Pointer for via:%d is null",vianum); return;}
+  if (&P->DC42==NULL) {ALERT_LOG(0,"ProFile DC42 for via:%d Pointer is null",vianum); return;}
 
-  P->DataBlock[512+4]=0xff;
+  #ifdef DEBUG
+     if (sectornumber==2055 && running_lisa_os==LISA_OFFICE_RUNNING) debug_on("los-hle");   //2021.03.31
+  #endif
+
+  DEBUG_LOG(0,"about to read sector:%d (pre-deinterleave) on via:%d",sectornumber,vianum);
+
+  P->DataBlock[512+4]=0xff; // premark non aaaa
   P->DataBlock[512+5]=0xff;
 
-  if (P->DC42.fd<3 || P->DC42.fh==NULL) return;
-
-  reg68k_regs[8+0]=0xfcd901;
+  //if (P->DC42.fd<3 || P->DC42.fh==NULL) {ALERT_LOG(0,"Profile file handle or descriptor does not exist"); return;}
 
 //  if (sectornumber<50)   ALERT_LOG(0,"Slot 1 ID:%04x, Slot 2 ID:%04x, Slot 3 ID:%04x",
 //           lisa_ram_safe_getword(1,0x298), lisa_ram_safe_getword(1,0x29a), lisa_ram_safe_getword(1,0x29c) ) 
-   
-
 
   if (sectornumber<0x00f00000)   sectornumber=deinterleave5(sectornumber);
 
@@ -760,23 +776,35 @@ void romless_proread(void)
     }
   else
     {
-       blk=dc42_read_sector_data(&(P->DC42),sectornumber);
-       if (!blk)  {  reg68k_regs[0]=0xffffff; reg68k_sr.sr_struct.c=1;  return;}
+       ALERT_LOG(0,"reading sector.");
+       blk=dc42_read_sector_data(&P->DC42,sectornumber);
+       if (!blk)  {
+            ALERT_LOG(0,"Read sector from blk#%d failed with error:%d %s",sectornumber,P->DC42.retval,P->DC42.errormsg);
+            reg68k_regs[0]=0xffffff; reg68k_sr.sr_struct.c=1;  
+            return;
+          }
        memcpy(sectordata,blk,512);
 
-       blk=dc42_read_sector_tags(&(P->DC42),sectornumber);
-       if (!blk)  {reg68k_regs[0]=0xffffff; reg68k_sr.sr_struct.c=1; ; return;}
+       blk=dc42_read_sector_tags(&P->DC42,sectornumber);
+       if (!blk)  {
+            ALERT_LOG(0,"Read tags from blk#%d failed with error:%d %s",sectornumber,P->DC42.retval,P->DC42.errormsg);
+            reg68k_regs[0]=0xffffff; reg68k_sr.sr_struct.c=1;  
+            return;
+          }
        memcpy((void *)&sectordata[512],blk,20);
     }
   
   // for loop is needed to prevent MMU failure when crossing mmu page boundaries
-  for (i=0; i< 20; i++) storebyte(reg68k_regs[ 9]+i,    sectordata[i+512]);
-  for (i=0; i<512; i++) storebyte(reg68k_regs[10]+i,    sectordata[i]);
+  for (i=0; i< 20; i++) storebyte(reg68k_regs[ 9]+i,    sectordata[i+512]); // a1
+  for (i=0; i<512; i++) storebyte(reg68k_regs[10]+i,    sectordata[i]);     // a2
+
+  ALERT_LOG(0,"sector:%d fileid:%02x %02x",sectornumber,sectordata[512+4],sectordata[512+5]);
 
   P->DataBlock[0]=0;
   P->DataBlock[1]=0;
   P->DataBlock[2]=0;
   P->DataBlock[3]=0;
+
   via[2].ProFile->Command=-2;
   via[2].ProFile->StateMachineStep=0x00;
   via[2].ProFile->indexread=0x0218;
@@ -788,7 +816,10 @@ void romless_proread(void)
   via[2].ProFile->VIA_PA=0x08;
   via[2].ProFile->last_a_accs=0x00;
 
-  reg68k_regs[0]=0;  reg68k_regs[1]=0;  reg68k_sr.sr_struct.c=0;
+  reg68k_regs[0]=0;  
+  reg68k_regs[1]=0;  
+  reg68k_sr.sr_struct.c=0;
+
 //  storebyte(0x01B4,0);
 //  storebyte(0x01B5,0);
 //  storebyte(0x01B6,0);
@@ -840,6 +871,17 @@ int romless_entry(void)
 {
   int taken=0;
 
+  if ((reg68k_pc & 0x00ffffff)==rom_profile_read_entry)
+  {
+     DEBUG_LOG(0,"HLE Intercept reading ProFile block 0x%08x (%ld)",reg68k_regs[1],reg68k_regs[1]);
+     romless_proread();
+     taken=1;
+     cpu68k_clocks+=5000; // not exactly accurate. :-)
+     pc24=reg68k_pc=fetchlong(reg68k_regs[15]); reg68k_regs[15]+=4;   /* Simulate RTS */
+     reg68k_regs[0]=0; reg68k_regs[1]=0;
+     ALERT_LOG(0,"reg68k_regs[0]=%d reg68k_regs[1]=%d",reg68k_regs[0],reg68k_regs[1]);
+     return 1;  // abort F-Line handler
+  }
 
 if ((reg68k_pc & 0x00ff0000)==0x00fe0000)
    switch((reg68k_pc & 0x00ffffff))

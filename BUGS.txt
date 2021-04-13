@@ -1,5 +1,10 @@
 Here's a list of some of the current known issues, there are likely many others.
 
+* Terminal code isn't complete - menus don't work, Xmodem isn't complete.
+* serial port A is broken on Lisa Office System so it's disabled by default
+* UniPlus + Xenix still don't fully boot.
+* MacWorks XL 3.0 sometimes works, other times crashes.
+
 * Various sound generation issues across several platforms, but works on 
 GTK if SDL is enabled, so turning on SDL for build wx scripts. 
 

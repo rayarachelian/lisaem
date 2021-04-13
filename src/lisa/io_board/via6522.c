@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2021.03.26                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -183,17 +183,30 @@ void  via2_orb(uint8 data);
 // VIA Wrapper around ProFile loop to handle BSY (CA1) IRQ's -- if they're enabled that is.
 void VIAProfileLoop(int vianum, ProFileType *P, int event)
 {
-int BSY=P->BSYLine;
+    if (event<0) return;
 
-//    if (via[2].ProFile->DENLine!=0) return;
-
-    ProfileLoop(P,event);
+    int BSY=(!(P->BSYLine!=0));     // before
+    ProfileLoop(P,event); // ignore null events
+    int NBSY=(!(P->BSYLine!=0));    // after
 
     // IF BSY has changed, and CA1 IRQ's are enabled, then, see if we need to send an IRQ based on polarity in PCR CA1 bit
-    if (P->BSYLine !=BSY)
+    if (NBSY != BSY) // ignore when there's no transition.
     {
+      // PCR bit 0 :=0 IRQ on high to low transition BSY=(1 0)NBSY
+      // PCR bit 0 :=1 IRQ on low to high transition BSY=(0 1)=NBSY
+      // can use XOR below with BSY
+      if ( BSY ^ (via[vianum].via[PCR] & 1) )
+         {
+           if ((via[vianum].via[IFR] & VIA_IRQ_BIT_CA1)==0)
+                {ALERT_LOG(0,"CA1 IER is not enabled, not checking for IRQ");}
+           else {via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;
+                ALERT_LOG(0,"profile.c:Enabling BSY IRQ on CA1 for VIA #%d BSY transitioned to:%d%d PCR flag:%d",vianum,BSY,NBSY,(via[vianum].via[PCR] & 1));}
+           return;
+         }
+    }
+/*
       //- not sure which is right. 1=positive edge, 0=negative edge, I think the logical XOR
-      //if (P->BSYLine!=0) && ((via[vianum].via[PCR] & 1)!=0) )   via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;
+      //if ( (P->BSYLine!=0) && ((via[vianum].via[PCR] & 1)!=0) )   via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;  //2021.03.19 turned this back on.
 
         DEBUG_LOG(0,"oldbsy:%d newbsy:%d PCR_bit0:%d   tag:profile.c",BSY,P->BSYLine,via[vianum].via[PCR]);
 
@@ -213,8 +226,7 @@ int BSY=P->BSYLine;
                               (via[vianum].via[PCR] & 1), pc24);
                 }
         // too bad we don't have a ^^ operator like we do && and || - logical XOR would be nice here.
-
-    }
+*/
 }
 
 
@@ -2386,7 +2398,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
 void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 {
 
-    via[1].active=1;                        // these are always active as they're on the
+    via[1].active=1;                    // these are always active as they're on the
     V->active=1;                        // motherboard of the machine...
 
     DEBUG_LOG(0,"VIA:%d writing %02x to register %d (%s) @%08x", V->vianum,xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );

@@ -21,6 +21,32 @@ uint32 save   = 0;
 
 uint8 sec[512];
 
+/*
+526 is one of the two.
+
+this is why I didn't find the 2nd one:
+boot disk a:
+Sec 613:(0x0265)   Used Block Part of file freeblocks-0000:"freeblocks-0000"
+01f0: 0c 0b 0a 09 08 07 06 05 . 04 03 02 01 00 00 09 c5   |  ,+*)('&%$#"!  )E
+                                            ^^^^^^^^^^^^
+
+sec 613, a-start 0x1fc
+sec 620  b-size .. f-size starting at offset 0.
+
+Sec 620:(0x026c)   Used Block Part of file freeblocks-0000:"freeblocks-0000"
+-----------------------------------------------------------------------------
+0000: 00 00 42 3b 00 00 00 65 . 00 00 09 60 00 00 09 c5   |    B;   e  )`  )E
+0010: 00 00 1c 3b 00 00 26 00 . 00 00 26 00 00 00 00 00   |    <;  &   &
+0020: 00 00 00 00 00 00 00 00 . 00 00 1c 00 00 00 1c 00   |            <   <
+0030: 00 00 09 c0 00 00 00 65 . 00 00 4b 9b 00 00 00 00   |    )@   e  K;
+0040: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+0050: 00 00 00 00 00 00 00 00 . 00 00 00 00 00 00 00 00   |
+0060: 00 03 0b ce 00 00 00 00 . 00 00 00 00 00 00 00 00   |   #+N
+0070: 00 02 4e 54 41 53 53 45 . 52 54 49 4f 4e 20 28 25   |   "NTASSERTION (%
+
+this 2nd one is in sunix! 613, 620.
+
+*/
 
 void set_to_size(uint32 disk)
 {
@@ -121,9 +147,51 @@ void writepart(DC42ImageType *F, uint8 *fsec) {
      if (save==0xfffffffe) {
         int i=dc42_write_sector_data(F,526,fsec); // write the sector back to the image
         if (i) {fprintf(stderr,"\n\nError writing block data 526 to dc42 because %s\n",F->errormsg); dc42_close_image(F); exit(1); }
-        fprintf(stderr,"Wrote changes to /unix uniplus kernel.\n");
+
+        // sunix kernel changes - sec 613, a-start 0x1fc,  sec 620  b-size .. f-size starting at offset 0.
+        {
+           uint8 *vsec, sec[512]; 
+           vsec=dc42_read_sector_data(F,613);  if (!vsec) {fprintf(stderr,"\n\nError reading block 613 to dc42 because %s\n",F->errormsg); dc42_close_image(F); exit(1); }
+           memcpy(sec,vsec,512);
+
+               sec[0x1fc]=(astart & 0xff000000)>>24;  sec[0x1fd]=(astart & 0x00ff0000)>>16; sec[0x1fe]=(astart & 0x0000ff00)>>8; sec[0x1ff]=(astart & 0x000000ff);
+           
+           i=dc42_write_sector_data(F,613,fsec);if (i)    {fprintf(stderr,"\n\nError writing block 613 to dc42 because %s\n",F->errormsg); dc42_close_image(F); exit(1); }
+
+           vsec=dc42_read_sector_data(F,620);  if (!vsec) {fprintf(stderr,"\n\nError reading block 620 to dc42 because %s\n",F->errormsg); dc42_close_image(F); exit(1); }
+           memcpy(sec,vsec,512);
+
+               sec[0x000]=(a_size & 0xff000000)>>24;  sec[0x001]=(a_size & 0x00ff0000)>>16; sec[0x002]=(a_size & 0x0000ff00)>>8; sec[0x003]=(a_size & 0x000000ff);
+
+               sec[0x004]=(bstart & 0xff000000)>>24;  sec[0x005]=(bstart & 0x00ff0000)>>16; sec[0x006]=(bstart & 0x0000ff00)>>8; sec[0x007]=(bstart & 0x000000ff);
+               sec[0x008]=(b_size & 0xff000000)>>24;  sec[0x009]=(b_size & 0x00ff0000)>>16; sec[0x00a]=(b_size & 0x0000ff00)>>8; sec[0x00b]=(b_size & 0x000000ff);
+
+               sec[0x00c]=(cstart & 0xff000000)>>24;  sec[0x00d]=(cstart & 0x00ff0000)>>16; sec[0x00e]=(cstart & 0x0000ff00)>>8; sec[0x00f]=(cstart & 0x000000ff);
+               sec[0x010]=(c_size & 0xff000000)>>24;  sec[0x011]=(c_size & 0x00ff0000)>>16; sec[0x012]=(c_size & 0x0000ff00)>>8; sec[0x013]=(c_size & 0x000000ff);
+
+               sec[0x014]=(dstart & 0xff000000)>>24;  sec[0x015]=(dstart & 0x00ff0000)>>16; sec[0x016]=(dstart & 0x0000ff00)>>8; sec[0x017]=(dstart & 0x000000ff);
+               sec[0x018]=(d_size & 0xff000000)>>24;  sec[0x019]=(d_size & 0x00ff0000)>>16; sec[0x01a]=(d_size & 0x0000ff00)>>8; sec[0x01b]=(d_size & 0x000000ff);
+
+               sec[0x01c]=(estart & 0xff000000)>>24;  sec[0x01d]=(estart & 0x00ff0000)>>16; sec[0x01e]=(estart & 0x0000ff00)>>8; sec[0x01f]=(estart & 0x000000ff);
+               sec[0x020]=(e_size & 0xff000000)>>24;  sec[0x021]=(e_size & 0x00ff0000)>>16; sec[0x022]=(e_size & 0x0000ff00)>>8; sec[0x023]=(e_size & 0x000000ff);
+
+               sec[0x024]=(fstart & 0xff000000)>>24;  sec[0x025]=(fstart & 0x00ff0000)>>16; sec[0x026]=(fstart & 0x0000ff00)>>8; sec[0x027]=(fstart & 0x000000ff);
+               sec[0x028]=(f_size & 0xff000000)>>24;  sec[0x029]=(f_size & 0x00ff0000)>>16; sec[0x02a]=(f_size & 0x0000ff00)>>8; sec[0x02b]=(f_size & 0x000000ff);
+
+               sec[0x02c]=(gstart & 0xff000000)>>24;  sec[0x02d]=(gstart & 0x00ff0000)>>16; sec[0x02e]=(gstart & 0x0000ff00)>>8; sec[0x02f]=(gstart & 0x000000ff);
+               sec[0x030]=(g_size & 0xff000000)>>24;  sec[0x031]=(g_size & 0x00ff0000)>>16; sec[0x032]=(g_size & 0x0000ff00)>>8; sec[0x033]=(g_size & 0x000000ff);
+
+               sec[0x034]=(hstart & 0xff000000)>>24;  sec[0x035]=(hstart & 0x00ff0000)>>16; sec[0x036]=(hstart & 0x0000ff00)>>8; sec[0x037]=(hstart & 0x000000ff);
+               sec[0x038]=(h_size & 0xff000000)>>24;  sec[0x039]=(h_size & 0x00ff0000)>>16; sec[0x03a]=(h_size & 0x0000ff00)>>8; sec[0x03b]=(h_size & 0x000000ff);
+
+           i=dc42_write_sector_data(F,620,fsec);     if (i) {fprintf(stderr,"\n\nError writing block 620 to dc42 because %s\n",F->errormsg); dc42_close_image(F); exit(1); }
+        }
+        fprintf(stderr,"Wrote changes to /unix v1.4 and /sunix v1.1 uniplus kernels. mkfs/scripts most likely need updating too.\n");
      }
+
+
 }
+
 
 void start(DC42ImageType *F) 
 {

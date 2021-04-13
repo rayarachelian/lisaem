@@ -1140,9 +1140,6 @@ void generate(FILE *o, int topnibble)
                             OUT("  SR = (SR & ~0xFF) | srcdata;\n");
                             break;
                         case sz_word:
-                            //OUT("  if (!SFLAG)\n");
-                            //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                            //(iib->wordlen)*2);
 
                             OUT("  if (!SFLAG)\n");
                             fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
@@ -1204,8 +1201,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  }\n");
                                 OUT("  while (datamask) {\n");
                                 OUT("    dstaddr-= 4;\n");
-                                OUT("    storelong(dstaddr, ");
-                                OUT("DATAREG((7-movem_bit[datamask])));\n");
+                                OUT("    storelong(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
                                 ABORT_CHECK(o);
                                 OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
@@ -1249,7 +1245,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storelong(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
                                 ABORT_CHECK(o);
-                                OUT("    DEBUG_LOG(5,\"reg A%d.L written to (%08x)<-%08x  SRC:\",7-movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
+                                OUT("    DEBUG_LOG(5,\"reg A%d.L written to (%08x)<-%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 4;\n");
                                 OUT("  }\n");
@@ -1332,10 +1328,6 @@ void generate(FILE *o, int topnibble)
                     C_ABRT_CHK(o);
 
                     OUT("\n");
-                    //OUT("  if (!SFLAG)\n");
-                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                    //(iib->wordlen)*2);
-                    //OUT("\n");
                     OUT("  if (!SFLAG)\n");
                     fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
@@ -1349,10 +1341,6 @@ void generate(FILE *o, int topnibble)
                     generate_ea(o, iib, tp_src, 1);
                     OUT("  uint32 outdata;\n");
                     OUT("\n");
-                    //OUT("  if (!SFLAG)\n");
-                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                    //(iib->wordlen)*2);
-                    //OUT("\n");
                     OUT("  if (!SFLAG)\n");
                     fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
@@ -2167,16 +2155,27 @@ void generate(FILE *o, int topnibble)
                     OUT("  uint32 srcdata = ipc->src;\n");
                     generate_cc(o, iib);
                     OUT("\n");
+                    OUT("  uint32 oldpc=PC;\n");
+                    #ifdef DEBUG
+                    OUT("static uint32 sent;\n");
+                    #endif
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"Bcc: 0x%X\\n\", PC);\n", o);
-                    OUT("  if (cc)\n");
+                    OUT("  if (cc) {\n");
+
                     #ifdef PRESERVE_HIGH_BYTE
                     OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
                     #else
                     OUT("    {  PC = srcdata; cpu68k_clocks+=(10-8);}\n");
                     #endif
-                    OUT("  else\n");
-                    if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                   }\n", (iib->wordlen)*2);
+
+                    OUT("        if (oldpc==PC) {\n");
+                    #ifdef DEBUG
+              fprintf(o,"            if (sent!=PC) {sent=PC; fprintf(stderr,\"infinite loop detected at %%08x opcode length: %d bytes\\n\",PC);}\n", (iib->wordlen)*2 );
+                    #endif
+                    OUT("            cpu68k_clocks+=10000; }\n");    // move clocks forward to speed up next timer IRQ
+                    OUT("  } else\n");
+                    if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                       }\n", (iib->wordlen)*2);
                     else                        fprintf(o, "    {PC+= %d; cpu68k_clocks+=(12-8);}\n", (iib->wordlen)*2);
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"Bcc: ->0x%X\\n\", PC);\n", o);

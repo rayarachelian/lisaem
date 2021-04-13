@@ -41,11 +41,16 @@
 
 #include <errno.h>
 
-extern "C"  int cheat_ram_test;
-extern "C"  int sound_effects_on;
-extern "C"  int skins_on_next_run;
-extern "C" void save_configs(void);
-extern "C" uint8 floppy_iorom;
+// from vars.c
+extern "C" {
+  extern int cheat_ram_test;
+  extern int sound_effects_on;
+  extern int skins_on_next_run;
+  extern int hle;
+  extern int double_sided_floppy;
+  extern void save_configs(void);
+  extern uint8 floppy_iorom;
+};
 
 extern wxString get_config_filename(void);
 
@@ -374,8 +379,12 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  my_lisaconfig->mymaxlisaram=memsizes[cpurambox->GetSelection()];
 
  cheat_ram_test=cheats->GetValue() ?1:0;
- sound_effects_on = soundeffects->GetValue()?1:0;
 
+ hle=hle_cheats->GetValue() ?1:0;
+
+ sound_effects_on = soundeffects->GetValue()?1:0;
+ double_sided_floppy=doublesided->GetValue() ?1:0;
+ 
  int last_skins_on=skins_on_next_run;   // disable this to require restart.
  skins_on_next_run= skinson->GetValue()?1:0;
 
@@ -523,7 +532,7 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
 
    (void)new wxStaticText(panel,wxID_ANY,   t,      wxPoint( 10* HIDPISCALE,  y), wxSize(500* HIDPISCALE, 30* HIDPISCALE));    y+=ya/2; //y+=ya/2;
 
-    wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"), wxT("2 MB*") };
+    wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"), /* wxT("2 MB*") */ };
     cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 4, ramsize, 0, wxRA_SPECIFY_COLS,
        wxDefaultValidator, wxT("radioBox"));
     switch(my_lisaconfig->mymaxlisaram)
@@ -531,7 +540,7 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
      case 0x512  : cpurambox->SetSelection(0); break;
      case 0x1024 : cpurambox->SetSelection(1); break;
      case 0x1536:  cpurambox->SetSelection(2); break;
-     case 0x2048:  cpurambox->SetSelection(3); break;
+//     case 0x2048:  cpurambox->SetSelection(3); break;
      default:      cpurambox->SetSelection(2);
     }
 
@@ -579,6 +588,9 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
      default:    iorombox->SetSelection(0);
     }
 
+    doublesided = new wxCheckBox(panel, wxID_ANY, wxT("SunRem 2x Sided Sony"), wxPoint(320 * HIDPISCALE,y-(ya/2)    ), wxDefaultSize,wxCHK_2STATE);
+    doublesided->SetValue( (bool)(double_sided_floppy) );  // y+=ya/2;
+
     soundeffects = new wxCheckBox(panel, wxID_ANY, wxT("Sound Effects"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize,wxCHK_2STATE);
     soundeffects->SetValue( (bool)(sound_effects_on) );  y+=ya/2;
     int yz=y;
@@ -588,6 +600,9 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
 
     cheats = new wxCheckBox(panel, wxID_ANY, wxT("Boot ROM speedup hacks"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize,wxCHK_2STATE);
     cheats->SetValue( (bool)(cheat_ram_test) );
+
+    hle_cheats = new wxCheckBox(panel, wxID_ANY, wxT("HLE hard drive speedup hacks"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
+    hle_cheats->SetValue( (bool)(hle) );
 
     applypoint=wxPoint(420 * HIDPISCALE,  yz+ya);
     (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );

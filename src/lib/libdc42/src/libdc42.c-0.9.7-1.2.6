@@ -108,14 +108,14 @@ typedef struct                          // floppy type
   uint32 size;                          // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
                                         // used for mmap fn's
 
-  char   fname[FILENAME_MAX];           // File name of this disk image (needed for future use to re-create/re-open the image)
+  char   fname[FILENAME_MAX+2];         // File name of this disk image (needed for future use to re-create/re-open the image)
                                         // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
                                         // to set this to whatever is reasonable for your OS.  ie. 256 or 1024, etc.
                                         //
                                         // Also can be used to automatically copy a r/o master disk to a private r/w copy - not yet implemented
                                         // copy made on open.
 
-  char  mfname[FILENAME_MAX];           // r/o master filename path - not yet implemented.
+  char  mfname[FILENAME_MAX+2];         // r/o master filename path - not yet implemented.
 
 
   uint8  readonly;                      // 0 read/write image - writes are sync'ed to disk image and checksums recalculated on close
@@ -1772,7 +1772,7 @@ return 0;
 int dc42_auto_open(DC42ImageType *F, char *infilename, char *options)
 {
     int i=0;
-    char filename[FILENAME_MAX];
+    char filename[FILENAME_MAX+2];
 
     // we do it this way so that the macbinii extraction can change the file name
     // and get the filename passed to the next layer!
@@ -1783,7 +1783,7 @@ int dc42_auto_open(DC42ImageType *F, char *infilename, char *options)
 
     if (dart_is_valid_image(filename))
     {
-     char dc42filename[FILENAME_MAX];
+     char dc42filename[FILENAME_MAX+2];
 
      strncpy(dc42filename,filename,FILENAME_MAX);
      if   (strlen(dc42filename)<FILENAME_MAX-6)   strcat(dc42filename,".dc42");

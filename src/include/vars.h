@@ -663,34 +663,44 @@ ACGLOBAL(uint8,highest_bit_val_inv[],
 #define CYCLE_TIMER_VIA1_T1_TIMER           (1    )
 #define CYCLE_TIMER_VIA1_T2_TIMER           (1+128)
 #define CYCLE_TIMER_VIA1_SHIFTREG           (1+64 )
+#define CYCLE_TIMER_VIA1_CA1                (1+32 )      // for completion, not really used
 
 #define CYCLE_TIMER_VIA2_T1_TIMER           (2    )
 #define CYCLE_TIMER_VIA2_T2_TIMER           (2+128)
 #define CYCLE_TIMER_VIA2_SHIFTREG           (2+64 )
+#define CYCLE_TIMER_VIA2_CA1                (2+32 )     // BSY
 
 #define CYCLE_TIMER_VIA3_T1_TIMER           (3    )
 #define CYCLE_TIMER_VIA3_T2_TIMER           (3+128)
 #define CYCLE_TIMER_VIA3_SHIFTREG           (3+64 )
+#define CYCLE_TIMER_VIA3_CA1                (3+32 )     // BSY
 
 #define CYCLE_TIMER_VIA4_T1_TIMER           (4    )
 #define CYCLE_TIMER_VIA4_T2_TIMER           (4+128)
 #define CYCLE_TIMER_VIA4_SHIFTREG           (4+64 )
+#define CYCLE_TIMER_VIA4_CA1                (4+32 )     // BSY
 
 #define CYCLE_TIMER_VIA5_T1_TIMER           (5    )
 #define CYCLE_TIMER_VIA5_T2_TIMER           (5+128)
 #define CYCLE_TIMER_VIA5_SHIFTREG           (5+64 )
+#define CYCLE_TIMER_VIA5_CA1                (5+32 )     // BSY
+
 
 #define CYCLE_TIMER_VIA6_T1_TIMER           (6    )
 #define CYCLE_TIMER_VIA6_T2_TIMER           (6+128)
 #define CYCLE_TIMER_VIA6_SHIFTREG           (6+64 )
+#define CYCLE_TIMER_VIA6_CA1                (6+32 )     // BSY
 
 #define CYCLE_TIMER_VIA7_T1_TIMER           (7    )
 #define CYCLE_TIMER_VIA7_T2_TIMER           (7+128)
 #define CYCLE_TIMER_VIA7_SHIFTREG           (7+64 )
+#define CYCLE_TIMER_VIA7_CA1                (7+32 )     // BSY
 
 #define CYCLE_TIMER_VIA8_T1_TIMER           (8    )
 #define CYCLE_TIMER_VIA8_T2_TIMER           (8+128)
 #define CYCLE_TIMER_VIA8_SHIFTREG           (8+64 )
+#define CYCLE_TIMER_VIA8_CA1                (8+32 )     // BSY
+
 
 #define CYCLE_TIMER_VERTICAL_RETRACE        (11   )
 #define CYCLE_TIMER_COPS_MOUSE_IRQ          (12   )
@@ -712,7 +722,7 @@ ACGLOBAL(uint8,highest_bit_val_inv[],
 
 ///////////////////////////////////////////////// Type definitions /////////////////////////////////////////////////
 //
-// 64 bit values might not be available on all host systems.  They seem to be define on modern ones, although I've
+// 64 bit values might not be available on all host systems.  They seem to be defined on modern ones, although I've
 // noticed buggy/limited support for them when using shift operations.  However, as long as addition/substraction
 // and multiplication works, and they're built in to your CPU, they can be used to gain an advantage with the timer
 // code.  int32's can also be used by the timer code, however they will cause a slowdown every 5 minutes of guest
@@ -758,7 +768,13 @@ GLOBAL(uint8,*lisaram,NULL);                 // pointer to Lisa RAM
 // this enables a hack that tricks the lisa into skipping the full ram test, thus speeding up
 // the boot process - this sets a PRAM variable saying RAM test is done.
 GLOBAL(int,cheat_ram_test,1);  // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
+DECLARE(int,hle);
 GLOBAL(int,romless,0);
+GLOBAL(int,uniplus_hacks,1);        // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
+GLOBAL(int,uniplus_loader_patch,1); // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
+GLOBAL(int,uniplus_sunix_patch,1);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+GLOBAL(uint32,rom_profile_read_entry,0); // ROM entry to profile read block
+GLOBAL(int,double_sided_floppy,0);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 
 // other globally saved defaults
 GLOBAL(int,sound_effects_on,1);
@@ -794,7 +810,7 @@ typedef struct
 
 typedef struct
 {
-    int8   Command;                      // what command is the profile doing:
+    int8    Command;                     // what command is the profile doing:
                                          // -1=disabled, -2=idle, 1=read, 2=write, 3=write verify
                                          //
     uint8   StateMachineStep;            // what step of Command is the state machine of this profile in?
@@ -935,15 +951,16 @@ GLOBAL(int,lisa_vid_size_y,364);
 GLOBAL(int,lisa_vid_size_xbytes,90);
 GLOBAL(int,has_lisa_xl_screenmod,0);
 
-// used by mouse routines to detect mouse acceleration undo strategy
-#define LISA_ROM_RUNNING      0
-#define LISA_OFFICE_RUNNING   1
-#define LISA_TEST_RUNNING     2
-#define LISA_MACWORKS_RUNNING 3
-#define LISA_MONITOR_RUNNING  4
-#define LISA_XENIX_RUNNING    5
-#define LISA_UNIPLUS_RUNNING  6
-#define UNKNOWN_OS_RUNNING    100
+// used by mouse routines to detect mouse acceleration undo strategy and other stuff
+#define LISA_ROM_RUNNING              0
+#define LISA_OFFICE_RUNNING           1
+#define LISA_TEST_RUNNING             2
+#define LISA_MACWORKS_RUNNING         3
+#define LISA_MONITOR_RUNNING          4
+#define LISA_XENIX_RUNNING            5
+#define LISA_UNIPLUS_RUNNING          6
+#define LISA_UNIPLUS_SUNIX_RUNNING    7
+#define UNKNOWN_OS_RUNNING          100
 
 GLOBAL(int,running_lisa_os,LISA_ROM_RUNNING);
 int check_running_lisa_os(void);
@@ -988,6 +1005,7 @@ GLOBAL(uint8,lisa_alarm_power,0);
 GLOBAL(uint8,lisa_clock_on,1);
 DECLARE(uint8,eparity[256]);
 DECLARE(uint8,lisa_clock_set[16]);
+
 
 // Instruction Parameter Cache
 typedef struct _t_ipc {
@@ -1285,6 +1303,7 @@ GLOBAL(XTIMER,tenth_sec_cycles,TENTH_OF_A_SECOND);      // 10th of a second cycl
 GLOBAL(XTIMER,z8530_event,-1);
 GLOBAL(XTIMER,cops_mouse,(COPS_IRQ_TIMER_FACTOR*4));
 
+DECLARE(int,irqs[7]); // flagged IRQs to fire
 
 
 #define KBCOPSCYCLES 6350
@@ -1820,9 +1839,6 @@ extern int8 IRQRingBufferAdd(uint8 irql, uint32 address);
 extern uint8 IRQRingGet(void);
 extern void init_IRQ(void);
 #endif
-
-
-
 
 
 

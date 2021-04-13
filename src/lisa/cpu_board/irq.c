@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -432,7 +432,7 @@ void flag_via_t2_irq(int i)
        V->via[IFR] |= (VIA_IRQ_BIT_T2 | VIA_IRQ_BIT_SET_CLR_ANY); //  Set the IRQ flag for the VIA
 
        DEBUG_LOG(0,"T2 Timer VIA#%d IRQ:%d queued",V->vianum,V->irqnum);
-       reg68k_external_autovector(V->irqnum);   // fire interrupt
+       //reg68k_external_autovector(V->irqnum);   // fire interrupt  //2021.03.21 moved to irq loop
 
    } /////////////////////////////////// end of timer 2 ///////////////////////////////////////////////////////
 
@@ -455,7 +455,8 @@ void flag_via_t1_irq(int i)
     if (V->via[IER] &   VIA_IRQ_BIT_T1)
     {   V->via[IFR] |= (VIA_IRQ_BIT_T1 | VIA_IRQ_BIT_SET_CLR_ANY);  // any bit only set when IRQ is fired.
         DEBUG_LOG(0,"T1 Timer Via#%d IRQ:%d queued.",V->vianum,V->irqnum);
-        reg68k_external_autovector(V->irqnum);
+        //reg68k_external_autovector(V->irqnum);   // fire interrupt  //2021.03.21 moved to irq loop
+
     }
     V->t1_fired++;
     DEBUG_LOG(0,"VIA %d T1 Timer expired at clock:%016llx was initialized at clock %016llx, ran for:%016llx clock cycles latch was:%04x rate:%ld",
@@ -595,8 +596,7 @@ void get_next_timer_event(void)
               else  flag_via_t1_irq(i); // cpu68k_clocks_stop=cpu68k_clocks+175; next_expired_timer=i;} }      // oops! it expired, but we missed it!
           }
 
-
-
+         if (!!(via[i].via[IER]&via[i].via[IFR])) reg68k_external_autovector(via[i].irqnum);   // 2021.03.21 fire interrupt if IFR set to enabled bits
        }
 
     // non-VIA timers - if they're due in this cycle, then see if they're smaller than the current min

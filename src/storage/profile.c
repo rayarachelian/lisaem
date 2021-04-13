@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2021.03.06                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -645,15 +645,19 @@ char *profile_event_names[5]=
 // same as above, but disable pre-entry delay
 #define SET_PROFILE_LOOP_NO_PREDELAY(x) {P->alarm_len_e=0;   P->clock_e=cpu68k_clocks + (x);           }
 
-#define CHECK_PROFILE_LOOP_TIMEOUT      {if (P->clock_e<=cpu68k_clocks)                  \
-                                            {                                            \
- 	                                         P->StateMachineStep=IDLE_STATE;             \
-                                             SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);\
-                                             P->last_cmd=1;                              \
-                                             return;}                                    \
+#define CHECK_PROFILE_LOOP_TIMEOUT      {if (P->clock_e<=cpu68k_clocks)                                      \
+                                            {                                                                \
+                                             if (P->StateMachineStep==GET_CMDBLK_STATE && !P->BSYLine)       \
+                                                {P->BSYLine=2;                                               \
+                                                ALERT_LOG(0,"force State:4b at timeout");     }              \
+                                             else if (P->StateMachineStep!=IDLE_STATE) {                     \
+                                                 ALERT_LOG(0,"ZZZZZZZ Timeout, back to state 0 ZZZZZZZZZZ"); \
+ 	                                             P->StateMachineStep=IDLE_STATE;                             \
+                                                 SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);                \
+                                                 P->last_cmd=1;                                              \
+                                                 return;    }                                                \
+                                            }                                                                \
                                         }
-
-//#define WAIT_FOR_PROFILE_LOOP_TIMEOUT   {if (P->clock_e >cpu68k_clocks) return;         }   // delete me not used
 
 
 // have we gone past x clk cycles since the last time the timeout was set?  useful for faking delays.
@@ -698,6 +702,23 @@ char *profile_event_names[5]=
 #define SEND_DATA_AND_TAGS_STATE   10    // send the status+data+tags back to the Lisa
 #define FINAL_FLIP_TO_IDLE_STATE   11    // short delay and return back to idle.
 
+char *profile_state_names[]={
+   /*  0 */ "Idle",
+   /*  1 */ "N/A",
+   /*  2 */ "WAIT_1st_0x55_STATE",
+   /*  3 */ "N/A-Delay-Before-CMD",
+   /*  4 */ "GET_CMDBLK_STATE",
+   /*  5 */ "WAIT_2nd_0x55_STATE",
+   /*  6 */ "PARSE_CMD_STATE",
+   /*  7 */ "ACCEPT_DATA_FOR_WRITE_STATE",
+   /*  8 */ "WAIT_3rd_0x55_STATE",
+   /*  9 */ "WRITE_BLOCK_STATE",
+   /* 10 */ "SEND_DATA_AND_TAGS_STATE",
+   /* 11 */ "FINAL_FLIP_TO_IDLE_STATE",
+   /* 12 */ "SEND_STATUS_BYTES_STATE"
+};
+
+
 
 void ProfileLoop(ProFileType *P, int event)
 {
@@ -708,25 +729,34 @@ void ProfileLoop(ProFileType *P, int event)
     if ( !P->DENLine && P->vianum==2) {DEBUG_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
     if ( !P->DENLine && P->vianum!=2) {ALERT_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
         
+#ifdef DEBUG
+if (!EVENT_WRITE_NUL)
+    ALERT_LOG(0,"ProFile access at PC:%d/%08x event:%d %s state:%d %s idxr,idxw: %d,%d bsy:%d cmd:%d rrw:%d",context,reg68k_pc,event,profile_event_names[event],
+          P->StateMachineStep,profile_state_names[P->StateMachineStep],P->indexread,P->indexwrite,
+          P->BSYLine,P->CMDLine,P->RRWLine);
+#endif
 
-/*
-6 bytes so far.
-1 @1/0001d766 - state machine high order state. this is 01, 02, or in the error state 03.
-1 @1/0001d767 - state machine low byte - this is also 06 which is the 2nd profile response for write 
-                this isn't the same a5 from the above code, need to find out how to get this address.
-4 @1/0001d768 - VIA2 address
-1 @1/0001d770 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
-1 @1/0001d771 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
-1 @1/0001d772 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
-1 @1/0001d773 - status.  byte 10-13 off (a5) is status bytes for the writes returned by the profile after the operation.
-4 @1/0001d774 - mentioned 2915097 1/0000f414 (2 0/2/0) : 0680 0001 d774             : .....t   :   92 : ADD.L      #$0001d774,D0  SRC:clk:000000007de90235 +12 clks
-              zero.l is written here.
-4 @1/0001d778 - unknown/unused.
+    // Patch UniPlus loader handshaking so it doesn't fail on profile handshaking as UniPlus does super timing specific checks.
+    if (uniplus_loader_patch) {
+       if (running_lisa_os==0 && ((reg68k_pc & 0xffffff00)==0x060000) && context==1)
+       {
+          if (lisa_rw_ram(0x0006281c)==0x66ea) {lisa_ww_ram(0x0006281c,0x4e71); ALERT_LOG(0,"*** UniPlus Loader handshake BNE  patched  ***");}
+          if (lisa_rw_ram(0x00062a52)==0x0000) {lisa_ww_ram(0x00062a52,0x0001); ALERT_LOG(0,"*** UniPlus Loader BSY delay wait patched ****");}
 
-*/
+          // disable serial number check on loader - incase it's from a BLU image
+          if (lisa_rl_ram(0x00060090)==0x2f3c0006 && lisa_rl_ram(0x00060094)==0x56c04eb9 && lisa_rl_ram(0x00060098)==0x00060438) {
+              lisa_wl_ram(0x00060090,0x42804287);    lisa_wl_ram(0x00060094,0x4E714E71);    lisa_wl_ram(0x00060098,0x4E714E71);
+             ALERT_LOG(0,"*** UniPlus Loader serial patched ****");
+          }
+          // uniplus serno check: sec 1 floppy or 13 profile/widget: 2f 3c 00 06 56 c0 4e b9 00 06 04 38 - JSR to SN check + push/pop
+          //                                                         42 80 42 87 4E 71 4E 71 4E 71 4E 71 (CLRL D0; CLRL D7; NOP 4x)
+          uniplus_loader_patch=0; // disable check now that we've applied the patch
+       }
+    }
+    else if (running_lisa_os!=0) uniplus_loader_patch=0; // if another OS is running disable this check
 
-
-    #ifdef DEBUG
+    #ifdef XXDEBUG
+    if (running_lisa_os==LISA_XENIX_RUNNING)
     {
             DEBUG_LOG(0,"----------------------------------------------------------------------");
             DEBUG_LOG(0,"Xenix ProFile State:         %04x",lisa_ram_safe_getword(1,0x0001d766) );
@@ -734,10 +764,11 @@ void ProfileLoop(ProFileType *P, int event)
             DEBUG_LOG(0,"Xenix ProFile status bytes:  %08x",lisa_ram_safe_getlong(1,0x0001d770) ); // 1d776+c=1D772 so c isn't the size of this.
             DEBUG_LOG(0,"Xenix ProFile unknown 1d774: %08x",lisa_ram_safe_getlong(1,0x0001d774) );
             DEBUG_LOG(0,"Xenix ProFile unknown 1d778: %08x",lisa_ram_safe_getlong(1,0x0001d778) );
-            if (debug_log_enabled) fdumpvia2(buglog);
-            DEBUG_LOG(0,"------------ State:%d PC:%d/%08x------------------------------------",P->StateMachineStep,context,pc24);
+            //if (debug_log_enabled) fdumpvia2(buglog);
+            DEBUG_LOG(0,"----------------------------------------------------------------------");
     }
     #endif
+
 
  switch (P->StateMachineStep)
  {
@@ -754,7 +785,7 @@ void ProfileLoop(ProFileType *P, int event)
          P->BSYLine=0;
          if (EVENT_WRITE_NUL) return;
 
-                             // not active.  If Lisa lowers CMD, we lower BSYLine and goto state 2
+        // not active.  If Lisa lowers CMD, in response we lower BSYLine and goto state 2
          if (P->CMDLine && P->last_cmd)          {
                                                 P->StateMachineStep=WAIT_1st_0x55_STATE;
                                                 SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);
@@ -827,8 +858,8 @@ void ProfileLoop(ProFileType *P, int event)
 //20201029//            P->BSYLine=0;
 //20201029//            return;
 //20201029//            }
-         #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
+         #ifdef DEBUG                         
+         if (!(EVENT_WRITE_NUL))   // don't fill up the log with useless shit when null event
 
          DEBUG_LOG(0,"State:2 - waiting for 55, last PA=%02x, last_a_accs:%d  - BSY is now %d",
                 P->VIA_PA,
@@ -870,26 +901,31 @@ void ProfileLoop(ProFileType *P, int event)
          return;
 
 
-
-
-
 case GET_CMDBLK_STATE:           // 4          // now copy command bytes into command buffer
          #ifdef DEBUG                          // don't fill up the log with useless shit
          if (!(EVENT_WRITE_NUL))
-
-         DEBUG_LOG(0,"State:4 - waiting for command");
+         DEBUG_LOG(0,"State:4 - waiting for command, event:%d",event);
          #endif
 		
+        // uniplus loader hax - weirdly this expects BSY to be down before it sends CMD!
+        if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) {
+            ALERT_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
+            SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
+            P->BSYLine=0; return;
+        }
+
          CHECK_PROFILE_LOOP_TIMEOUT;
          // wait a bit before flopping busy, but if Lisa sends a byte, accept it
-         if ( TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC)  && !(EVENT_WRITE_ORA) && running_lisa_os!=LISA_UNIPLUS_RUNNING) //was 1/100th
+         if (P->BSYLine!=2) {
+         if ( TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )  && !(EVENT_WRITE_ORA) ) //was 1/100th HUN_THOUSANDTH_OF_A_SEC 49152, 2021.03.23 add /100
             {
-                DEBUG_LOG(0,"State:4 - wasting 1/100,000th of a sec");
+                DEBUG_LOG(0,"State:4 - wasting 1/100,000th of a sec, BSYLine=0");
                 P->BSYLine=0;
                 return;
             }
 
-         P->BSYLine=1;
+            P->BSYLine=1; DEBUG_LOG(0,"State:4 BSYLine=1 signaled - IRQ should fire now.");
+         }
          if (EVENT_WRITE_NUL) return;
 
          // step 4a
@@ -897,6 +933,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          if (!(EVENT_WRITE_NUL))   DEBUG_LOG(0,"State4a: Waiting for event=2:%02x RRWline=1:%02x and !P->CMDLine:%02x",
                                    event,P->RRWLine,P->CMDLine);
          #endif
+
 
          if (EVENT_WRITE_ORA && !P->CMDLine)
                          {
@@ -909,7 +946,6 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
                              DEBUG_LOG(0,"Ignoring 2nd 0x55 write to avoid sync issues");
                              return;
                            }
-
 
                            P->DataBlock[P->indexwrite++]=P->VIA_PA;
 
@@ -925,7 +961,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
                             default: DEBUG_LOG(0,"Wrote ???? %02x into ProFile Data block index:%d",P->VIA_PA,P->indexwrite-1);
                            }
 
-                           if (P->indexwrite>542) P->indexwrite=4; // prevent overrun ?
+                           if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;} // prevent overrun ?
                            return;
                          }
 
@@ -996,52 +1032,40 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          P->BSYLine=1; //2006.05.09 was 0
          if (EVENT_WRITE_NUL) return;
          if (EVENT_WRITE_ORA) //  && P->last_a_accs && P->CMDLine && P->RRWLine)
-                                         {      DEBUG_LOG(0,"State:5: checking what we got:%02x==0x55",P->VIA_PA);
-                                               if (P->VIA_PA==0x55)   {
-                                                                       P->StateMachineStep=PARSE_CMD_STATE;
-                                                                       SET_PROFILE_LOOP_TIMEOUT(HALF_OF_A_SECOND);
-                                                                       PRO_STATUS_GOT55;
-
-                                                                       DEBUG_LOG(0,"State5: got 0x55 w00t!");
-                                                                      }
-
-                                                else
-
-                                                                      {
-                                                                       P->StateMachineStep=0; // possibly our old code
-                                                                       PRO_STATUS_NO55;
-                                                                       DEBUG_LOG(0,"State5: going into state 0 now. oh well.");
-                                                                      }
+            {      DEBUG_LOG(0,"State:5: checking what we got:%02x==0x55",P->VIA_PA);
+                  if (P->VIA_PA==0x55)   {
+                                          P->StateMachineStep=PARSE_CMD_STATE;
+                                          SET_PROFILE_LOOP_TIMEOUT(HALF_OF_A_SECOND);
+                               
+                                          DEBUG_LOG(0,"State5: got 0x55 w00t!");
                                          }
+                   else
+                                         {
+                                          P->StateMachineStep=0; // possibly our old code
+                                          PRO_STATUS_NO55;
+                                          DEBUG_LOG(0,"State5: going into state 0 now. oh well.");
+                                         }
+            }
 
          return;
 
     case PARSE_CMD_STATE:   //6 // now we execute the command after simulating a busy profile
-         // play some profile sounds now?
-         CHECK_PROFILE_LOOP_TIMEOUT;
+         // insert sound play some profile seeking sounds now?
+         //CHECK_PROFILE_LOOP_TIMEOUT;
 
          if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC) )  // this block was disabled -200604025
               {
-
-                #ifdef DEBUG                          // don't fill up the log with useless shit
-                if (!(EVENT_WRITE_NUL))
-                 DEBUG_LOG(0,"State:6 - wasting cycles for a bit to simulate a busy profile (%d cycles)",PROFILE_WAIT_EXEC_CYCLE);
-                #endif
-
-                 return;
+                DEBUG_LOG(0,"State:6 - wasting cycles for a bit to simulate a busy profile (%d cycles)",PROFILE_WAIT_EXEC_CYCLE);
+                return;
               }
 
          PRO_STATUS_CLEAR;
 
-         #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
          DEBUG_LOG(0,"Done wasting cycles in step 6");
-         #endif
 
          P->indexread=0;
 
          blocknumber=(P->DataBlock[5]<<16) | (P->DataBlock[6]<< 8) |  (P->DataBlock[7]    ) ;
-
 
          P->BSYLine=1; //20060425-moved from step 5, and re-enabled above delay to slow down
          if (EVENT_WRITE_NUL) return;
@@ -1253,7 +1277,6 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          P->indexwrite=4;
          P->indexread=0;
-
          P->DataBlock[0]=0;
          P->DataBlock[1]=0;
          P->DataBlock[2]=0;

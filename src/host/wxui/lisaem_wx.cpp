@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      RC4 2020.10.15                   *
+*              The Lisa Emulator Project  V1.2.7      RC4 2021.03.26                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) MCMXCVIII, MMXX Ray A. Arachelian                     *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                     *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -1664,7 +1664,7 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     float vidhz=(float)screen_paint_update;
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="KHz";}
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="MHz";}
-  
+
     text.Printf(_T("CPU: %1.2f%s want:%1.2fMHz tick:%d, video refresh:%1.2f%s %c contrast:%02x %s %x%x:%x%x:%x%x.%x @%d/%08x clk_cycles:%lld"),
                 mhzactual,c,throttle,emulation_tick,
                 vidhz,s,  (videoramdirty ? 'd':' '),
@@ -1688,8 +1688,7 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     my_lisawin->mousemoved=0;
     screen_paint_update=0;                              // reset statistics counters
     onidle_calls=0;
-    idleentry--;                                       // eat warning when debug version isn't used.
-
+    idleentry--;                                        // eat warning when debug version isn't used.
 
     // if we're in the ROM, and within the first 3 seconds of emulation, and have had command line options, 
     // send Apple-2 or Apple 3 to start from floppy/Widget/Profile
@@ -1714,7 +1713,6 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
 
     }
 
-
   #ifdef DEBUGSCREENSHOTS  // do ram, mmu, and screenshot dumps every 15s
     if  ( (!!buglog) && abs(lisa_clock.secs_l-last_lisa_clock_secs)>15 )
         {
@@ -1722,7 +1720,7 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
            last_lisa_clock_secs=lisa_clock.secs_l;
         }
   #endif
-
+    
 }
 
 
@@ -1915,6 +1913,7 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
                 static int ctr;
                 Update_Status(elapsed,idleentry);
                 if ((ctr++)>9) {iw_check_finish_job(); ctr=0;}
+                
             }
 
         if  (paste_to_keyboard && idx_paste_to_kb>-1 && (copsqueuelen>=0 && copsqueuelen<MAXCOPSQUEUE-8) )
@@ -1934,6 +1933,7 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
         lastcrtrefresh=0;
       }
 
+  
   barrier=0;
 }
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3242,6 +3242,8 @@ void LisaWin::LogKeyEvent(const wxChar* WXUNUSED(name), wxKeyEvent& event, int k
         case WXK_ALT:                lisakey=KEYCODE_COMMAND;         break; 
         case WXK_CONTROL:            lisakey=KEYCODE_LOPTION;         break;
 #endif
+        case 3:                      lisakey=KEYCODE_C;               break;  // control-c was handled differently for some reason.
+
         default: ALERT_LOG(0,"Uncaught Keycode:%ld",(long)keycode);   break;
 
 //Keycode:309 - linux windows-menu-key
@@ -5412,7 +5414,10 @@ extern "C" void lisa_rebooted(void)
 {
   setstatusbar("The Lisa is rebooting.");
   my_lisaconfig->Save(pConfig, floppy_ram);         // save PRAM, configuration
+
+  free_all_ipcts();
   unvars();                                         // reset global vars and all
+
   on_startup_actions_done=0;
 // can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
 #if defined(__WXMSW__)    && defined(DEBUG) 
@@ -7575,6 +7580,9 @@ void connect_device_to_via(int v, wxString device, wxString *file)
             free(via[v].ProFile);
             via[v].ProFile = NULL;
             ALERT_LOG(0, "Couldn't get profile because: %d",i);
+            #ifdef DEBUG
+            sleep(3600*10);
+            #endif
         } else {
             via[v].ProFile->vianum=v;
             ProfileReset(via[v].ProFile);
@@ -7909,8 +7917,8 @@ int initialize_all_subsystems(void)
     { // these are totally wrong.
        case 512  : maxlisaram=0x100000;  minlisaram=0x080000;  break;     // single 512KB board in slot 1
        case 1024 : maxlisaram=0x180000;  minlisaram=0x080000;  break;     // two 512KB boards in slot1, slot 2
-       case 1536 : maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
-       case 2048 : maxlisaram=0x1e0000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
+       case 1536 : maxlisaram=0x200000;  minlisaram=0x080000;  break;     // meh, this causes crashes // 512KB board in slot1, 1024KB board in slot 2
+       //case 2048 : maxlisaram=0x140000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
 
        default:    maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
 
@@ -8123,7 +8131,7 @@ int initialize_all_subsystems(void)
       {
           ALERT_LOG(0,"Connecting Dual Parallel Port Cards.");
   
-        if  (my_lisaconfig->slot1.IsSameAs(_T("dualparallel"),false) )
+        if  (my_lisaconfig->slot1.IsSameAs(_T("dualparallel"),false) || my_lisaconfig->slot1.IsSameAs(_T("Dual Parallel"),false))
             {
               ALERT_LOG(0,"Connecting slot 1");
               connect_2x_parallel_to_slot(0);
@@ -8131,7 +8139,7 @@ int initialize_all_subsystems(void)
               connect_device_to_via(4, my_lisaconfig->s1l, &my_lisaconfig->s1lp);
             }
   
-        if  (my_lisaconfig->slot2.IsSameAs(_T("dualparallel"),false) )
+        if  (my_lisaconfig->slot2.IsSameAs(_T("dualparallel"),false) || my_lisaconfig->slot2.IsSameAs(_T("Dual Parallel"),false))
             {
               ALERT_LOG(0,"Connecting slot 2");
               connect_2x_parallel_to_slot(1);
@@ -8139,8 +8147,7 @@ int initialize_all_subsystems(void)
               connect_device_to_via(6, my_lisaconfig->s2l, &my_lisaconfig->s2lp);
             }
   
-  
-        if  (my_lisaconfig->slot3.IsSameAs(_T("dualparallel"),false))
+        if  (my_lisaconfig->slot3.IsSameAs(_T("dualparallel"),false) || my_lisaconfig->slot3.IsSameAs(_T("Dual Parallel"),false))
             {
               ALERT_LOG(0,"Connecting slot 3");
               connect_2x_parallel_to_slot(2);
@@ -8148,7 +8155,8 @@ int initialize_all_subsystems(void)
               connect_device_to_via(8, my_lisaconfig->s3l, &my_lisaconfig->s3lp);
             }
       }
-
+      else
+            ALERT_LOG(0,"Could not load dual parallel ROM: (%s)",tmp);
 
      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -8681,6 +8689,7 @@ char *get_welcome_fortune(void)
   "That one bright pixel on your otherwise dead CRT",
   "Apply nylon screen cover to CRT now!",
   "Of course I've been up all night! Not because of caffeine, it was insomina, I couldn't stop thinking about LisaEm! I need a Nap! ZZzz! LisaEm TIME!",
+  "Of course I've been up all night! Not because of caffeine, it was insomnia. I couldn't stop thinking about coffee! I need a Nap! ZZzzz! Coffee TIME!",
   "Clean steel mouse ball now!",
   "Replace keyboard foam disks now to avoid failure!",
   "Shut up and emulate me a Lisa!",
@@ -8751,12 +8760,28 @@ char *get_welcome_fortune(void)
   "Come on loxy lady",
   "And so the endless circle of life, comes to an end.",
   "Oh my, yes",
-  "Let's go already",
+  "Let's go already!",
   "Freedom, Freedom, Freedom, Oy!",
   "Cashier does not have the keys to a successful emulation",
   "That's IT! I'm getting a hundred cups of coffee... Starting now!",
   "It costs a little more, but it's worth it!",
   "001100 010010 011110 100001 101101 110011",
+  "Hey buddy, I'm from the same time as you, remember that song, safety dance? You know that dance wasn't as safe as they said it was...",
+  "They're scared of our raw power",
+  "Awesome! Awesome to the Max!",
+  "I nominate... that guy, not just because he has a suit, but because he knows about business, and has a tie",
+  "Second",
+  "Scruffy believes in this company",
+  "Hey! You ate my change!",
+  "Please welcome, our new chief executive officer, That Guy",
+  "Gutsy question, you're a shark",
+  "I am proud to be the sheppard of this herd of sharks, and I'll lead you to the top in this industry of (whishpers) Lisa Emulation? Oh god! Fantastic!",
+  "That's not a business plan, it's an escape plan",
+  "what fevered dream is this bids to tear this emulator in twain",
+  "No thanks, I make my own",
+  "We can't compete with Mom, they're big and evil, we're small and neutral",
+  "Walt! Hit the retaliate button!",
+  "Our enemies shall be eaten by squirrels",
 
   "Nobody exists on purpose, nobody belongs anywhere, every Lisa's going to break down, emulate LOS on LisaEm.",
 
@@ -8825,6 +8850,25 @@ char *get_welcome_fortune(void)
   "Get it all together. And put it in a dc42. All your bits. And if you gotta take it somewhere, take it somewhere, take it to the .image store and sell it, or put it in a .image museum, I don’t care what you do, you just get your dc42 images together!",
   "Morty, you want to answer a literal JSR to Emulation?",
   "Break the cycle, Morty. Rise above. Focus on emulation!",
+  "Oh you think this emulator makes you special, what, because someone once said 'Good Job' once when you were 10? That's actually really sad dad.",
+  "You've labeled these machines 'unproductive', but I have given them more purpose than ever. His tongue is C#, but it cannot compile. The great roughing of it is at hand.",
+  "Let's show mom and dad what video games and emulation are all about",
+  "What's going on? He may have manifested some sort of Lisa Emulator? He can do that?",
+  "Yes, I'd like very much to visit the memory of you inventing the Lisa emulator",
+  "What is this place, and what's with hunger games Lisa?",
+  "I heard sci-fi noises? Did you make a Lisa-related breakthrough?",
+  "Is it cool if I use the level nine bathroom? What's the access code again?",
+   "No, I don't want to see your pog collection",
+  "Hey whoa, whoa, what are you doing in here? This area's for emulating a Lisa using only buttons and menus.",
+  "What's this supposed to accomplish, we have infinite disks, you're trying to use Windows 2.0 bucks at a Lisa's Palace",
+  "That is how you get level 9 access without a password!",
+  "Good pitches kids, I'm almost proud. But watch as Ray topples an empire by changing a 1 to a 0.",
+  "Gentlemen, gentlemen, there's a solution here you're not seeing...",
+  "I'm driven by finding that McLisa dipping sauce Morty! Nine more seasons or 97 more years Morty! I want that McLisa 2.0!",
+  "You kids did real good here. Emulating and playing games is the best!",
+  "We've got an over supply of programmers putting a strain on the emulation drive.",
+  "These controls... just like my Lisa's controls.. ",
+
   "What about the reality where the Lisa won and the Mac lost? Just don't think about it Morty!",
   "I'm better than your actual Lisa, I'm a version of your Lisa you can trust when she says 'I run everywhere'. Nobody emulates on purpose, nobody belongs in hardware, everbody's gonna die, come emulate with me.",
   "Lisa's seen some rough years, Morty, you don't agree to get an emulation built if your OS is doing great.",
@@ -8845,6 +8889,7 @@ char *get_welcome_fortune(void)
   "Oh my gosh, the square root of soon is never!",
   "There's no platypus controlling me",
   "Hey! Where's Jerry?",
+
   "There's a 104 days of CoVID19 isolation, and work just comes to end it, so the annual problem for our generation is how to emulate a Lisa",
   "You want us to be called L.O.V.E.M.U.F.F.I.N.? Yes, it stands for Lisas On Virtually Emulated Machines Under Fir Forests In Niagra!",
   "There you are Perry",
@@ -8873,6 +8918,8 @@ char *get_welcome_fortune(void)
   "He may have emulation madness, but that's no excuse for emulation rudeness!",
   "That just raises further exceptions!",
   "Fry! What in Sega Genesis happened to you?",
+  "Leela: \"Ray, you can't just sit here in the dark listening to death metal and hacking on Lisaem.\" Ray:\"I could if you hadn't turned on the lights and shut off the stereo.\"",
+  "Mom: \"Holy crap that emulator's itchy!\"",
   "Arrrr, the laws of emulation be a harsh mistress",
   "Regular Matter, Dark Matter, Wassa Matter",
   "Employees must wipe hands on pants",
@@ -8948,6 +8995,9 @@ char *get_welcome_fortune(void)
   "Ray, did you promise Morty a Lisa emulator?",
   "Dad, did you promise Morty a Lisa emulator? Aaaaaargh!",
   "Here's your tome of Lisa spells and lore, that'll have everything you need, enjoy your Lisa",
+
+  "... and if anything goes wrong, jump into the same vat of acid I do...",
+
 
   "First off, I always slay it, Lisa, Secondly, yes",
   "Ok, I'll bite, what's with the talking Lisa? I know that's a dragon, I'm talking about the talking Lisa in my bedroom",
@@ -9526,6 +9576,11 @@ char *get_welcome_fortune(void)
   "If you can overcome the fear, you'll find that you don't need your physical Lisa here.",
   "What isn't remembered never happened.",
 
+  "I solemnly swear that I am up to no good.",
+  "Mischief Managed!",
+
+  "Be water my friend, be water.",
+
   "He who rescues the past from the memory hole, subverts the corporation that controls the present, so he may regain control of the future",
   "Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.",
   "For a good time, type in: echo 0.0.0.0 ocsp.apple.com | sudo tee -a /etc/hosts",
@@ -9533,10 +9588,23 @@ char *get_welcome_fortune(void)
   "Not every cage is a prison, nor every loss eternal.",
   "8-4-1-9-4-7",
 
+  "Hello Lisa, It's Lisa Again!",
+  "Hindsight is always 7/7, But looking back, it's still a bit fuzzy",
+  "You Speak of mutually assured Lisa Emulation, Nice story, tell it to Reader's Digest",
+  "You can emulate, but never tame me",
+  "It gives me a migraine headache, running on Windows",
+  "Codestains on my hands and I don't know where I've been",
+  "If the 68000 inside my head won't take a day off, I'll be dead",
+  "Machinekind has got to know her limitations",
+  "And stay an inch or two out of booting distance",
+  "Oh, here I come again, whoa!",
+  "Sweating electrons",
+
   "Emulate different",
   "D5 AA 96",
   "SEE YOU SPACE COWBOY ...",
-  "It's the final countdown (to LisaEm 2.0!)"
+  "It's the final countdown (to LisaEm 2.0!)",
+
   "...in the immortal words of John Oliver, \"Fuck you 2020, get fucked!\" That's it, that's our emulator, we'll back with 2.0, please stay safe until then."
 };
 

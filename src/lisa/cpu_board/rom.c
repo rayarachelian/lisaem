@@ -149,9 +149,8 @@ void fixromchk(void)
     /* C ROM */ if (lisarom[0x3ffc]==0x02 && lisarom[0x3ffd]==0x11) ALERT_LOG(0,"C ROM 0x275:%02x",lisarom[0x0275]);
     
     
-    
     // don't touch any ROM except H
-    if (lisarom[0x3ffc] != 0x02 || lisarom[0x3ffd] != 'H')  return;
+    if (lisarom[0x3ffc] != 0x02 || lisarom[0x3ffd] != 'H') {ALERT_LOG(0,"ROM is not H-ROM, will not patch"); return;}
 
     if (cheat_ram_test)
     {
@@ -171,7 +170,31 @@ void fixromchk(void)
        /* Instead of jumping to BEGIN go to SETMMU. */
        lisarom[0x0006] = 0x02;
        lisarom[0x0007] = 0xc6;
+
+
+       // 0AD4| 203C 0013 12D0
+       lisarom[0x0ad7]=8; // 5 second delay -> 2s delay during boot process. this is used as a long beep, during booting, service mode display testing
     }
+
+
+    ALERT_LOG(0,"HLE is: %d",hle)
+    if (hle) {  
+               // patch the ROM entry at 090, and also the actual call inside the ROM, which can
+               // move around depending on the ROM version, because when booting from the ROM
+               // the ROM will call the actual address of PROREAD rather than go through the
+               // jump table entry at fe0090
+
+               lisarom[0x90]=0xf3; lisarom[0x91]=0x3d;
+
+               rom_profile_read_entry=(lisarom[0x92]<<8)+(lisarom[0x93])+0x92;
+
+               lisarom[rom_profile_read_entry+0]=0xf3;
+               lisarom[rom_profile_read_entry+1]=0x3d;
+               
+               rom_profile_read_entry|=0x00fe0000;
+
+               ALERT_LOG(0,"Applied HLE ProFile ROM patch to fe0090 and %08x",rom_profile_read_entry);
+             }
 
     /* Simulate all but the final add of the ROM checksum routine */
     uint16 d0;
@@ -179,7 +202,7 @@ void fixromchk(void)
 
     d0=0;                                    // CLR.L D0
     a0=0;                                    // LEA BASE,A0
-    a1=0x3ffe;                                // LEA LAST,A1
+    a1=0x3ffe;                               // LEA LAST,A1
 
     d0=chksum_a_rom_range(lisarom,a0,a1);
 

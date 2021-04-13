@@ -454,11 +454,11 @@ void set_keyboard_id(int32 id)
   if ( id>0xffff || id<-5) {cops_key_id=COPS_KEYID_US; return;}
   switch (id)
         {
-          case -1: cops_key_id=COPS_KEYID_US;     DEBUG_LOG(0,"US"); break;
-          case -2: cops_key_id=COPS_KEYID_UK;     DEBUG_LOG(0,"UK"); ;break;
-          case -3: cops_key_id=COPS_KEYID_GERMAN; DEBUG_LOG(0,"DE"); break;
-          case -4: cops_key_id=COPS_KEYID_FRENCH; DEBUG_LOG(0,"FR"); break;
-          default: cops_key_id=(id & 0xffff);     DEBUG_LOG(0,"Other");
+          case -1: cops_key_id=COPS_KEYID_US;     ALERT_LOG(0,"US"); break;
+          case -2: cops_key_id=COPS_KEYID_UK;     ALERT_LOG(0,"UK"); break;
+          case -3: cops_key_id=COPS_KEYID_GERMAN; ALERT_LOG(0,"DE"); break;
+          case -4: cops_key_id=COPS_KEYID_FRENCH; ALERT_LOG(0,"FR"); break;
+          default: cops_key_id=(id & 0xffff);     ALERT_LOG(0,"Other");
         }
 }
 
@@ -470,10 +470,13 @@ void cops_keyboard_id(void)
     uint8 x;
     DEBUG_LOG(0,"SRC: COPS: reporting keyboard ID:%04x len:%d",cops_key_id,copsqueuelen);
     if    (keyboard_keytronix) x=(cops_key_id>>8) & 0xff;        // keyboard id (allow user to change keyboards later)
-    else  x=(uint8)(cops_key_id & 0xff);                                // keyboard id (allow user to change keyboards later)
+    else  x=(uint8)(cops_key_id & 0xff);                         // keyboard id (allow user to change keyboards later)
 
-    SEND_RESETCOPS_AND_CODE(x);
-    DEBUG_LOG(0,"len:%d",copsqueuelen);
+
+    if ((reg68k_pc & 0x00ff0000)==0x00fe0000) {SEND_RESETCOPS_AND_CODE(x);
+        ALERT_LOG(0,"Sending keyboard id: %02x",x)
+        DEBUG_LOG(0,"len:%d",copsqueuelen);
+    }
 }
 
 
@@ -720,7 +723,7 @@ void via1_ora(uint8 data,uint8 regnum)
             if ( copsqueuelen+8>MAXCOPSQUEUE) {fprintf(buglog,"\n\n\n\n     COPS OVERFLOW! CAN'T SET DATE!\n\n\n"); }
             if ( copsqueuelen+7<MAXCOPSQUEUE)  // if the queue isn't full that is...
       			{
-              DEBUG_LOG(0,"getting clock.\n");
+              ALERT_LOG(0,"sending clock.\n");
 
 
 

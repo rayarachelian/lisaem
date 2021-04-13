@@ -2,8 +2,8 @@
 #define __BUILTBY_H__
 
 
-#define BUILTBY "Compiled on Wed 03 Mar 2021 07:01:40 PM EST by ray@helios  (#50~20.04.1-Ubuntu SMP Wed Feb 10 21:07:30 UTC 2021)  \n options:  -g -DDEBUG -g -DDEBUG -DTRACE  -g -DDEBUG -g -DDEBUG -DTRACE   \nusing:gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0"
-#define VERSION "1.2.7-RC4_2020.12.25"
+#define BUILTBY "Compiled on Mon 12 Apr 2021 07:40:09 PM EDT by ray@helios  (#54~20.04.1-Ubuntu SMP Sat Mar 20 13:40:25 UTC 2021)  \n options:     \nusing:gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0"
+#define VERSION "1.2.7-PRE-RC4-UNSTABLE_2021.03.23"
 #define LICENSE "Apple Lisa Emulator (and supporting software, documentation, etc.)\n"      \
 "Copyright (C) MMVIXX by Ray A. Arachelian, All Rights Reserved.\n"      \
 "see: http://lisaem.sunder.net for updates and other information.\n"      \

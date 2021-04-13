@@ -3,7 +3,7 @@
 *              The Lisa Emulator Project  V1.2.7      RC2 2020.06.21                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -153,30 +153,30 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status);
 
 
 #define GOBYTE        (0) //gobyte     1
-#define COMMAND       (0) //gobyte     1                // synonym
+#define COMMAND       (0) //gobyte     1              // synonym
 #define FUNCTION      (1) //function   3
-#define DRIVE         (2) //drive      5               // 00=lower, 80=upper
+#define DRIVE         (2) //drive      5              // 00=lower, 80=upper
 #define SIDE          (3) //side       7
 #define SECTOR        (4) //sector     9
 #define TRACK         (5) //track      b
-#define SPEED         (6)                  // rotation speed 0=normal, DA is fast
-#define CONFIRM       (7)                  // format confirm
+#define SPEED         (6)                             // rotation speed 0=normal, DA is fast
+#define CONFIRM       (7)                             // format confirm
 #define STATUS        (8)
-#define INTERLEAVE    (9)                  // sector interleave
-#define TYPE          (0xA)                // drive type id 0-twig, 1-sony, 2-double sony
+#define INTERLEAVE    (9)                             // sector interleave
+#define TYPE          (0xA)                           // drive type id 0-twig, 1-sony, 2-double sony
      // $FCC015 - DRVTYPE...
      #define  TWIGGY_TYPE 0
      #define SONY400_TYPE 1
      #define SONY800_TYPE 2
 
-#define STST          (0xB)                // rom controller self test status
-#define ROMVER        (0x18)               // ROM Version
+#define STST          (0xB)                           // rom controller self test status
+#define ROMVER        (0x18)                          // ROM Version
 // above are correct, not sure about below
 
 
-#define DISKID        9                        // synonym
-#define INTSTAT       (0x5f>>1)                // interrupt status == 2f
-#define INTSTATUS     (0x5f>>1)                // interrupt status ==2f
+#define DISKID        9                               // synonym
+#define INTSTAT       (0x5f>>1)                       // interrupt status == 2f
+#define INTSTATUS     (0x5f>>1)                       // interrupt status ==2f
 // fcc05d=pending IRQ's?
 
 
@@ -186,15 +186,15 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status);
 
 #define LISATYPE   0x0018
 #define LISATYPE_LISA1  0
-#define LISATYPE_LISA2  (32|128)              // Lisa 2 with slow timers
-#define LISATYPE_LISA2F (64|128)              // Lisa 2 with fast timers (or pepsi)
+#define LISATYPE_LISA2  (32|128)                      // Lisa 2 with slow timers
+#define LISATYPE_LISA2F (64|128)                      // Lisa 2 with fast timers (or pepsi)
 #define LISATYPE_LISA2PEPSI (128)
 
 
 
 
-#define DISKDATAHDR   (0x1f4)                 // disk buffer header
-#define DISKDATASEC   ((DISKDATAHDR)+12)      // disk buffer data  // check this!!!
+#define DISKDATAHDR   (0x1f4)                         // disk buffer header
+#define DISKDATASEC   ((DISKDATAHDR)+12)              // disk buffer data  // check this!!!
 
 // other status and error vars
 #define  FLOPPY_dat_bitslip1                  0x005b
@@ -929,18 +929,19 @@ void floppy_go6504(void)
     }
     #endif
 
+#ifdef IGNORE_FDIR_ON_COMMANDS
     // RWTS can't execute if there's a pending IRQ - return an error.
-    if (k==FLOP_CTRLR_RWTS && (floppy_ram[FLOP_PENDING_IRQ_FLAG]!=0 || fdir_timer!=-1) )
-            {
-                #ifdef DEBUG
-                DEBUG_LOG(0,"floppy: DANGER cannot execute cmd - IRQ pending.\n");
-                append_floppy_log("floppy: DANGER cannot execute cmd - IRQ pending\n");
-                #endif
-
-                floppy_ram[STATUS]=FLOP_STAT_IRQPND;
-                return;
+     if (k==FLOP_CTRLR_RWTS && (floppy_ram[FLOP_PENDING_IRQ_FLAG]!=0 || fdir_timer!=-1) )
+             {
+                 #ifdef DEBUG
+                 DEBUG_LOG(0,"floppy: DANGER cannot execute cmd - IRQ pending.\n");
+                 append_floppy_log("floppy: DANGER cannot execute cmd - IRQ pending\n");
+                 #endif
+ 
+                 floppy_ram[STATUS]=FLOP_STAT_IRQPND;
+                 return;
             }
-
+#endif
 
     DEBUG_LOG(0," SRC:gobyte:%02x, function:%02x drive:%02x gobyte@%d fn@%d side/trk/sec:%d/%d/%d\n",
             floppy_last_macro,floppy_ram[FUNCTION],floppy_ram[DRIVE],GOBYTE,FUNCTION,
@@ -1345,16 +1346,26 @@ half=(size/2) -1;
 void floppy_return(DC42ImageType *F, uint8 boot, uint8 status)
 {
 
-   //floppy_ram[TYPE]=SONY400KFLOPPY; /// HACK!!!
-    if (!F) return;
+    if (!!(floppy_ram[ROMVER] & 0x80))
+       floppy_ram[TYPE]=(double_sided_floppy) ? SONY800KFLOPPY : SONY400KFLOPPY;
+    else 
+       floppy_ram[TYPE]=TWIGGYFLOPPY;
+    //ALERT_LOG(0,"Set drive type to:%d",floppy_ram[TYPE]);
 
-    switch(F->ftype)
-        {// floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
-            case  TWIGGYFLOPPY:   // FALLTHROUGH
-            case  SONY400KFLOPPY: // FALLTHROUGH
-            case  SONY800KFLOPPY: floppy_ram[TYPE]=F->ftype; break;
-            default: floppy_ram[TYPE]=SONY400KFLOPPY;  // lie.
-        }
+    if (!F) return;
+       // override drive type if needed.
+       if (F->numblocks==1702 && floppy_ram[TYPE]!=0)   floppy_ram[TYPE]=TWIGGYFLOPPY;
+       if (F->numblocks==800  && floppy_ram[TYPE]==0)   floppy_ram[TYPE]=SONY400KFLOPPY; // ignore 400k disk in 800k drive, but not 400k in twiggy
+       if (F->numblocks==1600 && floppy_ram[TYPE]!=2)   floppy_ram[TYPE]=SONY800KFLOPPY;
+
+//    switch(F->ftype)
+//        {// floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
+//            case  TWIGGYFLOPPY:   // FALLTHROUGH
+//            case  SONY400KFLOPPY: // FALLTHROUGH
+//            case  SONY800KFLOPPY: floppy_ram[TYPE]=F->ftype; break;
+//            default: floppy_ram[TYPE]=SONY400KFLOPPY;  // lie.
+//            ALERT_LOG(0,"Set drive type to:%d",floppy_ram[TYPE]);
+//        }
 
     if ( boot )
     {
@@ -1374,7 +1385,7 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status)
 
         floppy_ram[DISKID    ]=0x00;
         floppy_ram[INTERLEAVE]=0x01;
-        floppy_ram[TYPE      ]=SONY400_TYPE;
+  //    floppy_ram[TYPE      ]=SONY400_TYPE;
         floppy_ram[STST      ]=0x00;
         floppy_ram[INTSTATUS ]=0;
 
@@ -1873,6 +1884,11 @@ void init_floppy(long iorom)
  floppy_ram[0x72]=0xAD;
  floppy_ram[0x73]=0xDE;
  floppy_ram[0x74]=0xAA;
+
+if (!!(floppy_ram[ROMVER] & 0x80))
+    floppy_ram[TYPE]=(double_sided_floppy) ? SONY800KFLOPPY : SONY400KFLOPPY;
+else 
+    floppy_ram[TYPE]=TWIGGYFLOPPY;
 
  floppy_return(NULL,1,FLOP_STAT_NODISK);
 }

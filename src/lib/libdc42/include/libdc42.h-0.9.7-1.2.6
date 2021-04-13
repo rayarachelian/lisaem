@@ -343,7 +343,6 @@ return codes:
 #define SONY400KFLOPPY 1
 
 
-
 typedef struct                          // floppy type
 {
   int    fd;                            // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
@@ -353,14 +352,14 @@ typedef struct                          // floppy type
   uint32 size;                          // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
                                         // used for mmap fn's
 
-  char   fname[FILENAME_MAX];           // File name of this disk image (needed for future use to re-create/re-open the image)
+  char   fname[FILENAME_MAX+2];         // File name of this disk image (needed for future use to re-create/re-open the image)
                                         // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
                                         // to set this to whatever is reasonable for your OS.  ie. 256 or 1024, etc.
                                         //
                                         // Also can be used to automatically copy a r/o master disk to a private r/w copy - not yet implemented
                                         // copy made on open.
 
-  char  mfname[FILENAME_MAX];           // r/o master filename path - not yet implemented.
+  char  mfname[FILENAME_MAX+2];         // r/o master filename path - not yet implemented.
 
 
   uint8  readonly;                      // 0 read/write image - writes are sync'ed to disk image and checksums recalculated on close
