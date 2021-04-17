@@ -24,8 +24,8 @@
 
 export AROPTS="crD"
 
-for VER in 3.1.2; do
-#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3; do
+for VER in 3.1.5; do
+#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3 3.1.4 3.1.5; do
   export TYPE=msw
   export VER
 

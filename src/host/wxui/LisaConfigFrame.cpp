@@ -601,7 +601,7 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
     cheats = new wxCheckBox(panel, wxID_ANY, wxT("Boot ROM speedup hacks"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize,wxCHK_2STATE);
     cheats->SetValue( (bool)(cheat_ram_test) );
 
-    hle_cheats = new wxCheckBox(panel, wxID_ANY, wxT("HLE hard drive speedup hacks"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
+    hle_cheats = new wxCheckBox(panel, wxID_ANY, wxT("Hard Drive Acceleration"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
     hle_cheats->SetValue( (bool)(hle) );
 
     applypoint=wxPoint(420 * HIDPISCALE,  yz+ya);

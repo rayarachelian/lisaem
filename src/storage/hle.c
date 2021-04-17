@@ -40,6 +40,28 @@
 #include <ui.h>
 #include <vars.h>
 
+extern int get_vianum_from_addr(long addr);
+
+#define D0  reg68k_regs[0  ]
+#define D1  reg68k_regs[1  ]
+#define D2  reg68k_regs[2  ]
+#define D3  reg68k_regs[3  ]
+#define D4  reg68k_regs[4  ]
+#define D5  reg68k_regs[5  ]
+#define D6  reg68k_regs[6  ]
+#define D7  reg68k_regs[7  ]
+#define A0  reg68k_regs[0+8]
+#define A1  reg68k_regs[1+8]
+#define A2  reg68k_regs[2+8]
+#define A3  reg68k_regs[3+8]
+#define A4  reg68k_regs[4+8]
+#define A5  reg68k_regs[5+8]
+#define A6  reg68k_regs[6+8]
+#define A7  reg68k_regs[7+8]
+#define SP  reg68k_regs[7+8]
+#define PC  reg68k_pc
+#define RTS {regs.pc=pc24=reg68k_pc=fetchlong(reg68k_regs[8+7]); reg68k_regs[8+7]+=4;}
+
 
 void uniplus_set_partition_table_size(uint32 disk, uint32 sswap, uint32 rroot, int kernel)
 {
@@ -106,25 +128,200 @@ void uniplus_set_partition_table_size(uint32 disk, uint32 sswap, uint32 rroot, i
 }
 
 
+void hle_los31_read(uint32 count) {
+  ProFileType *P=NULL;
+  int vianum=get_vianum_from_addr( A2 );
+  if (vianum>1 && vianum<9) P=via[vianum].ProFile;
+  else {ALERT_LOG(0,"Got insane via #%d A2:%08x",vianum,A2); return;}
+
+  int blocknumber=(P->DataBlock[5]<<16) | (P->DataBlock[6]<< 8) | (P->DataBlock[7]    ) ;
+  ALERT_LOG(0,"HLE LOS31 via:%d cmd:%d block:%d idxread:%d count:%d  PC:%08x A0:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread,count, PC, A0);
+
+  uint8 r=0;
+  uint32 e=D1;
+  
+  for (uint32 i=0; i<=count; i++) {
+        r=P->DataBlock[P->indexread++];
+        e^=r;
+        lisa_wb_ram(A0,r); A0++;
+   }
+
+   D0=r;
+   D1=e;
+
+   cpu68k_clocks += (count * (8+4+8+10) );     // this will be off for the 8x loop.
+   D2|=0x0000ffff; // after DBRA.W D2 is -1
+
+   RTS;
+
+   ALERT_LOG(0,"Returning HLE LOS31 via:%d cmd:%d block:%d idxread:%d count:%d pc:%08x A0:%08x D1:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread,count,
+             PC, A0, D1 );
+}
+
+
+void hle_los31_write(void) {
+     ProFileType *P=NULL;
+     int vianum=get_vianum_from_addr( A2 );
+     if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
+
+     for (int i=0; i<128; i++)
+     {
+            P->DataBlock[P->indexwrite++]=fetchbyte(A0); A0++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A0); A0++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A0); A0++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A0); A0++;   // MOVE.B     (A0)+,(A2)
+     }
+
+     cpu68k_clocks+=( (12+12+4+12+4+12+4+12+10) * 128  + 20);
+     D0|=0x0000ffff;  // d0.w=-1 after dbra
+     RTS;
+}
+
+void hle_los31_write_00c08d0a(void) {
+     ProFileType *P=NULL;
+     int vianum=get_vianum_from_addr( A2 ); 
+     if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
+
+     A1++;  // a1 ++
+     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;  // fetchbyte(A1++) should but does not work right because we want to pass A1 before incrementing it
+     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
+     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
+
+     RTS;
+     cpu68k_clocks+=(8+12+4+12+4+20);
+}
+
+
+void hle_macws_read(uint32 count) {
+  ProFileType *P=NULL;
+  int vianum=get_vianum_from_addr( A0 );
+  if (vianum>1 && vianum<9) P=via[vianum].ProFile;
+  else {ALERT_LOG(0,"Got insane via #%d A0:%08x",vianum,A0); return;}
+
+  int blocknumber=(P->DataBlock[5]<<16) | (P->DataBlock[6]<< 8) | (P->DataBlock[7]    ) ;
+  ALERT_LOG(0,"HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d  PC:%08x A0:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread,count, PC, A0);
+
+  uint8 r=0;
+  uint32 e=D1;
+  
+  for (uint32 i=0; i<count; i++) {
+        r=P->DataBlock[P->indexread++];
+        e^=r;
+        lisa_wb_ram(A2,r); A2++;
+   }
+
+   D0=r;
+   D1=e;
+
+   cpu68k_clocks += (count * (8+4+8+10) );     // this will be off for the 8x loop.
+   D2|=0x0000ffff; // after DBRA.W D2 is -1
+
+   A0=fetchlong(A7); A7+=4;
+
+   RTS;
+
+   ALERT_LOG(0,"Returning HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d pc:%08x A0:%08x D1:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread,count,
+             PC, A0, D1 );
+}
+
+
+void hle_macws_write(int count) {
+     ProFileType *P=NULL;
+     int vianum=get_vianum_from_addr( A0 );
+     if (vianum>1 && vianum<9) P=via[vianum].ProFile;
+     else {ALERT_LOG(0,"Got insane via #%d A0:%08x",vianum,A0); return;}
+
+
+     int blocknumber=(P->DataBlock[5]<<16) | (P->DataBlock[6]<< 8) | (P->DataBlock[7]    ) ;
+     ALERT_LOG(0,"HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread, PC, A0, A2);
+
+     for (int i=0; i<=128; i++)
+     {
+            P->DataBlock[P->indexwrite++]=fetchbyte(A2); A2++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A2); A2++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A2); A2++;   // MOVE.B     (A0)+,(A2)
+            P->DataBlock[P->indexwrite++]=fetchbyte(A2); A2++;   // MOVE.B     (A0)+,(A2)
+     }
+
+     cpu68k_clocks+=( (12+12+4+12+4+12+4+12+10) * 128  + 20);
+     D0|=0x0000ffff;  // d0.w=-1 after dbra
+     A0=fetchlong(A7); A7+=4;
+     RTS;
+
+     ALERT_LOG(0,"HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread, PC, A0, A2);
+
+}
+
+
+
+void hle_mw30_intercept(void) {
+  if ( PC == 0x00163946) { hle_macws_read( (D2+1) *8 ); return; }  // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
+  if ( PC == 0x00163ade) { hle_macws_write((D2+1) *8 ); return; }  // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
+  ALERT_LOG(0,"Unhandled MW intercept at %08x",PC);
+}
+
+void apply_mw30_hacks(void) {
+  if (!macworks_hle) return;
+
+  if (check_running_lisa_os() != LISA_MACWORKS_RUNNING || context!=1) return;
+
+  if (lisa_rl_ram(0x00163946)==0x1010b101 && lisa_rl_ram(0x0016394a)==0x14c01010) {
+      lisa_ww_ram(0x00163946,0xf33d);
+      lisa_ww_ram(0x00163ade,0xf33d);
+     }
+
+  macworks_hle=0;
+}
+
+void hle_los_intercept(void) {
+
+   if ( PC == 0x00c08a86) { hle_los31_read( 511      ); return; }
+   if ( PC == 0x00c08a2e) { hle_los31_read( D2       ); return; }
+   if ( PC == 0x00c08d0a) { hle_los31_write_00c08d0a(); return; }
+   if ( PC == 0x00c08c86) { hle_los31_write         (); return; }
+
+   ALERT_LOG(0,"UNHANDLED LOS31 HLE at %d/%08x",context,PC);
+}
+
+
+void apply_los31_hacks(void) {
+  if (!los31_hle) return;
+  
+  if (check_running_lisa_os() != LISA_OFFICE_RUNNING || context!=1) return;
+
+  if (lisa_rw_ram(0x00c08a86)==0x743f && lisa_rl_ram(0x00c08a88)==0x1012b101 && lisa_rl_ram(0x00c08a88+4)==0x10c01012) {      
+
+      lisa_ww_ram(0x00c08a86,0xf33d);          // read 512
+      lisa_ww_ram(0x00c08a2e,0xf33d);          // read 1x
+      lisa_ww_ram(0x00c08d0a,0xf33d);          // write 3x
+      lisa_ww_ram(0x00c08c86,0xf33d);          // write 512
+  }
+
+  los31_hle=0;
+}
+
+
 void  hle_intercept(void) {
       ALERT_LOG(0,".");
       check_running_lisa_os();
 
       ProFileType *P=NULL;
-      uint32 a4=reg68k_regs[8+4]; // get a4 to use as the target for copying data to
-      uint32 a5=reg68k_regs[8+5];
+      uint32 a4=A4; // get a4 to use as the target for copying data to
+      uint32 a5=A5;
       long size=0;
 
-      if  (reg68k_pc==0x00fe0090 || reg68k_pc==rom_profile_read_entry)
-          {ALERT_LOG(0,"profile.c:state:hle - boot rom read pc:%08x",reg68k_pc); romless_entry(); return;} // Boot ROM ProFile Read HLE
+      if  ( PC == 0x00fe0090 || PC == rom_profile_read_entry)
+          {ALERT_LOG(0,"profile.c:state:hle - boot rom read pc:%08x",PC); romless_entry(); return;} // Boot ROM ProFile Read HLE
 
-      ALERT_LOG(0,"running os: %d, want:%d pc:%08x a4:%08x, a5:%08x",running_lisa_os,LISA_UNIPLUS_RUNNING,reg68k_pc,a4,a5);
+      if (running_lisa_os == LISA_OFFICE_RUNNING )   {hle_los_intercept();  return;}
+      if (running_lisa_os == LISA_MACWORKS_RUNNING ) {hle_mw30_intercept(); return;}
+
+      ALERT_LOG(0,"running os: %d, want:%d pc:%08x a4:%08x, a5:%08x",running_lisa_os,LISA_UNIPLUS_RUNNING,PC,a4,a5);
       if (running_lisa_os==LISA_UNIPLUS_RUNNING) {
-          int vianum=(  (((a5>>0xe)&3)<<1) | (((5>>0xb)&1)^1)  )+ 3;
-          if ((reg68k_regs[8+5] & 0x00ffff00)==0x00fcd900) vianum=2;
+          int vianum=get_vianum_from_addr(a5);
           if (vianum>1 && vianum<9) P=via[vianum].ProFile;
 
-          ALERT_LOG(0,"running os: %d pc:%08x a4:%08x, a5:%08x via:%d profile :%p",running_lisa_os,reg68k_pc,a4,a5,vianum,P);
+          ALERT_LOG(0,"running os: %d pc:%08x a4:%08x, a5:%08x via:%d profile :%p",running_lisa_os,PC,a4,a5,vianum,P);
 
           if (P)
           {
@@ -140,13 +337,13 @@ void  hle_intercept(void) {
                                           P->StateMachineStep=12;
                                           break; // read 4 status bytes into A4, increase a4+=4, PC=00020c74
   
-               case 0x00020d1e: size= 20; reg68k_pc=0x00020d26; ALERT_LOG(0,"profile.c:state:hle:read tags");   break; // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26
-               case 0x00020d3e: size=512; reg68k_pc=0x00020d72; ALERT_LOG(0,"profile.c:state:hle:read sector"); break; // read 512 bytes of data into *a4, a4+=512 D5=0x0000ffff PC=0x00020d72
+               case 0x00020d1e: size= 20; regs.pc=pc24=reg68k_pc=0x00020d26; ALERT_LOG(0,"profile.c:state:hle:read tags");   break; // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26
+               case 0x00020d3e: size=512; regs.pc=pc24=reg68k_pc=0x00020d72; ALERT_LOG(0,"profile.c:state:hle:read sector"); break; // read 512 bytes of data into *a4, a4+=512 D5=0x0000ffff PC=0x00020d72
     
                // write tag/sector specific
-               case 0x00020ebc:           reg68k_pc=0x00020ef0; ALERT_LOG(0,"profile.c:state:hle:write sector+tags");  // write tags and data in one shot, then return to 0x00020ef0
-                                size=reg68k_regs[5]; // d5
-                                a4=reg68k_regs[8+4];
+               case 0x00020ebc:           regs.pc=pc24=reg68k_pc=0x00020ef0; ALERT_LOG(0,"profile.c:state:hle:write sector+tags");  // write tags and data in one shot, then return to 0x00020ef0
+                                size=D5; // d5
+                                a4=A4;
                                 while(size--) {
                                                  if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;}
                                                  P->DataBlock[P->indexwrite++]=fetchbyte(a4++);
@@ -154,22 +351,22 @@ void  hle_intercept(void) {
     
                                 return; // we're done, so return.
     
-               default: ALERT_LOG(0,"Unknown F-Line error: PC:%08x",reg68k_pc); 
+               default: ALERT_LOG(0,"Unknown F-Line error: PC:%08x",PC); 
                         return;
              }
     
              // fall through common code for read status, tag, data
     
-             reg68k_regs[8+4]+=size;     // final A4 value to return to UniPlus.
+             A4+=size;     // final A4 value to return to UniPlus.
              regs.pc=pc24=reg68k_pc;
-             reg68k_regs[5]=0x0000ffff;  // D5 is done in dbra loop for all 3 cases, mark it with -1 as done.
+             D5=0x0000ffff;  // D5 is done in dbra loop for all 3 cases, mark it with -1 as done.
     
              while(size--) {
                uint8 r=P->DataBlock[P->indexread++];
                DEBUG_LOG(0,"profile hle:%02x to %08x from index:%d state:%d",r,a4,P->indexread-1,P->StateMachineStep);
                lisa_wb_ram(a4++,r);}
 
-             ALERT_LOG(0,"returning to: %08x, a4:%08x,%08x",reg68k_pc, reg68k_regs[8+4],a4);
+             ALERT_LOG(0,"returning to: %08x, a4:%08x,%08x",PC, A4,a4);
              return;
           }
       }
@@ -191,6 +388,8 @@ void  hle_intercept(void) {
 // and certainly when James Denton tried to use an 010 in a Lisa, one of the first things to fail
 // was the very tight timing loop in the ROM that fetches the serial number of the Lisa. A similar
 // one is used in uniplus boot loader, which also fails with "Can't get serial number." or such.
+
+
 
 void apply_uniplus_hacks(void)
 {
@@ -265,16 +464,16 @@ int line15_hle_intercept(void)
       uint16 opcode,fn;
 
 
-      if (romless && (reg68k_pc & 0x00ff0000)==0x00fe0000)
+      if (romless && ( PC & 0x00ff0000)==0x00fe0000)
       {
         if (romless_entry()) return 1;
       }
 
-      abort_opcode=2; opcode=fetchword(reg68k_pc);          //if (abort_opcode==1) fn=0xffff;
-      abort_opcode=2; fn=fetchword(reg68k_pc+2);            //if (abort_opcode==1) fn=0xffff;
+      abort_opcode=2; opcode=fetchword(PC);          //if (abort_opcode==1) fn=0xffff;
+      abort_opcode=2; fn=fetchword(PC+2);            //if (abort_opcode==1) fn=0xffff;
       abort_opcode=0;
 
-      ALERT_LOG(0,"Possible HLE call at %08x opcode:%04x",reg68k_pc,opcode);
+      ALERT_LOG(0,"Possible HLE call at %08x opcode:%04x",PC,opcode);
 
       if (opcode == 0xf33d) {hle_intercept(); return 1;}
 
@@ -287,15 +486,15 @@ int line15_hle_intercept(void)
 
             case 0:   if (debug_log_enabled) { ALERT_LOG(0,"->debug_off");                     }
                       else                   { ALERT_LOG(0,"->debug_off, was already off!!!"); }
-                      debug_off(); reg68k_pc+=4; return 1;
+                      debug_off(); PC+=4; return 1;
 
             case 1:   if (debug_log_enabled) { ALERT_LOG(0,"->tracelog, was already on! turning off!"); debug_off(); }
                       else                   { ALERT_LOG(0,"->tracelog on");            debug_on("F-line-wormhole"); }
-                      reg68k_pc+=4; return 1; 
+                      PC+=4; return 1; 
           #else
 
             case 0:
-            case 1:   reg68k_pc+=4; 
+            case 1:   PC+=4; 
                       ALERT_LOG(0,"tracelog -> but emulator wasn't compiled in with debugging enabled!"); 
                       return 1;
           #endif
@@ -304,9 +503,9 @@ int line15_hle_intercept(void)
         }
       }
       if (opcode==0xfeef) {
-                              ALERT_LOG(0,"Executing blank IPC @ %08lx",(long)reg68k_pc);
-                              EXITR(99,0,"EEEK! Trying to execute blank IPC at %08lx - something is horribly wrong!",(long)reg68k_pc);
+                              ALERT_LOG(0,"Executing blank IPC @ %08lx",(long)PC);
+                              EXITR(99,0,"EEEK! Trying to execute blank IPC at %08lx - something is horribly wrong!",(long)PC);
                           }
-      ALERT_LOG(0,"Unhandled F-Line %04lx at %08lx",(long)opcode,(long)reg68k_pc);
+      ALERT_LOG(0,"Unhandled F-Line %04lx at %08lx",(long)opcode,(long)PC);
       return 0;
 }

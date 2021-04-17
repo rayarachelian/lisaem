@@ -8,12 +8,11 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
-::TODO:: dc42-to-tar completion
-test serial on macos, test pty again and on macos x
-re-enable serial a and test with LisaTest.
-test LOS with 2MB RAM.
-HLE code
-detect ProFile size on motherboard and update in-kernel /unix partition table
+
+2021.04.16 - HLE ProFile access for MacWorks XL 3.0 + LOS 3.1 read/write block
+             now works
+
+2021.04.13 - Added LOS 3.1 HLE block read code
 
 2021.04.12 - finished bisecting out the introduced profile bugs that were
              preventing LOS from booting up. Meh.

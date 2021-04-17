@@ -1,1 +1,0 @@
-../../../../bashbuild/interim-build.sh

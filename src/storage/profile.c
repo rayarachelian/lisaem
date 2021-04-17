@@ -718,6 +718,7 @@ char *profile_state_names[]={
    /* 12 */ "SEND_STATUS_BYTES_STATE"
 };
 
+extern void  apply_los31_hacks(void);
 
 
 void ProfileLoop(ProFileType *P, int event)
@@ -772,8 +773,7 @@ if (!EVENT_WRITE_NUL)
 
  switch (P->StateMachineStep)
  {
-
-
+     
     case IDLE_STATE:                           // 0 StateMachineStep is idle - wait for CMD to go low, then BUSY=0
          CHECK_PROFILE_LOOP_TIMEOUT;
 
@@ -793,6 +793,9 @@ if (!EVENT_WRITE_NUL)
                                                 P->BSYLine=1;           // flip BSY
                                                 P->VIA_PA=0x01;         // ACK cmd on bus
                                                 P->last_a_accs=0;
+
+                                                apply_los31_hacks();
+                                                apply_mw30_hacks();
 
                                                 DEBUG_LOG(0,"ACK CMD - sending 01 - State transition to State:2");
                                                 return;

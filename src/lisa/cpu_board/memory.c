@@ -109,8 +109,10 @@ uint8 lisa_rb_ext_2par_via(viatype *V,uint32 addr);
 void  lisa_wb_ext_2par_via(viatype *V,uint32 addr, uint8 xvalue);
 
 int get_vianum_from_addr(long addr) {
-  switch(addr & 0x00ffff00) {
+
+  switch(addr & 0x00fffe00) {
            case 0x00FCDD00: return 1;  // printf("cops: ");
+           case 0x00fcd800: return 2;  // printf("motherboard: ");
            case 0x00fcd900: return 2;  // printf("motherboard: ");
            case 0x00fc2800: return 3;  // printf("slot 1 high: ");
            case 0x00fc2000: return 4;  // printf("slot 1 low : ");

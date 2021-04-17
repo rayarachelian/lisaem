@@ -750,9 +750,9 @@ void romless_proread(void)
   if (P==NULL)        {ALERT_LOG(0,"ProFile Pointer for via:%d is null",vianum); return;}
   if (&P->DC42==NULL) {ALERT_LOG(0,"ProFile DC42 for via:%d Pointer is null",vianum); return;}
 
-  #ifdef DEBUG
-     if (sectornumber==2055 && running_lisa_os==LISA_OFFICE_RUNNING) debug_on("los-hle");   //2021.03.31
-  #endif
+//  #ifdef DEBUG
+//    if (sectornumber==2055 && running_lisa_os==LISA_OFFICE_RUNNING) debug_on("los-hle");   //2021.03.31
+//  #endif
 
   DEBUG_LOG(0,"about to read sector:%d (pre-deinterleave) on via:%d",sectornumber,vianum);
 

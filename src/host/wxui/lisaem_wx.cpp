@@ -8808,6 +8808,7 @@ char *get_welcome_fortune(void)
   "\"The Journey Isn't The Reward - Emulating Lisa Office System Is!\"",
   "\"It's Better To Run LisaEm Than Join The Navy\" - Steve Jobs",
   "\"It's Better To Be a Pirate than not Run LisaEm\" - Steve Jobs",
+  "\"It's Better to join the navy than be a pirate\" - Not Steve Jobs",
   "Meh, who needs bicycles, when you can drive a Maserati for the mind!",
   "\"Lisa: Invented Stupid Acronym\"",
   "LisaEmRama: \"An emulator Out of Ideas Teams Up with an OS Out Of Time\"",
@@ -8940,14 +8941,25 @@ char *get_welcome_fortune(void)
   "The Lisa 1 was so high tone, the only way to buy one was to create a parallel universe where you already owned one!",
   "The Lisa, it seems to go on and on forever. But then you get to the end and Steve starts throwing barrels at you.",
 
+  "Wasting hour upon hour, processing processes, thinking about thinking, accomplishing.... nothing!", // yt:EvGxv88t768
+
+  "Sanely Great!",
+  "Ludicrously Large!",
+  "Crazily Collosal",
+
   "Who you gonna call? Lisa Emulators!",
+  "Who you gonna call? Bluebusters! We ain't afraid of Big Blue! Do You Want it All?", // yt:kpzKJ0e5TNc
   "Zuuuuuuuuuul!",
-  "We came, we saw, we emulated its ass",
+  "We came, we saw, we emulated its (shiny metal) ass!",
   "Are you a god?",
   "Are you the keymaster?",
   "Excuse me Egon, I you said crossing the stdin/out streams was bad",
   "Alriiiight, this I/O board is toast!",
   "“Ray, when someone asks if you're a god, you say \"YES.\"” - Winston Zeddemore",
+  "“Ray, when someone asks you if you're a System Administrator, you say “YES“!“",
+  "“Ray, when someone asks you if you're root, you say “YES“!“",
+  "Lemme tell you something, Busting (Bugs) makes me feel good, yeah yeah yeah",
+  "Do you want it all?",
 
   "Wax on, wax off. XON XOFF.",
   "In the beginning, the CPU was created. This has made a lot of people very angry and has been widely regarded as a bad move.",
@@ -9449,8 +9461,11 @@ char *get_welcome_fortune(void)
 
   "Do not summon (Bill) AT ALL COSTS!",
   "Remember: reality is an illusion, the universe is an emulation, buy gold, bye.",
+  "But you can call me your lord and master for all eternity",
   "Be Amazed!",
   "Mystery #hack",
+  "Dippy Fresh didn't do anything to you dawg",
+  "You're the coolest person I know",
   "... and then we ride unicorns?",
   "Cast by Probabilitor the Annoying...",
   "Alright, alright, I guess if we don't have any other choice... we'll go on an epic emulation quest",

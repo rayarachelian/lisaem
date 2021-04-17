@@ -767,9 +767,11 @@ GLOBAL(uint8,*lisaram,NULL);                 // pointer to Lisa RAM
 
 // this enables a hack that tricks the lisa into skipping the full ram test, thus speeding up
 // the boot process - this sets a PRAM variable saying RAM test is done.
-GLOBAL(int,cheat_ram_test,1);  // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
-DECLARE(int,hle);
+GLOBAL(int,cheat_ram_test,1);       // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
+DECLARE(int,hle);                   // flag to enable HLE hacks
 GLOBAL(int,romless,0);
+GLOBAL(int,macworks_hle,1);         // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
+GLOBAL(int,los31_hle,1);            // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
 GLOBAL(int,uniplus_hacks,1);        // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
 GLOBAL(int,uniplus_loader_patch,1); // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
 GLOBAL(int,uniplus_sunix_patch,1);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
