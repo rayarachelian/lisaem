@@ -353,8 +353,13 @@ int check_running_lisa_os(void)
    if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||       // Macworks XL 3.0
         ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) ||       // 2020.08.03 did this move due to extra RAM?
         ((v1 & 0x00fff000) ==0x001b6000  && (v2 & 0x00fff000)==0x001b6000) ||       // 2021.03.23 and yet a new address!
+        ((v1 & 0x00fff000) ==0x00156000  && (v2 & 0x00fff000)==0x00156000) ||       // MacWorks XL 4.5 v1=00156206 v2=00156384; test1,2,3: 50555445, 400022d8, 91fc0000| 23:27:31.1 1242627682
         ((v1 & 0x00fff000) ==0x001c4000  && (v2 & 0x00fff000)==0x001c4000) || 
-        ((v1 & 0x00fff000) ==0x00164000  && (v2 & 0x00fff000)==0x00164000)   
+        ((v1 & 0x00fff000) ==0x00164000  && (v2 & 0x00fff000)==0x00164000) ||
+         (bootblockchecksum==0xce0ca734  || bootblockchecksum==0xce0cbba3) ||       // MWXL3.0, MWXL4.5 floppy
+         (bootblockchecksum==0xb66c2a5d                                  ) ||       // MW+II v2.3.0 floppy
+         (bootblockchecksum==0x703fe7ba                                  ) ||       // MWXL 3.0 profile boot block
+         (bootblockchecksum==0xce0cb94e                                  )          // MW1.018 for system 6
         )
       {
            //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);

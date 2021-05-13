@@ -336,28 +336,13 @@ static char templine[1024];
 
 int is_vector_available(int avno)
 {
-   if (insetjmpland) return (IS_VECTOR_AVAILABLE_INT(avno));
-   return IS_VECTOR_AVAILABLE_EXT(avno);
+   //if (insetjmpland) 
+     return (IS_VECTOR_AVAILABLE_INT(avno));
+   //return IS_VECTOR_AVAILABLE_EXT(avno);
 }
 
 
-static inline void fire_pending_external_autovector(void)
-{
- uint8 i=get_pending_vector();
- DEBUG_LOG(0,"Firing pending IRQ:%d if it meets the mask",i);
 
-
- if (IS_VECTOR_AVAILABLE_EXT(i))
-    {
-    #ifdef DEBUG
-    snprintf(templine,1024,"fire_pending_ext_av:Firing IRQ1 while floppy_FDIR is set. mask:%d",((regs.sr.sr_int>>8) & 7) );
-    if (i==1 && floppy_FDIR) append_floppy_log(templine);
-    #endif
-
-    reg68k_external_autovector(i);
-
-    }
-}
 
 
 static inline void fire_pending_internal_autovector(void)
@@ -382,6 +367,30 @@ static inline void fire_pending_internal_autovector(void)
  #endif
 
 }
+
+
+static inline void fire_pending_external_autovector(void)
+{
+  fire_pending_internal_autovector();
+  return;
+/*
+ uint8 i=get_pending_vector();
+ DEBUG_LOG(0,"Firing pending IRQ:%d if it meets the mask",i);
+
+
+ if (IS_VECTOR_AVAILABLE_EXT(i))
+    {
+    #ifdef DEBUG
+    snprintf(templine,1024,"fire_pending_ext_av:Firing IRQ1 while floppy_FDIR is set. mask:%d",((regs.sr.sr_int>>8) & 7) );
+    if (i==1 && floppy_FDIR) append_floppy_log(templine);
+    #endif
+
+    reg68k_external_autovector(i);
+
+    }
+*/
+}
+
 
 #ifdef DEBUG
 
@@ -1150,7 +1159,9 @@ void reg68k_ext_exec_various_dbug(void)
                           (long)reg68k_regs[8], (long)reg68k_regs[9], (long)reg68k_regs[10],(long)reg68k_regs[11],(long)reg68k_regs[12],(long)reg68k_regs[13],(long)reg68k_regs[14],(long)reg68k_regs[15]
                         );
 */
-          if  (reg68k_pc==0x00fe0090 || pc24==0x00fe0090)
+
+ switch (reg68k_pc) {
+   case 0x00fe0090:
               {
                   ALERT_LOG(0,"ENT Entering ROM profile read.  ROMLESS")    
                   int i;
@@ -1166,10 +1177,11 @@ void reg68k_ext_exec_various_dbug(void)
                               (long) reg68k_regs[8], (long)reg68k_regs[9], (long)reg68k_regs[10],(long)reg68k_regs[11],(long)reg68k_regs[12],(long)reg68k_regs[13],(long)reg68k_regs[14],(long)reg68k_regs[15]
                           );
                 
+                  return;
                 }
 
 
-//        if (reg68k_pc==0x00fe1fee)
+// case  0x00fe1fee:
 //           {
 //
 //               ALERT_LOG(0,"RET Return from ROM profile read.  ROMLESS")    
@@ -1187,12 +1199,13 @@ void reg68k_ext_exec_various_dbug(void)
 //                        );
 //                   
 //                  }
+   
 
-
-          if (reg68k_pc==0x00fe0084) {ALERT_LOG(0,"Return to ROM");          debug_off();} // 2021.03.31
-          if (reg68k_pc==0x00fe1fde) {ALERT_LOG(0,"Return to ROM - PROERR"); debug_off();} // 2021.03.31
-
-          if  (reg68k_pc==0x00020000)
+   case 0x00fe1d3e: {ALERT_LOG(0,"Return to ROM - Error 75"); debug_off();  return; }
+   case 0x00fe0084: {ALERT_LOG(0,"Return to ROM");            debug_off();  return; }
+   case 0x00fe1fde: {ALERT_LOG(0,"Return to ROM - PROERR");   debug_off();  return; }
+   case 0x00fe1f3a: {ALERT_LOG(0,"Return to ROM - BOOTERR");  debug_off();  return; }
+   case 0x00020000:
               {
                   int i;
                   uint8 b;
@@ -1204,7 +1217,9 @@ void reg68k_ext_exec_various_dbug(void)
                               (long)reg68k_regs[0], (long)reg68k_regs[1], (long)reg68k_regs[2], (long)reg68k_regs[3], (long)reg68k_regs[4], (long)reg68k_regs[5], (long)reg68k_regs[6], (long)reg68k_regs[7],
                               (long)reg68k_regs[8], (long)reg68k_regs[9], (long)reg68k_regs[10],(long)reg68k_regs[11],(long)reg68k_regs[12],(long)reg68k_regs[13],(long)reg68k_regs[14],(long)reg68k_regs[15]
                             );
+                  return;
               }            
+   }
 }
 #endif  /// end of ifdef XXXDEBUG disabled code
 
@@ -1982,34 +1997,10 @@ void reg68k_external_autovector(int avno)
 
 void reg68k_external_vector(int vector, uint32 oldpc,uint32 addr_error)
 {
-    DEBUG_LOG(0,"VECTOR: %ld, OLDPC:%08lx memerr@:%08lx",(long)vector,(long)oldpc,(long)addr_error);
-    if  (insetjmpland)
-        {
-          reg68k_internal_vector(vector,oldpc,addr_error);
-          return;
-        }
-
-        DEBUG_LOG(0,"In setjmp land vector:%ld oldpc:%08lx regs.pc:%08lx regs.sr:%lx",(long)vector,(long)oldpc,(long)regs.pc,(long)regs.sr.sr_int);
-
-//20190601        reg68k_pc = regs.pc;
-//20190601        reg68k_regs = regs.regs;
-//20190601        reg68k_sr.sr_int = regs.sr.sr_int;
-////20190601      insetjmpland=1;
-
-        DEBUG_LOG(0,"Calling internal_vector from external reg68k_pc:%08lx reg68k_sr:%lx",(long)reg68k_pc,(long)reg68k_sr.sr_int);
-        reg68k_internal_vector(vector,oldpc,addr_error);
-        DEBUG_LOG(0,"Done with internal_vector vector:%ld reg68k_pc:%08lx reg68k_sr:%08lx regs.pc:%08lx regs.sr:%08lx, exiting setjmp land",
-                  (long)vector,
-                  (long)reg68k_pc,
-                  (long)reg68k_sr.sr_int,(long)regs.pc,(long)regs.sr.sr_int);
-
-    /* restore global registers back to permanent storage */
-        regs.pc = reg68k_pc;
-        regs.sr.sr_int = reg68k_sr.sr_int;
-
-        //insetjmpland=1; //20190601
+    reg68k_internal_vector(vector,oldpc,addr_error);
+    regs.pc = reg68k_pc;
+    regs.sr.sr_int = reg68k_sr.sr_int;
 }
-
 
 
 // called by mmuflush to make sure that the correct context is set!
@@ -2109,14 +2100,54 @@ RAM 0a6ba0: 00 02 d0 ea 00 02 d0 ea:00 00 00 00 00 00 00 00 |................ 02
 
 extern void apply_uniplus_hacks(void);
 
-
-
 #define SEND_STATUS_BYTES_STATE    12    // Let Lisa read the status bytes after the write is done, then return to idle.
 
 extern void  hle_intercept(void);
-
 extern int line15_hle_intercept(void);
+//extern void enable_4MB_macworks(void);
 
+void disable_4MB_macworks(void) {
+  ALERT_LOG(0,"Need to implement me. or maybe just reset");
+}
+
+void enable_4MB_macworks(void) {
+
+  ALERT_LOG(0,"\n\n\n\n\n\n");
+  ALERT_LOG(0," **** Enabling 4MB RAM for MacWorks ****");
+  ALERT_LOG(0," **** Enabling 4MB RAM for MacWorks ****");
+  ALERT_LOG(0," **** Enabling 4MB RAM for MacWorks ****");
+
+  regs.pc = pc24 = reg68k_pc = 0x0002001c+6;
+  maxlisaram=0x3E0000;        //0x004000040-(128*1024);
+  TWOMEGMLIM=0x003fffff;
+
+  ALERT_LOG(0,"Move vidram to %08x",maxlisaram-32768);
+  memmove(&lisaram[maxlisaram-32768],&lisaram[videolatchaddress],32768); // move video data over
+
+  // 4MB RAM sleight of hand hack - was this your card? if minlisaram is set, reallocate RAM to zero
+  if (minlisaram) {
+     memmove(&lisaram[0],&lisaram[minlisaram],minlisaram);
+     
+     for (uint32 i=0; i<maxlisaram/0x00200; i++) {mmu_trans_all[1][i].address=0; mmu_trans_all[1][i].readfn=17; mmu_trans_all[1][i].writefn=17;} 
+     for (uint32 i=0; i<maxlisaram/0x20000; i++) {mmu[i].sor=0x000; mmu[i].slr=0x0700;}
+
+     minlisaram=0;
+  }
+
+  // might be able to get as high as 8MB as videoram latch=255 -> 0x7F8000
+  videolatchaddress  = maxlisaram-32768;
+  videolatch         = videolatchaddress / 32768;
+
+  ALERT_LOG(0,"Set vidlatch to %02x address: %08x",videolatch,videolatchaddress);
+  ALERT_LOG(0,"Min/max/total RAM: %08x - %08x :%08x",minlisaram,maxlisaram,maxlisaram-minlisaram);
+
+  storelong(0x2A4,minlisaram);
+  storelong(0x294,maxlisaram);
+  storelong(0x2A8,maxlisaram-minlisaram);
+  storelong(0x110,videolatchaddress); // ROM SCRNBASE variable
+  refresh_vidram_fns();
+  sleep(10);
+}
 
 
 void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
@@ -2129,8 +2160,9 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
     uint16 busfunctioncode;
     uint8 old_supervisor=reg68k_sr.sr_struct.s;
 
-    if (vno==V_LINE15) { if (line15_hle_intercept()) return;}
 
+    if (vno==V_LINE15) { if (line15_hle_intercept()) return;}
+    if (vno==2 && reg68k_pc == 0x0002001c && addr_error==0x00400000 && macworks4mb) {enable_4MB_macworks(); return;}
     /*-----------------12/8/2003 9:56PM-----------------
      * needs to do this: RA
      * SSP-2 ->SSP                      // push FV -- 680010+ only
@@ -2383,13 +2415,15 @@ void lisa_mmu_exception(uint32 addr_error)
     lisa_buserror(addr_error);
 }
 
-
+static uint32 lastaddrpc=0;
 void lisa_addrerror(uint32 addr_error)
 {
 #ifndef CPU_CORE_TESTER
     ALERT_LOG(0,"Odd Address Exception @%08lx PC=%08lx clk:%016llx ",(long)addr_error,(long)reg68k_pc,(long long)cpu68k_clocks);
     DEBUG_LOG(0,"ADDRESS EXCEPTION @%08lx PC=%08lx",(long)addr_error,(long)reg68k_pc);
+    if (reg68k_pc==lastaddrpc) return;
     reg68k_internal_vector(3,reg68k_pc,addr_error);
+    lastaddrpc=reg68k_pc;
     abort_opcode=1;
 #endif
 

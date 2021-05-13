@@ -28,12 +28,12 @@ for VER in 3.1.5; do
   mkdir  build-${TYPE}
   cd     build-${TYPE}
 
+#	       --with-sdl \
   export CFLAGS="-fPIC" CXXFLAGS="-fPIC"
   ../configure --with-gtk --enable-unicode --disable-debug --disable-shared --without-expat  --disable-richtext  \
                --with-libpng=builtin --with-libjpeg=builtin --with-libtiff=builtin --with-libxpm=builtin \
                --prefix=/usr/local/wx${VER}-${TYPE} \
                --with-libxpm=builtin  --prefix=/usr/local/wx${VER}-${TYPE} \
-	       --with-sdl \
 	       && make -j $( nproc ) && $SUDO make -j $( nproc ) install || exit 2
  # 2020.02.12: 
  # ^ added --with-sdl because wxWidgets wants oss which is extinct as modern distros have moved to pulseaudio

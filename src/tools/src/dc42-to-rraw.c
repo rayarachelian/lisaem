@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <libdc42.h>
 
-
 int interleave=0;
 int deinterleave=0;
 
@@ -27,16 +26,15 @@ long deinterleave5(long sector)
   return offset[sector&31] + sector-(sector&31);
 }
 
-void help(void)
-{
+void help(void) {
             printf("dc42-to-raw\n\n"
                 //  01234567890123456789012345678901234567890123456789012345678901234567890123456789
                 //  0         1         2         3         4         5         6         7         8
                    "Usage: dc42-to-raw -i|-d|-s Disk_Image.dc42\n\n"
-		   " -i | --interleave   - turn on   interleave 5 translation\n"
-		   " -d | --deinterleave - turn on deinterleave 5 translation\n"
-		   " -s | --straight     - no translation (default)\n"
-		   " -h | --help         - this screen\n\n"             
+                   " -i | --interleave   - turn on   interleave 5 translation\n"
+                   " -d | --deinterleave - turn on deinterleave 5 translation\n"
+                   " -s | --straight     - no translation (default)\n"
+                   " -h | --help         - this screen\n\n"
 
                    "This utility is used to convert dc42 images to raw images\n"
                    "does the opposite of raw-to-dc42.\n"
@@ -50,7 +48,6 @@ int main(int argc, char *argv[])
   DC42ImageType  F;
   char *Image=NULL;
   uint8 *data, *tags;
-  int argn;
 
   int do_patch=15;
   FILE *raw, *tag;
@@ -58,13 +55,12 @@ int main(int argc, char *argv[])
   char rawtag[8192];
 
   puts(    "  ---------------------------------------------------------------------------");
-  puts(    "    DC42 To Raw Image (data+tags) v0.02              http://lisaem.sunder.net");
+  puts(    "    DC42 To Reverse Raw (tags+data) v0.02            http://lisaem.sunder.net");
   puts(    "  ---------------------------------------------------------------------------");
   puts(    "          Copyright (C) 2021, Ray A. Arachelian, All Rights Reserved.");
   puts(    "              Released under the GNU Public License, Version 2.0");
   puts(    "    There is absolutely no warranty for this program. Use at your own risk.  ");
   puts(    "  ---------------------------------------------------------------------------\n");
-
 
     deinterleave=0; interleave=0; // defaults
 
@@ -74,12 +70,12 @@ int main(int argc, char *argv[])
     {
       if (argv[argn][0]=='-') {
          if      (argv[argn][1]=='h')                           { help(); exit(0);               }
-	 else if (argv[argn][1]=='i')                           {   interleave=1; deinterleave=0;}
+         else if (argv[argn][1]=='i')                           {   interleave=1; deinterleave=0;}
          else if (argv[argn][1]=='d')                           { deinterleave=1;   interleave=0;}
          else if (argv[argn][1]=='s')                           { deinterleave=0;   interleave=0;}
          else if (argv[argn][1]=='-') {
            if      (strncmp(argv[argn],"--help"      ,20)  ==0) { help(); exit(0);               }
-	   else if (strncmp(argv[argn],"--interleave",20)  ==0) {   interleave=1; deinterleave=0;}
+           else if (strncmp(argv[argn],"--interleave",20)  ==0) {   interleave=1; deinterleave=0;}
            else if (strncmp(argv[argn],"--deinterleave",20)==0) { deinterleave=1;   interleave=0;}
            else if (strncmp(argv[argn],"--straight",20)    ==0) { deinterleave=0;   interleave=0;}
            else {help(); fprintf(stderr,"\nUnknown option: %s\n\n",argv[argn]); exit(1);}
@@ -104,19 +100,19 @@ int main(int argc, char *argv[])
      }
 
   for (x=0; x<F.numblocks; x++)
-  { 
+  {
     long b5=x;
     if (  interleave) b5=  interleave5(x);
     if (deinterleave) b5=deinterleave5(x);
 
     data=dc42_read_sector_data(&F,b5);
-    fwrite(data,F.sectorsize,1,raw);
     if (F.tagsize) {
        tags=dc42_read_sector_tags(&F,b5);
        if (!tags) {fprintf(stderr,"Could not read tags for sector %d from image!\n",(int)x); dc42_close_image(&F);exit(2);}
        fwrite(tags,F.tagsize,1,raw);
     }
     if (!data) {fprintf(stderr,"Could not read data for sector %d from image!\n",x); dc42_close_image(&F);exit(2);}
+    fwrite(data,F.sectorsize,1,raw);
   }
 
  dc42_close_image(&F);

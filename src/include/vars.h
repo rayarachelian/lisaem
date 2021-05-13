@@ -769,6 +769,8 @@ GLOBAL(uint8,*lisaram,NULL);                 // pointer to Lisa RAM
 // the boot process - this sets a PRAM variable saying RAM test is done.
 GLOBAL(int,cheat_ram_test,1);       // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
 DECLARE(int,hle);                   // flag to enable HLE hacks
+GLOBAL(uint32, bootblockchecksum,0);     // checksum of bootsector (sector 0) whether from profile or floppy.
+DECLARE(int,macworks4mb);
 GLOBAL(int,romless,0);
 GLOBAL(int,macworks_hle,1);         // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
 GLOBAL(int,los31_hle,1);            // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
@@ -2644,18 +2646,18 @@ uint8 cmp_screen_hash(uint8 *hashtable1, uint8 *hashtable2);
 
 /* these are a bit too conservative perhaps, but they will prevent address overflows.              0x00fe0000*/
 //** DANGER ** REMOVE & TWOMEGLIM!!! ***
-#define CHK_MMU_REGST(addr)     (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
-//#define RAM_MMU_REGST(addr)     (lisaram+(((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))  & TWOMEGMLIM))
-#define CHK_MMU_A_REGST(c,addr) (        (((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
-#define RAM_MMU_A_REGST(c,addr) (lisaram+(((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
+#define CHK_MMU_REGST(addr)         (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
+//#define RAM_MMU_REGST(addr)       (lisaram+(((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))  & TWOMEGMLIM))
+#define CHK_MMU_A_REGST(c,addr)     (        (((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
+#define RAM_MMU_A_REGST(c,addr)     (lisaram+(((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) +  (addr & MMUXXFILT))              ))
 
-#define VALIDATE_MMU(addr)       (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
+#define VALIDATE_MMU(addr)          (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
 
 // cheato
-//#define XCHK_MMU_TRANS(addr)     (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
-//#define XRAM_MMU_TRANS(addr)     (lisaram+(((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
-//#define XCHK_MMU_A_TRANS(c,addr) (        (((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
-//#define XRAM_MMU_A_TRANS(c,addr) (lisaram+(((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
+//#define XCHK_MMU_TRANS(addr)      (        (((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
+//#define XRAM_MMU_TRANS(addr)      (lisaram+(((       mmu[(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
+//#define XCHK_MMU_A_TRANS(c,addr)  (        (((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
+//#define XRAM_MMU_A_TRANS(c,addr)  (lisaram+(((mmu_all[c][(addr & MMUSEGFILT)>>17].sor<<9) + (addr & MMUXXFILT))  & TWOMEGMLIM))
 
 
 // half way cheato

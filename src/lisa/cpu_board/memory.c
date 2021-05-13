@@ -2233,6 +2233,7 @@ void refresh_vidram_fns(void) {  // erase old vidram fn's and update the new one
     videoramdirty=32768;   videoximgdirty|=9;
 }
 
+extern void disable_4MB_macworks(void);
 
 void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
 {
@@ -2241,20 +2242,24 @@ void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
   //  char shout[1024];
   //  #endif
 
-    ALERT_LOG(100,"@%08x:%02x videolatch/motherboard error led",addr,data);
+    ALERT_LOG(100,"@%08x:%02x videolatch/motherboard error led, set by pc:%d/%08x",addr,data,context,reg68k_pc);
 
     videoramdirty=32768;
 
     if ((addr & 0x000000fff)==0x00000800)
     {
-        if (data & 0x80)  {  ALERT_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x",addr,data);  return;}
-
-        if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
+        if (!!(data & 0x80))  {  ALERT_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x set by pc:%d/%08x",addr,data,context,reg68k_pc); return;}
+        data &= 0x7f;
+      //if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
+      if  ( (data*32768)<maxlisaram && (data*32768)>=minlisaram )
             {
-                videolatch=data; videolatchaddress=(videolatch*32768);
+                videolatch=data & 0x7f; videolatchaddress=(videolatch*32768);
                 ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);
                 if (lastvideolatch!=videolatch)refresh_vidram_fns();
                 lastvideolatch=videolatch; lastvideolatchaddress=videolatchaddress;
+
+                if ((reg68k_pc & 0x00ff0000)==0x00fe0000 && macworks4mb) {ALERT_LOG(0,"disabling 4mb macworks"); disable_4MB_macworks();}
+
             }
             else {ALERT_LOG(100,"video latch write:OUT OF RANGE:%02x->@%08x %08x-%08x at pc=%d/%08x\n",
                     data,
@@ -2590,6 +2595,7 @@ uint8  *lisa_mptr_ram(uint32 addr)
     if (physaddr!=-1) return (uint8 *)(&lisaram[physaddr]);
     else return NULL;
 }
+
 
 
 uint8  lisa_rb_ram(uint32 addr)
@@ -3305,34 +3311,34 @@ uint8  lisa_rb_sio_mmu(uint32 addr)
     lisa_mem_t f;
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(100,"preflush addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(100,"preflush addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(100,"post addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(100,"post addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(100,"fetching mmu function called: %d %s seg1/seg2/start:%d/%d/%d con:%d context%d slr=%04x",f,mspace(f),
-            segment1,segment2,start,
-            con,context,mmu_all[con][a17].slr);
+//    DEBUG_LOG(100,"fetching mmu function called: %d %s seg1/seg2/start:%d/%d/%d con:%d context%d slr=%04x",f,mspace(f),
+//            segment1,segment2,start,
+//            con,context,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_byte[f](addr);
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
     if (physaddr >  -1) return (uint8)(lisaram[physaddr]);
@@ -3378,10 +3384,10 @@ uint16 lisa_rw_sio_mmu(uint32 addr)
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_word[f](addr);
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
     if (physaddr >  -1) return LOCENDIAN16(*(uint16 *)(&lisaram[physaddr]) );
@@ -3405,30 +3411,30 @@ uint32 lisa_rl_sio_mmu(uint32 addr)
     DEBUG_LOG(100,"@%08x",addr);
     CHK_R_ODD_ADR(addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_long[f](addr);
-    DEBUG_LOG(100,"ram sio from %08x",CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %08x",CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
 
@@ -3451,28 +3457,28 @@ void   lisa_wb_sio_mmu(uint32 addr, uint8 data)
 
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
 
     if (f!=ram && f!=vidram) {mem68k_store_byte[f](addr,data); return;}
 
@@ -3495,34 +3501,34 @@ void   lisa_ww_sio_mmu(uint32 addr, uint16 data)
     uint16 con=CXSEL;
     lisa_mem_t f;
     addr &=ADDRESSFILT;
-    DEBUG_LOG(100,"@%08x",addr);
+//  DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     // Flush MMU cache if needed.
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
 
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
 
     if (f!=ram && f!=vidram) {mem68k_store_word[f](addr,data); return;}
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_W_ODD_ADR(addr);
     CHK_RAM_A_LIMITS(con,addr);
@@ -3542,31 +3548,31 @@ void   lisa_wl_sio_mmu(uint32 addr, uint32 data)
     lisa_mem_t f;
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
 
     if (f!=ram && f!=vidram) {mem68k_store_long[f](addr,data); return;}
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_W_ODD_ADR(addr);
     CHK_RAM_A_LIMITS(con,addr);

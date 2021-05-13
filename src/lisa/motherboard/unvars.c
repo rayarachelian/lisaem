@@ -25,6 +25,7 @@ void unvars(void)
 #undef ACGLOBAL
 
 REASSIGN(int,cheat_ram_test,1);       // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
+REASSIGN(uint32, bootblockchecksum,0);     // checksum of bootsector (sector 0) whether from profile or floppy.
 REASSIGN(int,romless,0);
 REASSIGN(int,macworks_hle,1);         // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
 REASSIGN(int,los31_hle,1);            // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE

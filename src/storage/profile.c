@@ -355,8 +355,19 @@ void do_profile_read(ProFileType *P, uint32 block)
 
     if (blk!=NULL) memcpy( &(P->DataBlock[4+P->DC42.tagsize]), blk, P->DC42.datasize); //4
 
+    if (block==0) {
+        bootblockchecksum=0;
+        for (int i=0; i<P->DC42.datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
+    }
 
     blk=dc42_read_sector_tags(&(P->DC42),block);
+
+    if (block==0) {
+        for (int i=0; i<P->DC42.tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
+        ALERT_LOG(0,"Bootblock checksum:%08x",bootblockchecksum);
+    }
+
+
     if (P->DC42.retval || blk==NULL)
        {ALERT_LOG(0,"Read tags from blk#%d failed with error:%d %s",block,P->DC42.retval,P->DC42.errormsg);}
 
@@ -732,7 +743,7 @@ void ProfileLoop(ProFileType *P, int event)
         
 #ifdef DEBUG
 if (!EVENT_WRITE_NUL)
-    ALERT_LOG(0,"ProFile access at PC:%d/%08x event:%d %s state:%d %s idxr,idxw: %d,%d bsy:%d cmd:%d rrw:%d",context,reg68k_pc,event,profile_event_names[event],
+    DEBUG_LOG(0,"ProFile access at PC:%d/%08x event:%d %s state:%d %s idxr,idxw: %d,%d bsy:%d cmd:%d rrw:%d",context,reg68k_pc,event,profile_event_names[event],
           P->StateMachineStep,profile_state_names[P->StateMachineStep],P->indexread,P->indexwrite,
           P->BSYLine,P->CMDLine,P->RRWLine);
 #endif

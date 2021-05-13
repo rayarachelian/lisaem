@@ -1186,7 +1186,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  while (datamask) {\n");
                                 OUT("    dstaddr-= 2;\n");
                                 OUT("    storeword(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
-                                OUT("    DEBUG_LOG(5,\"reg D%d.W written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
+                                OUT("    DEBUG_LOG(5,\"reg D%d.W written to %08x <-%04x  SRC:\",7-movem_bit[datamask],dstaddr,DATAREG((7-movem_bit[datamask])));\n")
                                 ABORT_CHECK(o);
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
@@ -1203,7 +1203,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("    dstaddr-= 4;\n");
                                 OUT("    storelong(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
                                 ABORT_CHECK(o);
-                                OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
+                                OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x<-%08x  SRC:\",7-movem_bit[datamask],dstaddr,DATAREG((7-movem_bit[datamask])));\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
                                 break;
@@ -1228,7 +1228,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  }\n");
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storeword(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
-                                OUT("    DEBUG_LOG(5,\"reg A%d.W written to (%08x)<-%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
+                                OUT("    DEBUG_LOG(5,\"reg A%d.W written to (%08x)<-%04x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                                 ABORT_CHECK(o);
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 2;\n");
@@ -1925,13 +1925,13 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)+= (sint16)srcdata;\n");
                     break;
 
-                case i_UNLK:
+                case i_UNLK:  //       An -->; SP; (SP) -->; An; SP + 4 -->; SP 
                     GENDBG("");
                     generate_ea(o, iib, tp_src, 1);
                     generate_eaval(o, iib, tp_src);
                     OUT("\n");
-                    OUT("uint32 tmp=ADDRREG(srcreg);\n");
-                    OUT("l1=fetchlong(srcdata);");
+                 // OUT("  ADDRREG(srcreg) = fetchlong(srcdata);\n");
+                    OUT("  l1=fetchlong(srcdata);");
                     ABORT_CHECK(o);
                     OUT("  ADDRREG(srcreg) =l1;\n");
                     OUT("  ADDRREG(7) = srcdata+4;\n");

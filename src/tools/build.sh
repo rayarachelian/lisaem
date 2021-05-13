@@ -54,7 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw raw-to-dc42 dc42-to-tar"
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar"
 
 
 

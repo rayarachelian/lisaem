@@ -38,7 +38,7 @@ fi
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
     STABILITY="PRE-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2021.04.16"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2021.05.12"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -204,7 +204,7 @@ for j in $@; do
                 echo -n "Done. "
                 elapsed=$(get_elapsed_time)
                 [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
-                rm -f .env-*
+                rm -f .env-* bin/hashes.txt bin/gdb-run obj/build-warnings.txt obj/get-uintX-types .env-saved .last-opts
                 exit 0
             fi
 

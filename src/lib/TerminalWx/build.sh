@@ -82,6 +82,7 @@ then
 )
 fi
 
+[[ -d src ]] && mkdir obj lib 2>/dev/null
 CHECKDIRS src obj lib
 CHECKFILES src/GTerm/actions.cpp src/GTerm/gterm.cpp src/GTerm/keytrans.cpp src/GTerm/states.cpp src/GTerm/utils.cpp src/GTerm/vt52_states.cpp src/taTelnet/wxterm.cpp src/include/wxterm.h
 

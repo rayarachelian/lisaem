@@ -10,6 +10,7 @@
 \**************************************************************************************/
 
 #include <libdc42.h>
+#include <string.h>
 
 uint32 astart, bstart, cstart, dstart, estart, fstart, gstart, hstart,
        a_size, b_size, c_size, d_size, e_size, f_size, g_size, h_size;
@@ -136,7 +137,7 @@ void writepart(DC42ImageType *F, uint8 *fsec) {
          char answer[8];
          char *lf;
          fprintf(stderr,"\n\nWrite this table to the unix kernel? ");
-         fgets(answer,7,stdin); lf=strchr(answer,10); if (lf) *lf=0; // remove LF
+         char *igner=fgets(answer,7,stdin); lf=strchr(answer,10); if (lf) *lf=0; // remove LF
 
          //fprintf(stderr,"answer  ::%s:: %d\n",answer, strncasecmp(answer,"y",2) );
 
@@ -288,6 +289,7 @@ uint32 parse_blocks(char *v) {
   return b;
 }
 
+
 void parse_arg(int argc, char *argv[]) {
 
   char *equal=NULL;
@@ -295,17 +297,20 @@ void parse_arg(int argc, char *argv[]) {
   char *syntax2="Hoc mihi omnium Graeca! Didn't understand this parameter you passed, why did you add the '=' sign?: %s\n";
 
   for (int i=2; i<argc; i++) {
-
+      char *nul=(char *)NULL;
       char *v=argv[i];
 
-      if (strcasestr(v,"reset")!=NULL) {
+      // why the fuck is gcc 9.3.0 on linux claiming   warning: comparison between pointer and integer  here? strcasestr returns a char *, null is a void *, wtf.  originally had !=NULL but got the same
+      // including string.h does not remove this warning.
+      
+      if ( strcasestr(v,"reset") != NULL)  {
           if (argc!=3) {fprintf(stderr,"Nope, nope, nope! Can't use any other arguements with 'reset'\n"); exit(2);}
           equal=strchr(v,'='); if (equal!=NULL) {help(); fprintf(stderr,syntax2,v); exit(1);}
           reset_to_default();
           return; // ignore all other options.
       }
     
-      if ( (strcasestr(v,"disk=")!=NULL) || (strcasestr(v,"size=")!=NULL) ) {
+      if ( strcasestr(v,"disk=")!=NULL || (strcasestr(v,"size=")!=NULL) )   {
          equal=strchr(v,'='); if (!equal) {help(); fprintf(stderr,syntax,v); exit(1);}
          equal++;
          disk=parse_blocks(equal);
@@ -316,14 +321,14 @@ void parse_arg(int argc, char *argv[]) {
          continue;
       }
     
-      if (strcasestr(v,"root=")!=NULL) {
+      if ( strcasestr(v,"root=")!=NULL)  {
          equal=strchr(v,'='); if (!equal) {help(); fprintf(stderr,syntax,v); exit(1);}
          equal++;
          root=parse_blocks(equal);
          continue;    
       }
     
-      if (strcasestr(v,"swap=")!=NULL) {
+      if ( strcasestr(v,"swap=")!=NULL ) {
          equal=strchr(v,'=');
          equal++;
          swap=parse_blocks(equal);
@@ -331,7 +336,7 @@ void parse_arg(int argc, char *argv[]) {
          continue;
       }
 
-      if (strcasestr(v,"write=")!=NULL) {
+      if ( strcasestr(v,"write=")!=NULL ) {
          equal=strchr(v,'=');
          equal++;
          save=parse_blocks(equal);
@@ -354,7 +359,7 @@ int main(int argc, char *argv[])
   DC42ImageType  F;
 
   puts("  ---------------------------------------------------------------------------");
-  puts("    UniPlus Set ProFile Size v0.0.1                  http://lisaem.sunder.net");
+  puts("    UniPlus Set ProFile Size v0.0.2                  http://lisaem.sunder.net");
   puts("  ---------------------------------------------------------------------------");
   puts("          Copyright (C) 2021, Ray A. Arachelian, All Rights Reserved.");
   puts("              Released under the GNU Public License, Version 2.0");

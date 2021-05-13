@@ -47,6 +47,7 @@ extern "C" {
   extern int sound_effects_on;
   extern int skins_on_next_run;
   extern int hle;
+  extern int macworks4mb;
   extern int double_sided_floppy;
   extern void save_configs(void);
   extern uint8 floppy_iorom;
@@ -377,10 +378,10 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
 
  int memsizes[]={512,1024,1536,2048};
  my_lisaconfig->mymaxlisaram=memsizes[cpurambox->GetSelection()];
-
  cheat_ram_test=cheats->GetValue() ?1:0;
 
  hle=hle_cheats->GetValue() ?1:0;
+ macworks4mb=macwx4mb->GetValue() ? 1:0;
 
  sound_effects_on = soundeffects->GetValue()?1:0;
  double_sided_floppy=doublesided->GetValue() ?1:0;
@@ -532,17 +533,22 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
 
    (void)new wxStaticText(panel,wxID_ANY,   t,      wxPoint( 10* HIDPISCALE,  y), wxSize(500* HIDPISCALE, 30* HIDPISCALE));    y+=ya/2; //y+=ya/2;
 
-    wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"), /* wxT("2 MB*") */ };
-    cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 4, ramsize, 0, wxRA_SPECIFY_COLS,
+    wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"),  wxT("2 MB*") };
+    cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 3, //4 - to -reneable 2MB, uncomment case 2048 below as well
+       ramsize, 0, wxRA_SPECIFY_COLS,
        wxDefaultValidator, wxT("radioBox"));
+    
     switch(my_lisaconfig->mymaxlisaram)
     {
-     case 0x512  : cpurambox->SetSelection(0); break;
-     case 0x1024 : cpurambox->SetSelection(1); break;
-     case 0x1536:  cpurambox->SetSelection(2); break;
-//     case 0x2048:  cpurambox->SetSelection(3); break;
-     default:      cpurambox->SetSelection(2);
+     case  512:  cpurambox->SetSelection(0); break;
+     case 1024:  cpurambox->SetSelection(1); break;
+     case 1536:  cpurambox->SetSelection(2); break;
+     case 2048:  cpurambox->SetSelection(3); break;
+     default:    cpurambox->SetSelection(2); 
     }
+
+   macwx4mb = new wxCheckBox(panel, wxID_ANY, wxT("4MB RAM MacWorks"), wxPoint(320 * HIDPISCALE,y+(ya/4)), wxDefaultSize,wxCHK_2STATE);
+   macwx4mb->SetValue( (bool)(macworks4mb) );
 
    y+=ya; y+=ya/2;
 

@@ -56,8 +56,9 @@ extern "C"
  extern uint8 floppy_iorom;
 
  extern int double_sided_floppy;
-
  extern int hle;
+ extern int macworks4mb;
+
 }
 
 extern char *getDocumentsDir(void);
@@ -118,6 +119,7 @@ void LisaConfig::Load(wxFileConfig *config, uint8 *floppy_ram)
    cheat_ram_test=     (int)config->Read(_T("/cheatromtests"),1);
    double_sided_floppy=(int)config->Read(_T("/doublesided"  ),0L);
    hle=                (int)config->Read(_T("/hle"          ),1);
+   macworks4mb=        (int)config->Read(_T("/4mbmacworks"  ),1);
 
    serial1_setting = config->Read(_T("/seriala/connecta"));
    serial1xon      = config->Read(_T("/seriala/xon"), "1");
@@ -134,6 +136,9 @@ void LisaConfig::Load(wxFileConfig *config, uint8 *floppy_ram)
    ioromstr.sprintf(_T("%02x"),(uint8)iorom);
 
    mymaxlisaram=config->Read(_T("/MemoryKB"),1536l);
+
+   fprintf(stderr,"\nRead config RAM:%d\n\n",mymaxlisaram);
+
    saw_3a_warning=config->Read(_T("/no_warn_xl_rom"),0L);
    config->Read(_T("/ROMFILE"), &rompath);
    config->Read(_T("/DUALPARALLELROM"), &dualrom);
@@ -223,6 +228,8 @@ void LisaConfig::Save(wxFileConfig *config, uint8 *floppy_ram)
 
    config->Write(_T("/cheatromtests"),cheat_ram_test);
    config->Write(_T("/hle"),hle);
+   config->Write(_T("/4mbmacworks"),macworks4mb);
+
    config->Write(_T("/doublesided"),double_sided_floppy);
 
    config->Write(_T("/seriala/connecta"),   serial1_setting );

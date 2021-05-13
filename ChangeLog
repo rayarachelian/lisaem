@@ -9,8 +9,17 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 --- 1.2.7    Released on (TBA) (Major release for all platforms)
 
 
-2021.04.16 - HLE ProFile access for MacWorks XL 3.0 + LOS 3.1 read/write block
-             now works
+2021.05.12 - added some new dc42/*raw conversion tools and added -i,-d,-s
+             options to existing disk tools to turn de/interleave on/off.
+             raw-to-dc42 -d aphid.image   for example can allow you to
+             move a Cameo/Aphid image to LisaEm, likely
+             dc42-to-raw -i lisaem-profile.dc42 should copy a LisaEm
+             image to Cameo/Aphid.
+
+2021.05.02 - still trying to get UniPlus to work with the emulated ProFile
+
+2021.04.30 - more work on 4MB MacWorks, but need to find the right MacWorks
+             version and setup for MMU
 
 2021.04.13 - Added LOS 3.1 HLE block read code
 

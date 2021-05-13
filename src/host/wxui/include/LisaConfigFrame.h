@@ -71,6 +71,7 @@ public:
 
     wxCheckBox *cheats;            // startup BOOT ROM cheats
     wxCheckBox *hle_cheats;
+    wxCheckBox *macwx4mb;
     wxCheckBox *soundeffects;
     wxCheckBox *doublesided;
     wxCheckBox *skinson;
