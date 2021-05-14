@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
     long numblocks,i,b;
     FILE *raw;
     DC42ImageType profile;
-    int argn;
 
     char dc42filename[8192]; 
     uint8 block[533];
