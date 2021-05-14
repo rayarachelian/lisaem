@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
   DC42ImageType  F;
   char *Image=NULL;
   uint8 *data, *tags;
+  int argn;
 
   int do_patch=15;
   FILE *raw, *tag;
