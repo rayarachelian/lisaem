@@ -881,7 +881,7 @@ if  [[ -f "$LISANAME" ]]; then
               exit 0
         else
           #   PREFIX="/usr/local/bin"
-          #   PREFIXLIB="/usr/local/share/"
+              PREFIXLIB="/usr/local/share"
     
           echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
           mkdir -pm755 $PREFIXLIB/LisaEm/ $PREFIX
