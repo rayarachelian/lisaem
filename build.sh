@@ -909,7 +909,7 @@ if  [[ -f "$LISANAME" ]]; then
     
           echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
           mkdir -pm755 $PREFIXLIB/lisaem $PREFIX
-          cp ../resources/skins "$PREFIXLIB/lisaem/"
+          cp -r ../resources/skins "$PREFIXLIB/lisaem/"
           echo "* Installing lisaem binary in $PREFIX/lisaem" 1>&2
           cp ../bin/lisaem "$PREFIX"
           echo -n "  Done Installing." 1>&2
