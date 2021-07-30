@@ -144,7 +144,7 @@ cat <<END1 >motherboard/unvars.c
 # \**************************************************************************************/
 
 #define IN_UNVARS_C 1
-# include all the includes we'll (might) need (and want)
+// include all the includes we'll (might) need (and want)
 #include <vars.h>
 
 #define REASSIGN(  a , b  , c  )  {(b) = (c);}
@@ -249,6 +249,8 @@ for j in $@; do
 
             echo Uninstalling from $PREFIX and $PREFIXLIB
             rm -rf $PREFIXLIB/lisaem/
+            rm -rf $PREFIXLIB/applications/lisaem.desktop
+            rm -rf $PREFIXLIB/icons/hicolor/128x128/apps/lisaem.png
             rm -f  $PREFIX/lisaem
             rm -f  $PREFIX/lisafsh-tool
             rm -f  $PREFIX/lisadiskinfo
@@ -886,6 +888,9 @@ if  [[ -f "$LISANAME" ]]; then
           echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
           mkdir -pm755 $PREFIXLIB/lisaem $PREFIX
           cp -r ../resources/skins "$PREFIXLIB/lisaem/"
+          echo "* Installing launcher in $PREFIXLIB/applications" 1>&2
+          cp ../resources/lisaem.png "$PREFIXLIB/icons/hicolor/128x128/apps"
+          cp ../resources/lisaem.desktop "$PREFIXLIB/applications"
           echo "* Installing lisaem binary in $PREFIX/lisaem" 1>&2
           cp ../bin/lisaem "$PREFIX"
           echo -n "  Done Installing." 1>&2
