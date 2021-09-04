@@ -1,5 +1,7 @@
 Here's a list of some of the current known issues, there are likely many others.
 
+* Windows - unicode chars in paths to Profile disks fail to work properly so the hard drive won't be found. Stick to all ASCII paths.
+  this is not an issue for macos, I suspect this is some wxwidgets string conversion issue.
 * Terminal code isn't complete - menus don't work, Xmodem isn't complete.
 * serial port A is broken on Lisa Office System (causes a lockup on access to the port) so it's disabled by default, there's a build script option to force enable it anyway.
 * UniPlus + Xenix still don't fully boot.
