@@ -35,6 +35,8 @@ Bug reports are welcome, but most likely I'm already well aware.
 
 Arroooo!
 
+##  [Read the actual README.md as well](README-for-release.md)
+
 
 ## What is this thing?
 

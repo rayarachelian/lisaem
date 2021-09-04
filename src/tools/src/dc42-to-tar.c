@@ -339,12 +339,17 @@ int main(int argc, char *argv[])
   // so we can have the whole tar file in RAM that way we can use memmove as needed and easily
   // edit headers and remove the unused ends of the disk images.
 
+#ifndef __MSVCRT__
    for  (int file=1; file<argc; file++) {
          struct stat statbuf;
          int i=lstat(argv[file], &statbuf);
          if (i==0) memsize+=statbuf.st_size;
          else { fprintf(stderr, "Error accessing %s ",argv[file]); perror(""); exit(1);}
    }
+#else
+   // estimate it for windows
+   memsize=argc * 860 * 1024; 
+#endif
 
    tarball=calloc(2,memsize); // allocate 2x as much so we'll zero fill the end. Not efficient, but helps when we'll do memmove as zero filled records are EOF markers in tar
    if (!tarball) {fprintf(stderr,"Couldn't allocate %ld bytes\n",memsize); exit(2);}
@@ -380,7 +385,7 @@ int main(int argc, char *argv[])
    int filenum=1;
    cursor=0;
 
-   if (is_valid_header(tarball,cursor) )  fprintf(stderr,"valid: "); 
+   if (is_valid_header((tarhdr *)tarball,cursor) )  fprintf(stderr,"valid: "); 
    else { fprintf(stderr,"invalid header, not sure this was a tar file.\n"); exit(1);}
 
    char *lastfilename=NULL, *currentfilename=NULL; lastfilecursor=cursor;
@@ -394,21 +399,21 @@ int main(int argc, char *argv[])
          fprintf(stderr,"start of loop, next cursor:%08x (%d)\n\n\n",nextcursor,nextcursor);
          #endif
 
-         if (is_null_header(tarball,cursor)) {
+         if (is_null_header((tarhdr *)tarball,cursor)) {
              fprintf(stderr,"found null block at %08x (%d) - crunching it size:%ld\n",cursor+512,cursor+512,memsize);
              memmove( (char *)(&tarball[cursor]),(char *)(&tarball[cursor+512]),memsize ); // crunch empty headers that may exist between diskettes
              memsize-=512;
              continue;
          }
 
-         nextcursor=find_next_header(tarball,cursor);
+         nextcursor=find_next_header((tarhdr *)tarball,cursor);
 
          // here's the important bit. Xenix can split a single file across two disks, it does this by
          // putting the same file name, but with two different sizes. If you do this with modern tar,
          // the 2nd half of the file will OVERWRITE the first. Instead we want to merge them together.
          // that's why there's a need for this tool. Otherwise you can strip off the tags off all the
          // xenix floppy dc42 images and then just run tar on each one, but that would result in data loss.
-         if (!is_valid_header(tarball,nextcursor) ) 
+         if (!is_valid_header((tarhdr *)tarball,nextcursor) ) 
             { fprintf(stderr,"invalid header, not sure this was a tar file.\n"); exit(1);}
 
          cursor=nextcursor;
@@ -426,9 +431,9 @@ int main(int argc, char *argv[])
               header other file...           : *- sum file sizes and update tar header checksum
            */
 
-           size_t lastfilesize=get_tar_header_size(tarball,lastfilecursor);
-           size_t currentfilesize=get_tar_header_size(tarball,cursor);
-           size_t lastfileends=roundup512( lastfilecursor+512+get_tar_header_size(tarball,lastfilecursor) ); // new target
+           size_t lastfilesize=get_tar_header_size((tarhdr *)tarball,lastfilecursor);
+           size_t currentfilesize=get_tar_header_size((tarhdr *)tarball,cursor);
+           size_t lastfileends=roundup512( lastfilecursor+512+get_tar_header_size((tarhdr *)tarball,lastfilecursor) ); // new target
 
            fprintf(stderr,"found continued file %100s merging\n",lastfilename);
                   // target end of lastfile        source - start of current file (512 after header) - memsize to zero fill the end

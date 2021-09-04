@@ -1281,7 +1281,7 @@ void log_screen_box(FILE *f,int x, int y, int x2, int y2)
   uint8 *l=(uint8 *) calloc(1,4*size/3  +128);
 
   // save header - big endian, as ${diety} intended, of course.
-  m[1]=((x &  7) <<    4) | (x2&7);  // save x coordinate lefover bits so we know how many bits to the left and right to ignore later
+  m[1]=((x &  7) <<    4) | (x2&7);  // save x coordinate lefover bits so we know how many bits to the left and right to ignore later
   m[2]=((xb2-xb) >>    8)         ;  // size in x bytes
   m[3]=((xb2-xb) &  0xff)         ; 
   m[4]=((y2-y1 ) >>    8)         ;  // size in y lines
@@ -2931,7 +2931,7 @@ char *getbanner(void)
                     "-----------------------------------------------------------------------\n"
                     "  The Lisa II Emulator %-17s http://lisaem.sunder.net\n"
                     "  -------------------------------------------------------------------  \n"
-                    "  Copyright  (C) MMXX  by Ray A. Arachelian,   All Rights Reserved     \n"
+                    "  Copyright  (C) 2021  by Ray A. Arachelian,   All Rights Reserved     \n"
                     "  Released  under  the terms of  the  GNU Public License  Version 2.0  \n"
                     "  -------------------------------------------------------------------  \n"
                     "  For historical/archival/educational use only - no warranty provied.  \n"
@@ -5887,7 +5887,7 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
     #endif
 
     info.SetDescription(_T("The first fully functional Apple Lisa emulator."));
-    info.SetCopyright(_T("\xa9 2007, 2020 Ray Arachelian"));
+    info.SetCopyright(_T("\xa9 2007, 2021 Ray Arachelian"));
     info.SetWebSite(_T("http://lisaem.sunder.net"));
 
 //#ifdef BUILTBY
@@ -6521,16 +6521,13 @@ void LisaEmFrame::OnNewProFile(wxCommandEvent& WXUNUSED(event))
     {
         wxString filename=open.GetPath();
         strncpy(cfilename,CSTR(filename),MAXPATHLEN-1);
-        sz=pickprofilesize(cfilename);  if (sz<0 || sz>6) return;
+        sz=pickprofilesize(cfilename,0);  if (sz<-1 || sz>6) return;
         int i=dc42_create(cfilename,"-lisaem.sunder.net hd-",blocks[sz]*512,blocks[sz]*20);
         if (i) 
             wxMessageBox(wxT("Could not create the file to store the Profile.\n\nDo you have permission to write to this folder?\nIs there enough free disk space?"),
                               wxT("Failed to create drive!"));
     }
 }
-
-
-
 
 
 
@@ -7531,8 +7528,23 @@ void connect_2x_parallel_to_slot(int slot)
     via[v+1].active = 1;
 }
 
-/* Connects a printer/profile to the specified VIA */
-void connect_device_to_via(int v, wxString device, wxString *file)
+
+wxString g_profile_prefs_path="";
+
+// callback to write config when there's a profile path change, i.e. profile_mount fails
+// because file does not exists, and user selects a new file path.
+extern "C" void update_profile_preferences_path(char *newfilename) {
+
+   wxString newname=newfilename;
+   if ( ! g_profile_prefs_path.IsEmpty() )
+       pConfig->Write(g_profile_prefs_path, newname );
+
+   g_profile_prefs_path="";
+}
+
+
+// Connects a printer/profile to the specified VIA - 2021.08.24 added profile_prefs_path to save the preferences it came from.
+void connect_device_to_via(int v, wxString device, wxString *file, wxString profile_prefs_path)
 {
     char tmp[MAXPATHLEN];
     char *t;
@@ -7575,6 +7587,7 @@ void connect_device_to_via(int v, wxString device, wxString *file)
         t=strncpy(tmp,cSTR(file),MAXPATHLEN-1);
         ALERT_LOG(0, "Attempting to attach VIA#%d to profile %s", v, tmp);
         if (!via[v].ProFile) via[v].ProFile = (ProFileType *)calloc(1,sizeof(ProFileType));  // valgrind reports leak here, but it's ok, just not freed before exit
+
         int i = profile_mount(tmp, via[v].ProFile);
         if (i) {
             free(via[v].ProFile);
@@ -7918,10 +7931,18 @@ int initialize_all_subsystems(void)
        case 512  : maxlisaram=0x100000;  minlisaram=0x080000;  break;     // single 512KB board in slot 1
        case 1024 : maxlisaram=0x180000;  minlisaram=0x080000;  break;     // two 512KB boards in slot1, slot 2
        case 1536 : maxlisaram=0x200000;  minlisaram=0x080000;  break;     // meh, this causes crashes // 512KB board in slot1, 1024KB board in slot 2
-       //case 2048 : maxlisaram=0x140000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
+
+       #ifdef ALLOW2MBRAM
+       case 2048 :
+                   #ifdef FULL2MBRAM
+                   maxlisaram=0x200000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
+                   #else
+                   maxlisaram=0x1e0000;  minlisaram=0x000000;  break;
+                 //maxlisaram=0x140000;  minlisaram=0x000000;  break;     // two 1024KB boards in slot 1,2 I can do -128k here but no less for max ram, but not 2MB with H-ROM
+                   #endif
+       #endif
 
        default:    maxlisaram=0x200000;  minlisaram=0x080000;  break;     // 512KB board in slot1, 1024KB board in slot 2
-
     }
 
     // maxlisaram! New!  And! Improved! Now available in bytes at a register Store Near You!  OpCodes are Standing by!
@@ -8118,7 +8139,8 @@ int initialize_all_subsystems(void)
   setstatusbar("Initializing Parallel Port");
 
   // Connect profile/printer to builtin parallel port
-  connect_device_to_via(2, my_lisaconfig->parallel, &my_lisaconfig->parallelp);
+  connect_device_to_via(2, my_lisaconfig->parallel, &my_lisaconfig->parallelp, "/parallelport/path");
+
 
   // ----------------------------------------------------------------------------------
 
@@ -8135,24 +8157,24 @@ int initialize_all_subsystems(void)
             {
               ALERT_LOG(0,"Connecting slot 1");
               connect_2x_parallel_to_slot(0);
-              connect_device_to_via(3, my_lisaconfig->s1h, &my_lisaconfig->s1hp);
-              connect_device_to_via(4, my_lisaconfig->s1l, &my_lisaconfig->s1lp);
+              connect_device_to_via(3, my_lisaconfig->s1h, &my_lisaconfig->s1hp, "/cardslot1/highpath");
+              connect_device_to_via(4, my_lisaconfig->s1l, &my_lisaconfig->s1lp, "/cardslot1/lowpath");
             }
   
         if  (my_lisaconfig->slot2.IsSameAs(_T("dualparallel"),false) || my_lisaconfig->slot2.IsSameAs(_T("Dual Parallel"),false))
             {
               ALERT_LOG(0,"Connecting slot 2");
               connect_2x_parallel_to_slot(1);
-              connect_device_to_via(5, my_lisaconfig->s2h, &my_lisaconfig->s2hp);
-              connect_device_to_via(6, my_lisaconfig->s2l, &my_lisaconfig->s2lp);
+              connect_device_to_via(5, my_lisaconfig->s2h, &my_lisaconfig->s2hp, "/cardslot2/highpath" );
+              connect_device_to_via(6, my_lisaconfig->s2l, &my_lisaconfig->s2lp, "/cardslot2/lowpath");
             }
   
         if  (my_lisaconfig->slot3.IsSameAs(_T("dualparallel"),false) || my_lisaconfig->slot3.IsSameAs(_T("Dual Parallel"),false))
             {
               ALERT_LOG(0,"Connecting slot 3");
               connect_2x_parallel_to_slot(2);
-              connect_device_to_via(7, my_lisaconfig->s3h, &my_lisaconfig->s3hp);
-              connect_device_to_via(8, my_lisaconfig->s3l, &my_lisaconfig->s3lp);
+              connect_device_to_via(7, my_lisaconfig->s3h, &my_lisaconfig->s3hp, "/cardslot3/highpath");
+              connect_device_to_via(8, my_lisaconfig->s3l, &my_lisaconfig->s3lp, "/cardslot3/lowpath");
             }
       }
       else
@@ -8224,11 +8246,25 @@ extern "C" void save_configs(void)
   save_global_prefs();
 }
 
-            //               0     1     2     3     4     5     6
-            //              5M   10M   16M   20M   32M   40M    64M
-extern "C" int pickprofilesize(char *filename)
+
+
+
+//               0     1     2     3     4     5     6f
+//              5M   10M   16M   20M   32M   40M    64M
+// if allowexisting is set, and return value is -1, filename has been changed to a different setting and needs
+// to be written back to the preferences. 2021.08.24
+extern "C" int pickprofilesize(char *filename, int allowexisting)
 {
-  wxString choices[]={  _T( "5M - any OS"),
+  wxString choices0[]={ _T( "5M - any OS"),
+                        _T("10M - any OS"),
+                        _T("16M - MacWorks only"),
+                        _T("20M - MacWorks only"),
+                        _T("32M - MacWorks only"),
+                        _T("40M - MacWorks only"),
+                        _T("64M - MacWorks only") };
+
+  wxString choices1[]={ _T( "Select existing ProFile instead of creating a new."),
+                        _T( "5M - any OS"),
                         _T("10M - any OS"),
                         _T("16M - MacWorks only"),
                         _T("20M - MacWorks only"),
@@ -8245,10 +8281,43 @@ extern "C" int pickprofilesize(char *filename)
   d=new wxSingleChoiceDialog(my_lisaframe,
                               txt,
                               _T("Hard Drive Size?"),
-                              7,             choices);
-  if (d->ShowModal()==wxID_CANCEL) {delete d; return -1;}
+                              7,      allowexisting ? choices1:choices0);
+  if (d->ShowModal()==wxID_CANCEL) {delete d; filename[0]=0; return -1;}
 
-  int r=d->GetSelection();
+  int r=d->GetSelection()-(allowexisting ? 1:0);
+
+  // User selecting existing image ///////////////////////////////////////////////////////////////////////////////////////////////
+  if (r==-1 && allowexisting) {
+    int check=1;
+    while (check) {
+        wxString openfile;
+        wxFileDialog open(my_lisaframe,         wxT("Select an ProFile hard drive image"),
+                                                wxEmptyString,
+                                                wxEmptyString,
+                                                wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                                                (long int)wxFD_OPEN,wxDefaultPosition);
+
+        if (open.ShowModal()==wxID_OK) {        openfile=open.GetPath();
+                                                strncpy( filename, CSTR(openfile), FILENAME_MAX );
+                                                
+                                                DC42ImageType P;
+
+                                                check=dc42_auto_open(&P, filename, "");
+                                                // if we failed to open, or it's not at least a 5MB dc42 image, alert and don't accept
+                                                if ((!check) || P.datasizetotal < (9728 * 512) ) { 
+                                                    filename[0]=0; // clear return file
+                                                    messagebox("The selected file is either not a proper DC42 image, or it's not a ProFile/Widget image.", "Sorry Not a Lisa Hard Disk Image");
+                                                }
+                                                dc42_close_image(&P);
+                                                check=0;
+                                       }
+        else                           // cancel selected, fall through and clear the file name.
+                                       {filename[0]=0; check=0; r=-1;}
+    }
+
+    delete d;
+  } ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
   delete d;
   return r;
 }
@@ -8743,6 +8812,8 @@ char *get_welcome_fortune(void)
   "\"Jinkies! Old man Jobs tried to kill the Lisa!\" \"And I would have gotten away with it too if it weren't for you meddeling kids!\"",
   "Bender lives large and kicks butt!",
   "Who's 'We', Mammal?",
+  "You have to use a light touch; like a safecracker, or a pickpocket.",
+  "Yes, I saw. You were doing well until every Lisa died.",
   "\"You guys don't know what you're doing!\", he began... \"The Mac is going to destroy the Lisa! The Mac is going to ruin Apple!!!\"",
   "Steve said, \"Well, should we fire him?\" Andy replied \"No, just get him a copy of LisaEm!\"",
   "That's no hourglass.. I'm busy being born!",
@@ -8768,6 +8839,7 @@ char *get_welcome_fortune(void)
   "Posers! I was hating Jobs before it was cool",
   "Cashier does not have the keys to a successful emulation",
   "That's IT! I'm getting a hundred cups of coffee... Starting now!",
+  "Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee, Coffee!",
   "It costs a little more, but it's worth it!",
   "001100 010010 011110 100001 101101 110011",
   "Hey buddy, I'm from the same time as you, remember that song, safety dance? You know that dance wasn't as safe as they said it was...",
@@ -8775,10 +8847,10 @@ char *get_welcome_fortune(void)
   "Awesome! Awesome to the Max!",
   "I nominate... That Guy! Not just because he has a suit, but because he knows about business, and has a tie",
   "Second",
-  "Scruffy believes in this company",
+  "(removes hat and places on chest) Scruffy believes in this company",
   "Hey! You ate my change!",
-  "Please welcome, our new chief executive officer, That Guy",
-  "Gutsy question, you're a shark",
+  "Please welcome, our new Chief Executive Officer: That Guy",
+  "Gutsy question! You're a shark",
   "I am proud to be the sheppard of this herd of sharks, and I'll lead you to the top in this industry of (whishpers) Lisa Emulation? Oh god! Fantastic!",
   "That's not a business plan, it's an escape plan",
   "what fevered dream is this bids to tear this emulator in twain",
@@ -8788,23 +8860,155 @@ char *get_welcome_fortune(void)
   "Our enemies shall be eaten by squirrels",
 
   "Nobody exists on purpose, nobody belongs anywhere, every Lisa's going to break down, emulate LOS on LisaEm.",
+  "Chudely Dudely Ho!",
 
   "The mouse is sticky with honey!",
   "Argle-Bargle ::== <NULL>  Essentially you can forget that Argle_Bargle exists for this MMU context!",
 
-  "Once upon a time was a lovely little sausage named baldrick, and it lived happily ever after. The end.",
+  "Oh Steve, you are a smeg-head",
+  "Today is both a day of sadness and joy, sadness because the Lisa has passed, and joy because she's back as an emulator",
+  "Looking better than nice, I'm looking dangerous, Meeeeeeeoww",
+  "Smegging brilliant",
+  "I knew I was lying. No silicon heaven? Preposterous! Where would all the Lisas go?",
+  "Of course, lager! The only thing that can kill a vindaloo! "
+  "How come you need more memory? Over the years you've had more RAM than a field of sheep!",
+  "Now there is an invitation that will NOT cause a stampede.",
+  "Let's at least ask someone who's at least going to give us a slightly more intelligent opinion. Hello, wall! What do you think?",
+  "I'm so gorgeous, there's a six month waiting list for birds to suddenly appear, every time I am near!",
+  "I am LisaEm, the ship's computer, with an IQ of 6000; the same IQ as 6000 Mac 128s.",
+  "I was in love once. A Sinclair ZX81. People said, no, Lisa, he's not for you. He's cheap, he's stupid and he wouldn't load, well, not for me anyway.",
+  "I have a medium-sized logic analyzer buried in my spinal column. That sort of thing can really put a crimp on your day.",
+  "Smoke me a Kipper, Skipper, I’ll be back for Breakfast",
+  "Oh, it’s a little box that goes “Bzzzt.” Just what I’ve alwayswanted.",
+  "RIMMER. Hologram. Ex-human. VIABLE TARGET",
+  "Apple Lisa. Emulated. Ex-machine. VIABLE TARGET",
+  "Well, to coin a phrase: Whoops!",
+  "Oh, don’t apologise — it’s those cute little flaws that keep a guy interested.",
+  "CAT. Felis Sapiens. Non-human. VIABLE TARGET",
+  "LisaEm. Emulator Ex-computer. VIABLE TARGET",
+  "Waiter! My gazpacho soup is cold, bring it back piping hot!",
+  "Up the zigurat lickety split",
+  "Nothing wrong with LisaEm. Full of goodness, full of vitamins, full of marrowbone jelly. Lasts longer than any other type of emulator, LisaEm",
+  "I could never invent an emulator like this, Ray. All the ingredients are wrong. The GUI: wrong, the VIA: wrong, the skin - all wrong; But put them together and somehow it works.  It becomes right.  It's you -- this emulator",
+  "This better be good! I was sleeping, and sleeping's my third favorite thing!",
+  "Don’t worry this is easier than repairing a faulty drive plate in White Corridor 159.",
+  "Engaging Holly-Hop Drive...",
+  "Holly: Emergency, there's an emergency going on. It's still going on.",
+  "Tickety-boo!",
+  "It's cold outside, there's no kind of atmosphere, I'm all alone, more or less.",
+  "Let me fly, far away from here, Fun, fun, fun, In the sun, sun, sun.",
+  "I want to lie, shipwrecked and comatose, Drinking fresh, mango juice,",
+  "We'll lock on course straight through the universe, You and me and the galaxy, Reach the stage where hyper-drive's engaged",
+  "I hope when you come, the weather will be clement",
+  "Ah, Kryten, nothing to do? Follow me and write this Lisa emulator",
+  "His name's not Master. His name is Steve or Smeghead, and on special occasions you can call him Acehole",
+  "Lister: Drop dead Rimmer, Rimmer: Already have done",
+  "I think.... I think I'm rebelling",
+  "Of all the emulators in all the systems, you had to load into mine...",
+  "Better than a game of Better Than Life",
+  "It's LisaEm you gimp",
+  "I can't hang around here, I have to go take the penguin for a walk",
+  "4,691 irradiated Haggis in store",
+  "Visual System: CCD 517.3 AI: K177, Machine Ident: Talkie Toaster: MFG: Crapola Inc.",
+  "Ahhhh, so you're a waffle man!",
+  "Would anyone like any toast?",
+  "I toast, therefore I am",
+  "Computer senility, such a weird condition... kerplunk kerplunk thribble",
+  "New I.Q. Rating: 12,368",
+  "What a truly copacetic piece of equipment",
+  "Jobs: \"Lisa, You've been found unworthy of having existed and will be wiped from history. The void you occupied in the space-time continuum will be allocated to the Mac 128",
+  "Rude alert, Rude alert, Abandon shop! This is not a daffodil. Repeat ... This is not a daffodil. Repeat: This is not a daffodil!",
+  "Lie Mode: Of course it'll work Sir, no worries. Hook, line, sinker, rod, and copy of Angling Times, Sir.",
+  "Ah... smug mode, I can't hang around saving your necks all day, I'll go make short work of the ironing...",
+  "This old baby's crashed more often than a ZX81",
+  "More fun than a season pass to Rimmer Experience Ride",
+  "Yummier than cottage cheese with pineapple chunks in",
+  "Smeg happens, you just have to roll with it",
+  "Lisa, you're dead but you're still running. For me, how lucky is that?",
+  "I went bobbing for apple lisas in a cement mixer.",
+  "Existence is all absurd. Why get up in the morning (if not to emulate Lisae?)",
+  "You mean to say I've been busting my balls so you can have UniPlus on your lousy stinking emulator?",
+  "ALERT! ALERT! A chocky nut bar has been removed! Repeat, a chocky nut bar has been removed without payment!!! ALERT! ALERT!",
+  "HA HA HA HA HA HA HA!!!!! I had me circuits crossed! ALERT! ALERT!",
+  "Cesiumfranciolithicmyxialobidiumrixydixydoxidrexidroxhide",
+  "No - not my brain! Not my brain! I need that sometimes!",
+  "Come on, come on, Lisa, why are you always so slow? I've seen snails with club feet move faster than you; the French army after lunch moves quicker.",
+  "Things are about to get a lot more Rimmery",
+  "Condition TAUPE",
+  "Condition Tangerine",
+  "Mr. Fibble's very cross",
+
+  "Can you see the writing on the wall? Can you see the riders on the storm?",
+
+  "\"Tolerance will reach such a level that intelligent people will be banned from thinking so as not to offend the imbeciles.\" - Dostoievski",
+  "\"We demand rigidly defined areas of doubt and uncertainty.\" -Douglas Adams",
+  "\"I have certain rules I live by. My first rule: I don’t believe anything the government tells me.\" – George Carlin",
+  "\"Everything That Has Transpired Has Done So According To My Design.\" - Emperor Palpatine",
+  "\"When tyranny becomes law, rebellion becomes duty\" - Thomas Jefferson",
+  "\"When the whole world is running towards a cliff, he who is running in the opposite direction appears to have lost his mind.\" -- C.S. Lewis",
+
+  "\"In a Time of Universal Deceit, Telling the Truth Is a Revolutionary Act\" - George Orwell (but possibly not)",
+  "I_v_e_r_m_e_c_t_i_n  f_o_r  d_a   w_i_n",
+  "Up yours, Klaus and BillG -- up wherever your species traditionally crams things; I'll rent nothing, buy/make/repair/own whatever I want, and be actually happy instead of a serf",
+  "When you tear out a man's tongue, you are not proving him a liar, you're only telling the world that you fear what he might say. - GRRM",
+  "Lysenko, once tried to co-opt science to political ideals and as a result caused mass starvation. Never ever allow politics or profits to run science!",
+  "If we lose freedom here, there’s no place to escape to. This is the last stand on Earth.",
+  "\"Ignore the facts in front of you, Deny thе logic and the truth, Conform to mediocrity, You know it's manufactured hopе\" - Fear Factory Manufactured Hope",
+  "\"The truth is singular. Its 'versions' are mistruths.\" - David Mitchell",
+  "Who controls the past controls the future. Who controls the present controls the past.",
+  "Freedom is the freedom to say that two plus two make four. If that is granted, all else follows",
+  "In the USSR dissenters were committed as insane, because \"you'd have to be crazy to go against the party\"",
+  "No one ever seizes power with the intention of relinquishing it.",
+  "The new serfdom: own nothing, rent everything, and be miserable, so BillyG and his Epstein Island buddies can be slightly richer",
+  "Great Reset? Just say Nope! Imagine a boot stamping on a human face—for ever.",
+  "Great Reset? Isn't that slavery with extra steps?",
+  "Great Reset? Are you trying to bring back the dark ages and serfdom? Because that's how you do that!",
+  "The ultra wealthy own multiple jets and yachts while they want us to rent everything, and own nothing, and be happy? Ha!",
+  "Pssst! Want to reverse desertification? Ruminants such as cattle can do that, they don't pollute as much planting GMO monocrops do",
+  "What's more nutritious than plant based? Meat. Ounce for ounce liver has a lot more than any superfood plant",
+  "Did you know human brains evolved by the use of cooking and hunting. Farming led to increased disease and brain shrinkage",
+  "Without the ability to own property, no one can invest in anything, thus remaining a perpetual serf, always renting everything, never able to rise above their class",
+  "War is the new normal. Great Reset is slavery. Ignorance is 10 o'clock news fed",
+  "And if all others accepted the lie (and censorship) which the Party imposed - if all records told the same tale - then the lie passed into history and became truth.",
+  "How nice that the machine provides freedom from thought, that you can blindly repeat what you're told on the news as fact and denouce those who question the fake reality imposted on the citizenry",
+  "How nice that you can cancel/censor those who question the machine because you're trained to not be able to think for yourself",
+  "Psst! WhiteHouse telling cellco's, goog, yt, twitter, fb, etc. what to censor is a form of prior restraint and is unconstitutional",
+  "(Cough cough)... ccu cgg cgg gca (cough cough, GoF, GoF)...",
+  "Using our tax $$$, NIAD paid $6M to EHA, a cutout, to pay WIV's GoF R&D, then gifted that R&D to 3 companies, causing massive inflation further destroying our economy! Foxes in charge of then henhouses!",
+  "Psst! MacAfee was Epsteined.",
+  "The nine most terrifying words in the English language are: I'm from the Government, and I'm here to help. (still very much true today!)",
+  "\"I Disapprove of What You Say, But I Will Defend to the Death Your Right to Say It\" - So why blindly accept cancel culture censorship? Have we forgotten this?",
+  "They also cancel cultured Galileo Galilei and Giordano Bruno because everyone 'knew the Earth was the center of the universe'",
+  "Drs. Marshall & Warren were called quacks for claiming H.Pylori survived stomach pH. Marshall infected himself to prove it! Today they'd be cancel-culture censored by antisocial media!",
+  "Freedom consists of the distribution of power (and wealth), despotism is it's concentration",
+  "War is peace. Freedom is slavery. Ignorance is strength, inflation is deflation.",
+  "The past was erased, the erasure was forgotten, the lie became the truth.",
+
+  "4/5 capacitors agree, if you're gonna smoke, RIFA power supply capacitors explode the best",
+  "NiCAD battery packs: silent but deadly",
+  "We can't go in there, those Lisas don't wear cases, you can see their bare circuits!",
+
+  "\"Always take stones out of your shoe\" - Floki",
+  "Oh ho! A single entendre, the most complicated joke there is!",
+  "This is the greatest thing I have ever seen, and I have seen like 5 things!",
+
+  "Once upon a time was a lovely little sausage named Balderick, and it lived happily ever after. The end.",
   "\"I have a cunning plan!\" - Balderick",
   "Baldrick: \"Well, that depends how cunning you mean, My Lord.\"",
   "Baldrick: \"Wait a moment, My Lord! I have a cunning plan that cannot fail!\"",
   "I’ve got a plan so cunning you could put a tail on it and call it a weasel.",
-  "Blackadder: As cunning as a fox who’s just been appointed Professor of Cunning at Oxford University?",
-  "I’m I jumping the gun, Baldrick, or are the words \"I have a cunning plan\" marching with ill-deserved confidence in the direction of this conversation?",
+  "As cunning as a fox who’s just been appointed Professor of Cunning at Oxford University?",
+  "Life without LisaEm is like a broken mouse: pointless",
+  "Blackadded, Blackadder, he's smarter than an duck",
+  "Well, Bravo! With Big Brass Bells On!",
+  "Am I jumping the gun, Baldrick, or are the words \"I have a cunning plan\" marching with ill-deserved confidence in the direction of this conversation?",
   "Young Crone:\"Two things, my Lord, must ye know of the Wise Woman. First... she is a woman! And second... she is...\" Blackadder: \"Wise?\"",
-  "Yes. To you, Baldrick, the Renaissance was just something that happened to other people, wasn't it?",
+  "Yes. To you, Balderick, the Renaissance was just something that happened to other people, wasn't it?",
   "Forgive me, Herr Blackadder. I have been neglecting my duties as a host. Please accept my Apple-ogies.",
   "Tally-ho, Blackadder! You look has happy as a man who thought a cat had done his business on his pie, but it turned out to be an extra big blackberry!",
   "The Ancient Greeks wrote in legend of a terrible container in which all the evils of the world were trapped. All they got wrong was the name, they meant LisaEm",
   "There are amoeba on Saturn who could emulate a Lisa better than you, Ray!",
+  "You twist and turn like a ... twisty-turny thing. I say you are a weedy pigeon and you can call me Lisa if it isn't so.",
 
   "There's only been 3 revolutions in the computer industry: the transistor, the invention of the IC, and I think I just saw the 3rd!", // yt/cKZxia0lYGU
 
@@ -8844,6 +9048,7 @@ char *get_welcome_fortune(void)
   "Sploosh!",
   "Must be some kind of MMU segment, er... zone.. of danger...",
 
+  "As bad as Steve was, he always had better taste than Billy G, you see, Steve didn't visit Epstein Island",
   "Welcome to Lisa Emulation and Earth Invasion Tonight!",
   "Tonight at 11: Lisa Emulatioooooon",
   "EEEK! My NiCADs leaked!",
@@ -8867,6 +9072,7 @@ char *get_welcome_fortune(void)
   "I am LisaEm, please insert microdisk.",
   "I am LisaEm, please insert widget.",
   "LisaEm: the first emulator to qualify for a boat loan",
+  "\"Only 14.99 for a two-emulator set? Two emulators! Oh, Zoidberg, at last you're becoming a crafty consumer. Hello? Hello? I'll take eight!\"",
   
   "Get it all together. And put it in a dc42. All your bits. And if you gotta take it somewhere, take it somewhere, take it to the .image store and sell it, or put it in a .image museum, I don’t care what you do, you just get your dc42 images together!",
   "Morty, you want to answer a literal JSR to Emulation?",
@@ -8889,6 +9095,16 @@ char *get_welcome_fortune(void)
   "You kids did real good here. Emulating and playing games is the best!",
   "We've got an over supply of programmers putting a strain on the emulation drive.",
   "These controls... just like my Lisa's controls.. ",
+  "Analysis mode password: 8==D",
+  "Analysis mode password: 80085",
+  "Happy Analisys mode",
+  "Happy Analisys mode to you too",
+  "This isn't Lisa Emulation, it's an Asimov Cascade!",
+
+  "You walked across half the known world for 8 lemons?",
+
+  "Because an actual real Lisa is slower than the speed of dark",
+  "\"You always pass failure on the way to success.\" - Mickey Rooney",
 
   "What about the reality where the Lisa won and the Mac lost? Just don't think about it Morty!",
   "I'm better than your actual Lisa, I'm a version of your Lisa you can trust when she says 'I run everywhere'. Nobody emulates on purpose, nobody belongs in hardware, everbody's gonna die, come emulate with me.",
@@ -9147,7 +9363,9 @@ char *get_welcome_fortune(void)
   "The secret is freshly squeezed Lisas",
   "Fry did it! Whoop whoop whoop whoop whoop!",
 
-
+  "It's OK Morty, it's what you do... Now let me Deus Ex-Machina this LisaEm, and let's go home",
+  "Now? Now we go team LisaEm!",
+  "Time to turn up the throttle",
   "What the! All that's left are these ****y Kirkland Brand Lisa Emulation Boxes...",
   "There's a lesson here... and, I'm not the one that's gonna figure it out.",
   "You have to emulate-ahead AND live into the moment",
@@ -9155,16 +9373,22 @@ char *get_welcome_fortune(void)
   "What are you guys doing? Did you develop an emulator! It's tatooed on his forehead!",
   "LisaEm... of all the overrated emulators, in all the git repos in the world, why did it have to be LisaEm...",
   "You know what emulation is, Ray, it's a pointless bid for control. You want to take the one part of life that you truly think is yours and you want to protect it from a universe that takes whatever it wants.",
-  "Ray: These are Flurbos. Do you understand what two humans can accomplish with 3000 of these? An entire afternoon of LisaEeeeemmmmmmm!",
-  "Lookit this. You beat cancer and then you went back to work at the emulation store? Boo",
+  "Here you go, 3000 Flurbos, now where's my Lisa Emulator",
+  "Ray: These are Flurbos. Do you understand what two humans can accomplish with 3,000 of these? An entire afternoon of LisaEeeeemmmmmmm!",
+  "Cancer can't beat the rocket!",
+  "LookIt this! You beat cancer, and then you went back to work at the emulation store? Boooo Morty!",
   "Fifty-five years. Not bad, Morty. You really wasted your 30s with that whole emulation writing phase",
   "Uh-huh, yeah, that’s the difference between you and me, Morty. I never go back to the emulation store.",
-  "Oh boy, here I go emulatin’ again!",
-  "Holy shit! This guy’s taking Ray off the grid! ... This guy doesn’t have a social security number for Ray!",
+  "If you ever need any computer emulated, I have no code of ethics, I'll emulate any system anywhere, I just love emulating!",
+  "Oh boy! Here I go emulatin’ again!",
+  "Holy $#!t! This guy’s taking Ray off the grid! ... This guy doesn’t have a social security number for Ray!",
+  "Well of course, right through that tube!",
+  "Who wants to watch Mortynight Run with Director's Commentary on? First one there gets to adjust the picture settings...",
   "Oh, good job, Morty. Y-Y-Y-You killed my best emulator, but you saved a mind-reading fart!",
+  "Wait, did you change my seat settings?",
   "Just hit buttons, we're too big to fail!",
   "You thimk I'd lie to you about why we're running an emulator? I wouldn't lie to you Morty... huh, that's a lie...",
-  "A bigger emulation emergency than my lemon bars not setting?",
+  "A bigger emulation emergency than my lemon bars not setting? I think not!",
 
   "It's a Saturnalia Miracle!",
   "Great Scott! It has a 1.21GAmp power supply! So we can go forward... to the past!",
@@ -9176,6 +9400,9 @@ char *get_welcome_fortune(void)
   "Look, you're the guy that wanted an epic adventure, I'm the guy with only one LisaEm.",
   "Lisa Emulation!?!! Ray, you SOB, I'm in!",
   "Oooweee",
+  "And awaaaaaaaay, weeeee gooooo.....",
+  "Are you kidding me? Two dots? This never needs to be more than one dot! The two of you made us uncertain! We're entirely hypothetical...",
+  "I assume they're both are and aren't Schrodinger's Cats",
   "Hey Steve, every Lisa 68000 clock cycle I emulate without your permission raises my self esteem",
   "Initiate clap sequence.. clap...clap...clap... slow clap achieved",
   "Hey LisaEm-O-Tron, I programmed YOU to believe that you're an actual Lisa",
@@ -9371,8 +9598,20 @@ char *get_welcome_fortune(void)
 
   "B.L.A.R.F. N.A.R.G. F.R.E.E.P.O.",
 
-  "The sky above the port was the color of a Lisa CRT, running a dead office suite.",
-  "The past is already here – it's just not evenly distributed.",
+  "PART ONE. TEXACO TOWER BLUES.",
+  "The sky above the parallel port was the color of a Lisa CRT, running a dead office suite.",
+  "`It's not like I'm emulating,' Ray heard someone say, as he shouldered his way through the crowd around the door of the Chat. `It's like my body's developed this massive LisaEm deficiency.'",
+  "It was a 68000 voice and a 68000 joke. The LisaEm was a bar for professional emudevs; you could drink there for a week and never see two objects in Python.",
+  "Ray was tending bar, his prosthetic arm jerking monotonously as he filled a tray of thumb drives with draft LisaEm.",
+  "LisaEm's ugliness was the stuff of legend. In an age of affordable beauty, there was something heraldic about it's lack of it.",
+  "You are too much the artiste Herr Ray... You are the artiste of the slightly funny emulation.'",
+  "Ray's emu was a 23-year-old American imitation of a British copy of an Sega emulator, double-action on the first boot, with a very rough git pull.",
+  "Lisa fell into the prison of her own iron. She jacked into a custom Raspberry Pi CPU mod that projected her consciousness into the consensual hallucination that was LisaEm. ",
+  "Strapped over a breadboard in a workbench, his talent burning out micron by micron, he hallucinated C code for thirty hours.",
+  "He'd found her, one rainy night, in an 80s office.",
+  "\"I think you screwed up, Ray. I showed up and you just fit me right into your emulation picture.\", Lisa shook her head",
+  "She held out her hands, palms up, the white fingers slightly spread, and with a barely audible click, ten double-sided, 5.25\" FileWare media slid from their housings beneath the burgundy covers.",
+  "Technically nonlethal",
   "When you want to know how things really work, study them when they're coming apart",
   "Time moves in one direction, ROM another. We are that strange species that constructs artifacts intended to counter the natural flow of forgetting.",
   "LisaEm is a waste of time, and that's exactly what's right about it. -- William Gibson",
@@ -9405,6 +9644,19 @@ char *get_welcome_fortune(void)
   "I will not compile the code for emulating again... I will not compile the code for emulating again... I will not compile the code for emulating again...",
   "I look upon the crumbling Lisas and despair",
   "When you do things right, people won’t be sure you’ve done anything at all.",
+  "The use of long words expresing something other than their unsigned intention!",
+  "Your emulator lacks subtlety! You can't just have your programs pop up dialog boxes with how they feel! That makes me feel hangry!",
+  "The candle that burns twice as bright, burns half as long.",
+  "Scruffy believes in this emulator...",
+  "But we'll always know that I'm a man, and you're emulatorial equipment.",
+  "Seconded",
+  "All time travel to the year 1983 is forbidden",
+  "All time travel to the year 2020 is forbidden",
+  "\"Hey Ray, you building an emulator?\" \"Part of one.\"",
+  "I don't want to live in macos anymore",
+  "Oh cruel fate, to be thusly emulated, ask not for whom the emulator emulates, it emulates for thee.",
+
+
   "We have such sights to show you...",
   "Tearing the Mask Off LOS to See the Face of LisaEm",
   
@@ -9494,11 +9746,25 @@ char *get_welcome_fortune(void)
   "When gone am I, the last of the Lisas will you be. The emulation runs strong in your family. Pass on what you have learned.",
   "Dath Steve, You can’t stop emulators, any more than you can stop the Sun Microsystems from setting.",
   "What if I told you that Apple Computer Inc. is now under the control of a Dark Lord of the Sith?",
+  "Karrabast!",
 
   "Be excellent to each other.",
   "Be excellent to each other. And Party On Dudes!",
-  "Party on dudes!",
+  "This is deputy Van Halen down at the station, look, we found your Lisa, if you want it, you'd better come and get it...",
+  "Let's reach out and emulate someone...",
+  "In unison: \"Excellent!\"",
+  "We're going to the age of civilization...",
+  "Look him up, it's under \"So Crates\".. \"The only true wisdom consists of knowing that you know nothing\"...",
+  "\"I don't know... philosophize with him\"... \"All we are is dust in the wind dude\"...",
   "We were there, there were many steps and columns, it was most tranquil",
+  "Party on dudes!",
+  "How's it going dudes?",
+  "Friends, friends, friends, these are emulations, replicas only, furnished with my agenda. Now what is your mission?",
+  "Emulated before a live audience at the San Dimas Civic Auditorium",
+  "This should be a most resplendid emulation",
+  "Most triumphant",
+  "Hey Missy... I mean,uh, Mom",
+  "A most Excellent adventure through time...",
   "Very important, do not do your homework without wearing headphones.",
   "Don't overlook my butt, I work out all the time. And emulating burns a lot of calories.",
   "Not bad. - Yeah, let's make it bad!",
@@ -9517,6 +9783,13 @@ char *get_welcome_fortune(void)
   "Things are about to change in a most outstanding way.",
   "Yeah. Maybe we should always not know what we’re doing.",
   "You don’t just get to emulate. You've got to earn the right to emulate.",
+  "Totally Non-Heinous",
+  "They totally Melllvared me", // Melvined, George Tekai: "I think I've done enough conventions to know how to spell 'Melllvar'" tee hee tripple Trek+Futurama+Bill&Ted fortune right there for the price of 1!
+
+  "I ask myself 'Ray, is it worth it?' I answer myself 'Yes, yes, yes! It IS worth it Ray! Viva La'Emulation!'", // Ray Le Pew
+  "I keep all my floppies numbered for just such an emergency", // Foghorn
+
+  "It's the stuff that dreams are made of", // Sam Spade, Maltese Falcon
   
   "\"We all have our time machines, don't we. Those that take us back are memories... And those that carry us forward, are dreams.\" - H.G. Wells",
 
@@ -9592,6 +9865,8 @@ char *get_welcome_fortune(void)
 
   "We have clearance Clarence. · Roger, Roger. What's our vector Victor? That's Clarence Oveur. Over.",
 
+  "\"When the whole world is running towards a cliff, he who is running in the opposite direction appears to have lost his mind.\" -- C.S. Lewis",
+
   "An Elegant Emulator From a More Civilized Age.",
   "MOS 6504 - You will never find a more wretched CPU of scum and villainy.",
   "Now witness the emulation power of this fully armed and operational Emulator Platform",
@@ -9601,21 +9876,37 @@ char *get_welcome_fortune(void)
   "You don't need to see my serial number.  These aren't the floppies you're looking for.",
   "Emulation can have a strong influence on a weak mind",
   "Steve shot first!",
-  "New strategy, Ray, let the Linker win!",
-  "LisaEm, it made the Kessel Run in less than 5Mhz",
+  "I see your point. I suggest a new strategy, Ray, let the Linker win!",
+  "LisaEm, it made the Kessel Run in less than 12Mhz",
   "That's no moon! It's a Lisa emulator!",
+  "Help me LisaEm, you're my only hope",
+  "You must learn the ways of the emulator. You must come with me to Lisa Pascal Workshop.",
+  "Now Witness the CPU power of this fully written and Operational Emulation Station",
+  "And now your high-bitness we will discuss the location of your hidden segment origin base",
+  "I want to learn the ways of the Pascal Compiler and become a coder, like my father before me ...",
+  "The emulator can have a strong influence on a weak OS",
+  "I felt a great disturbance in the force, as if thousands of Lisas were buried in a landfull in Utah for a tax write off",
+  "It's a TRAP",
+  "Noooooooooooooooooooooooooooooooo",
+  "Hokey macos 11s and ancient windows are no match for a good Lisa Office System at your side, kid.",
+  "Red 5 standing by",
+  "Remember, the emulator will be with you... always",
+
+  "If we emulators have offended, Think but this, and all is mended: you have but gamboled here, while these pixels of the past did appear; No more yielding but a dream.",
 
   "PC LOAD LETTER",
   "Sounds like someone has a case of the Mondays!",
   "Well, I wouldn’t say I’ve been MISSING it, Bob.",
   "Listen, are you gonna have those TPS reports for us this afternoon?",
   "I believe you have my stapler.",
-  "Did You See The Memo About The New TPS Reports?",
+  "Did You See The Memo About The New TPS Reports Cover Sheets?",
   "Oh, and remember, next Friday is Hawaiian shirt day. So, you know, if you want to, go ahead and wear a Hawaiian shirt and jeans.",
   "Yeah........I'm gonna need you to come in on Saturday.",
   "Oh, oh, and I almost forgot. Ahh, I'm also gonna need you to go ahead and come in on Sunday, too...",
   "Open-plan offices have been found to reduce productivity and impair memory. They’re associated with high staff turnover. They make people sick, hostile, unmotivated, and insecure.",
   "Well, that was easy",
+
+  "\"The point of modern propaganda isn't only to misinform or push an agenda. It is to exhaust your critical thinking, to annihilate truth.\" ― Garry Kasparov",
 
   "Crikey! Gotta travel back to 1983 to get my mojo back... Oh behave!",
   "Very well. Where do I begin? My father was a relentlessly self-improving Rat Shack owner from Belgium with low-grade neuromancy and a penchant for emulation.",
@@ -9675,18 +9966,40 @@ char *get_welcome_fortune(void)
   "I solemnly swear that I am up to no good.",
   "Mischief Managed!",
 
+  "Lisa's favorite ice cream? RAM Raisin!",
+  "Lisa's favorite ice cream? ROM Raisin!",
+  
   "Be water my friend, be water.",
+  "Be software my friend, be software.",
 
   "He who rescues the past from the memory hole, subverts the corporation that controls the present, so he may regain control of the future",
   "Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.",
   "For a good time, type in: echo 0.0.0.0 ocsp.apple.com | sudo tee -a /etc/hosts",
+
+  "All growth comes at a cost; moving forward means sacrifice enduring all paths crossed, LisaEm Lux",
+  "One time forsaken, but forgotten I am not",
+
+  "Think again Professor Quillejoie! The LisaEm 1.2.7, it's what a man drives!",
+  "Better than Slapify",
+  "If you hate everything else, you might like this...",
+  "Not as depressing as Quilloughby and the Snuffs",
+  "... But I don't want this!",
+  "Every day you wave that wand, and yet, nothing ever happens.",
+  "Stop resisting, surrender to my mighty torque",
+  "A little of both, it's complicated...",
+  "Conspicuous eyeroll",
+  "Setting throttle to: Full-Scale Riot!",
+  
+  "Finest machine in the world, as far as I'm concerned",
+  "Audience members must laugh continuously",
+  "I may not speak Spanish, but I know when an imaginary talking skull is mocking me",
 
   "Not every cage is a prison, nor every loss eternal.",
   "8-4-1-9-4-7",
 
   "Hello Lisa, It's Lisa Again!",
   "Hindsight is always 7/7, But looking back, it's still a bit fuzzy",
-  "You Speak of mutually assured Lisa Emulation, Nice story, tell it to Reader's Digest",
+  "You Speak of mutually assured Lisa Emulation, Nice story, tell it to Writer's Digest",
   "You can emulate, but never tame me",
   "It gives me a migraine headache, running on Windows",
   "Codestains on my hands and I don't know where I've been",

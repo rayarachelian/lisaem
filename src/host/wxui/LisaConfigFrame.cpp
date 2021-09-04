@@ -534,16 +534,25 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
    (void)new wxStaticText(panel,wxID_ANY,   t,      wxPoint( 10* HIDPISCALE,  y), wxSize(500* HIDPISCALE, 30* HIDPISCALE));    y+=ya/2; //y+=ya/2;
 
     wxString ramsize[] = { wxT("0.5 MB"), wxT("1 MB"), wxT("1.5 MB"),  wxT("2 MB*") };
-    cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 3, //4 - to -reneable 2MB, uncomment case 2048 below as well
+
+    cpurambox = new wxRadioBox(panel, wxID_ANY,wxT("RAM:"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize, 
+    #ifdef ALLOW2MBRAM
+          4, // 3 to turn off 2mb// 4 - to -reneable 2MB, uncomment case 2048 below as well
+    #else
+          3,
+    #endif
        ramsize, 0, wxRA_SPECIFY_COLS,
        wxDefaultValidator, wxT("radioBox"));
-    
+
+
     switch(my_lisaconfig->mymaxlisaram)
     {
      case  512:  cpurambox->SetSelection(0); break;
      case 1024:  cpurambox->SetSelection(1); break;
      case 1536:  cpurambox->SetSelection(2); break;
+     #ifdef ALLOW2MBRAM
      case 2048:  cpurambox->SetSelection(3); break;
+     #endif
      default:    cpurambox->SetSelection(2); 
     }
 
@@ -631,20 +640,15 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
 
 
    (void)new wxStaticText(panel, wxID_ANY, _T("Serial A:"),  wxPoint( 10,  y+10), wxSize(100 * HIDPISCALE, 30 * HIDPISCALE));
-    serialabox = new wxChoice(panel, wxID_ANY, wxPoint(100 * HIDPISCALE, y), wxDefaultSize, 1 /* serialopts */, nothingonly); y+=ya;
-//    serialabox = new wxRadioBox(panel, wxID_ANY,
-//        wxT("Serial A:"), wxPoint(10 * HIDPISCALE, y), wxSize(380 * HIDPISCALE,128 * HIDPISCALE), serialopts, serportopts, 2, wxRA_SPECIFY_COLS,
-//        wxDefaultValidator, wxT("radioBox"));                                                      y+=ya+ya;
-    serialabox->SetSelection(0);
-//    for (i=0; i<serialopts; i++)
-//        if (my_lisaconfig->serial1_setting.IsSameAs(serportopts[i],false) ) serialabox->SetSelection(i);
 
-    //#define BROKEN_SERIAL_A
-    // 2020.11.27 until we fix serial port a, disable it.
-    //#ifdef BROKEN_SERIAL_A
-    //serialabox->Enable(0,true); serialabox->SetSelection(0);
-    //for (i=1; i<serialopts; i++) serialabox->Enable(i,false);
-    //#endif
+#ifndef ALLOWSERIALA
+    serialabox = new wxChoice(panel, wxID_ANY, wxPoint(100 * HIDPISCALE, y), wxDefaultSize, 1 /* serialopts */, nothingonly); y+=ya;
+    serialabox->SetSelection(0);
+#else
+    serialabox = new wxChoice(panel, wxID_ANY, wxPoint(100 * HIDPISCALE, y), wxDefaultSize, serialopts, serportopts); y+=ya+ya;
+     for (i=0; i<serialopts; i++)
+         if (my_lisaconfig->serial1_setting.IsSameAs(serportopts[i],false) ) serialabox->SetSelection(i);
+#endif
 
     //y+=ya/8;
     serialaparam = new wxTextCtrl(panel, wxID_ANY,  my_lisaconfig->serial1_param  ,

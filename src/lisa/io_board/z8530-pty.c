@@ -30,11 +30,12 @@
 
 // Based on code from: mypty3 http://rachid.koucha.free.fr/tech_corner/pty_pdip.html
 
+#ifndef __MSVCRT__
+
 #include <vars.h>
 #include <z8530_structs.h>
-
-#ifndef __MSVCRT__
 #include <stdlib.h>
+
 #include <sys/types.h>
 #include <signal.h>
 
@@ -45,14 +46,14 @@
 #include <netinet/in.h>
 
 #ifndef sun
-#include <err.h>
-#endif
-
+  #include <err.h>
 #endif
 
 #define _XOPEN_SOURCE 600
+
 #include <fcntl.h>
 #include <errno.h>
+
 #define __USE_BSD
 #include <termios.h>
 #include <sys/select.h>
@@ -111,7 +112,7 @@ static int init_child(int port)
   #endif
 
 
-  int rc;
+  int rc, ignore;
   struct termios slave_orig_term_settings; // Saved terminal settings
   struct termios new_term_settings; // Current terminal settings
 
@@ -168,9 +169,9 @@ static int init_child(int port)
   close(1); // Close standard output (current terminal)
   close(2); // Close standard error  (current terminal)
 
-  dup(fds[port]); // PTY becomes standard input (0)
-  dup(fds[port]); // PTY becomes standard output (1)
-  dup(fds[port]); // PTY becomes standard error (2)
+  ignore=dup(fds[port]); // PTY becomes standard input (0)
+  ignore=dup(fds[port]); // PTY becomes standard output (1)
+  ignore=dup(fds[port]); // PTY becomes standard error (2)
 
   // Now the original file descriptor is useless
   close(fds[port]);
@@ -261,6 +262,7 @@ void init_pty_serial_port(int port)
   scc_r[port].s.rr0.r.dcd=1;
   scc_r[port].s.rr0.r.cts=1;
 
+  // for some reason warnings are issued on posix_openpt, grantpt, unlockpt but fnctl.h and stdlib.h are both included, wtf?
   // Check arguments is O_NDELAY something we want?                 // 2020.12.07 added
   ALERT_LOG(0,"openpt");   fdm[port] = posix_openpt(O_RDWR| O_NONBLOCK|   O_NDELAY);  if (fdm[port] < 0 )  { fprintf(stderr, "Error %d on posix_openpt()\n", errno); return; }
   ALERT_LOG(0,"grantpt");  rc        = grantpt(fdm[port]);                            if (rc       != 0 )  { fprintf(stderr, "Error %d on grantpt()\n", errno);      return; }
@@ -268,7 +270,11 @@ void init_pty_serial_port(int port)
 
   memset(ptyname,0,1023);
   // Open the slave side ot the PTY
+#ifdef __linux__
   ptsname_r(fdm[port], ptyname, 1023);
+#else
+  strncpy(ptyname,ptsname(fdm[port]),1023);
+#endif
   ALERT_LOG(0,"open_ptsname: %s for port:%d",ptyname,port); 
   fds[port] = open(ptyname, O_RDWR, O_NONBLOCK);
   ALERT_LOG(0,"got fd# %d for port %d",fds[port],port);
@@ -328,3 +334,5 @@ void close_pty(int port) {
   fdm[port]=-1;
   kill(child_pid[port],SIGTERM);
 }
+
+#endif

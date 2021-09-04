@@ -622,15 +622,15 @@ void FloppyIRQ(uint8 RWTS)
 {
 
       fdir_timer=cpu68k_clocks+(RWTS==2 ? (HALF_OF_A_SECOND):(HUN_THOUSANDTH_OF_A_SEC));  //THOUSANDTH_OF_A_SECOND;
+      cpu68k_clocks_stop=MIN(fdir_timer+1,cpu68k_clocks_stop); //2021.06.11
       my_rwts=RWTS;
-
 
       #ifndef USE64BITTIMER
       prevent_clk_overflow_now();
       #endif
 
       DEBUG_LOG(0,"Scheduling FDIR to fire at clock:%016llx  Time now is %016llx",fdir_timer,cpu68k_clocks);
-      get_next_timer_event();
+      //2021.06.10 causing IRQ before PC+=iib->opcodesize update! can we live without this?  //get_next_timer_event();
       DEBUG_LOG(0,"returning from FloppyIRQ - event should not have fired now uness CPU stopped, check it please.");
 }
 
@@ -921,9 +921,6 @@ void floppy_go6504(void)
     floppy_ram[0x48+6]=0;
     floppy_ram[0x48+7]=0;
     floppy_ram[0x7b]=0;
-
-
-
 
 
     floppy_last_macro=k;                       // copy the new gobyte over the last one;

@@ -314,18 +314,23 @@ return codes:
 #include <unistd.h>
 #include <fcntl.h>
 
-// Windows lacks MMAP functions
+
+// Windows lacks MMAP, strcasestr functions
 #ifndef __MSVCRT__
 #include <sys/mman.h>
 #include <glob.h>
 #define HAVE_MMAPEDIO
+#else
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#include <strcasestr.h>
 #endif
-
 
 #include <errno.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+
 
 
 ////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////

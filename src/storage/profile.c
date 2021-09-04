@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2021.03.06                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2021.06.09                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -364,7 +364,7 @@ void do_profile_read(ProFileType *P, uint32 block)
 
     if (block==0) {
         for (int i=0; i<P->DC42.tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
-        ALERT_LOG(0,"Bootblock checksum:%08x",bootblockchecksum);
+        ALERT_LOG(0,"Bootblock checksum:%08x for %s",bootblockchecksum,P->DC42.fname);
     }
 
 
@@ -508,6 +508,7 @@ void init_Profiles(void)
 
 
 
+extern void update_profile_preferences_path(char *newfilename);
 
 
 void profile_unmount(void)
@@ -545,11 +546,18 @@ ALERT_LOG(0,"Attempting to open profile:%s",filename);
             //              5M   10M   16M   20M   32M   40M    64M
 
             ALERT_LOG(0,"Did not find %s, asking user what size drive to create",filename);
-            sz=pickprofilesize(filename);  if (sz<0 || sz>6) return -1;
+            sz=pickprofilesize(&filename,1);  if (sz<-1 || sz>6) return -1;
+
+            if (sz==-1) {
+                ALERT_LOG(0,"User chose to select an existing profile instead");                
+                update_profile_preferences_path(filename);
+                i=dc42_open(&P->DC42,filename,"wm");
+                return ( i ? -1 : 0 );
+            }
 
             i=dc42_create(filename,"-lisaem.sunder.net hd-",blocks[sz]*512,blocks[sz]*20);
             i=dc42_open(&P->DC42,filename,"wm");
-            //if (i) {DEBUG_LOG(0,"Failed to open newly created ProFile drive!");  exit(1);}
+            if (i) {ALERT_LOG(0,"Failed to open newly created ProFile drive!");}
          }
 
  if (i) return -1;
@@ -730,7 +738,7 @@ char *profile_state_names[]={
 };
 
 extern void  apply_los31_hacks(void);
-
+extern void apply_mw30_hacks(void);
 
 void ProfileLoop(ProFileType *P, int event)
 {
@@ -921,25 +929,33 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          DEBUG_LOG(0,"State:4 - waiting for command, event:%d",event);
          #endif
 		
-        // uniplus loader hax - weirdly this expects BSY to be down before it sends CMD!
-        if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) {
-            ALERT_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
-            SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
-            P->BSYLine=0; return;
-        }
+         // uniplus loader hax - weirdly this expects BSY to be down before it sends CMD!
+         if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) {
+             ALERT_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
+             SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
+             P->BSYLine=0; return;
+         }
 
          CHECK_PROFILE_LOOP_TIMEOUT;
-         // wait a bit before flopping busy, but if Lisa sends a byte, accept it
-         if (P->BSYLine!=2) {
-         if ( TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )  && !(EVENT_WRITE_ORA) ) //was 1/100th HUN_THOUSANDTH_OF_A_SEC 49152, 2021.03.23 add /100
-            {
-                DEBUG_LOG(0,"State:4 - wasting 1/100,000th of a sec, BSYLine=0");
-                P->BSYLine=0;
-                return;
-            }
-
-            P->BSYLine=1; DEBUG_LOG(0,"State:4 BSYLine=1 signaled - IRQ should fire now.");
+         
+         if ( (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) && 
+              (TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/1000)) ) ) {
+              ALERT_LOG(0,"UniPlus OS, faking BSYLine=1");
+              SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
+              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // force IFR BSY/CA1 bit on //2021.06.13
+              P->BSYLine=1; return;
          }
+         else 
+            if (P->BSYLine!=2) {         // wait a bit before flopping busy, but if Lisa sends a byte, accept it
+               if ( TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )  && !(EVENT_WRITE_ORA) ) //was 1/100th HUN_THOUSANDTH_OF_A_SEC 49152, 2021.03.23 add /100
+                  {
+                      DEBUG_LOG(0,"State:4 - wasting 1/10,000,000th of a sec, BSYLine=0");
+                      P->BSYLine=0;
+                      return;
+                  }
+      
+                  P->BSYLine=1; DEBUG_LOG(0,"State:4 BSYLine=1 signaled - IRQ should fire now.");
+               }
          if (EVENT_WRITE_NUL) return;
 
          // step 4a
@@ -974,6 +990,8 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
                             default: DEBUG_LOG(0,"Wrote ???? %02x into ProFile Data block index:%d",P->VIA_PA,P->indexwrite-1);
                            }
+
+                           P->blocktowrite=(P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
 
                            if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;} // prevent overrun ?
                            return;
@@ -1067,7 +1085,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          // insert sound play some profile seeking sounds now?
          //CHECK_PROFILE_LOOP_TIMEOUT;
 
-         if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC) )  // this block was disabled -200604025
+         if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC) ) //2021.08.24 - disabling this: && P->DataBlock[4]==0)  // this block was disabled 2021.06.15 added && P->DataBlock[4]
               {
                 DEBUG_LOG(0,"State:6 - wasting cycles for a bit to simulate a busy profile (%d cycles)",PROFILE_WAIT_EXEC_CYCLE);
                 return;
@@ -1075,14 +1093,14 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
          PRO_STATUS_CLEAR;
 
-         DEBUG_LOG(0,"Done wasting cycles in step 6");
+         DEBUG_LOG(0,"State:6 Done wasting cycles in step 6");
 
          P->indexread=0;
 
          blocknumber=(P->DataBlock[5]<<16) | (P->DataBlock[6]<< 8) |  (P->DataBlock[7]    ) ;
 
          P->BSYLine=1; //20060425-moved from step 5, and re-enabled above delay to slow down
-         if (EVENT_WRITE_NUL) return;
+         if (EVENT_WRITE_NUL) { DEBUG_LOG(0,"EVENT_WRITE_NULL - skipping"); return;}
 
          switch (P->DataBlock[4])                                                       // Now execute the command
          {
@@ -1122,13 +1140,9 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
                       P->StateMachineStep=ACCEPT_DATA_FOR_WRITE_STATE;
                       P->indexwrite=10;  // bytes 0-3 are status, 4-6 are cmd block, 10-522 are byte, 523-542 are tags.
                       SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND*3);
-
                       #ifdef DEBUG
 
-
-
-
-                      DEBUG_LOG(0,"step6: (cmd:%02x) Fixin to write to block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
+                      DEBUG_LOG(0,"Step6: (cmd:%02x) Fixin to write to block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
                         P->DataBlock[4],
                         blocknumber, blocknumber,
                         P->DataBlock[ 0],
@@ -1149,12 +1163,11 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
                         P->DataBlock[15]);
                      #endif
 
-
-
-
                      break;  // write/verify block
 
-             default:  P->StateMachineStep=IDLE_STATE;
+             default:  
+                       DEBUG_LOG(0,"Leaving state 6 for 0, because unknown command:%d",P->DataBlock[4])
+                       P->StateMachineStep=IDLE_STATE;
          }
          return;
 
@@ -1192,8 +1205,8 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
             }
             else
                 {
-                    DEBUG_LOG(0,"State:7 did not recognize byte event:%02x bsy:%02x cmd:%02x rrw:%02x",
-                      event,
+                    DEBUG_LOG(0,"State:7 did not recognize byte event:%02x %s bsy:%02x cmd:%02x rrw:%02x",
+                      event, profile_event_names[event],
                       P->BSYLine,
                       P->CMDLine,
                       P->RRWLine);
@@ -1235,6 +1248,8 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
          DEBUG_LOG(0,"State:9 - write and waste more time (%d)",PROFILE_WAIT_EXEC_CYCLE);
          #endif
          if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC*5) ) return;
+
+         DEBUG_LOG(0,"State:9b - time's done");
 
          blocknumber=(P->DataBlock[5]<<16) |
                      (P->DataBlock[6]<< 8) |
@@ -1297,6 +1312,9 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
          P->DataBlock[3]=0;
 
          P->BSYLine=0;  //2006.05.17 was 1
+         if (running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) 
+             via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
+
          P->StateMachineStep=SEND_STATUS_BYTES_STATE;
          SET_PROFILE_LOOP_TIMEOUT(HALF_OF_A_SECOND);
 
@@ -1385,9 +1403,10 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
           DEBUG_LOG(0,"State:12, post write - allow Lisa to read the status and data  - pointer:%d",P->indexread);
          #endif
 
-
          CHECK_PROFILE_LOOP_TIMEOUT;
 
+         if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) 
+             via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
          P->BSYLine=0;
 
          if (EVENT_WRITE_NUL || EVENT_READ_IRB) return;
@@ -1404,6 +1423,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
          }
          else
          {
+             ALERT_LOG(0,"Going back to idle since Lisa set CMDLine");
              P->StateMachineStep=IDLE_STATE;
          }
 

@@ -1,13 +1,38 @@
 ------------------------------------------------------------------------------
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
---- 1.2.7    Released on (TBA) (Major release for all platforms)
+TBA 1.2.7  - Release on 2021.XX.YY (TBA) (Major release for all platforms)
 
-------------------------------------------------------------------------------
-Lisa Emulator Change History                         http://lisaem.sunder.net/
-------------------------------------------------------------------------------
---- 1.2.7    Released on (TBA) (Major release for all platforms)
 
+2021.09.03 - fix macos missing ptsname_r (only exists in linux)
+           - unstable push
+
+2021.08.24 - added "Select existing ProFile" option when ProFile hard disk
+             file path does not exist.
+
+2021.08.20 - trying to find why booting is broken again
+
+2021.08.02 - fixes to TerminalWx to allow Windows to compile
+
+2021.08.01 - fixed windows compile issues around strcasestr, lstat, z8530-pty
+
+           - incorporating PR changes from pull #7 from @Neelix57 via github
+
+2021.07.12 - fixes to decode-vsrom tool for output + various formats such as
+             matching service mode and BLU displays
+
+2021.06.26 - attempting a new HLE intercept for UniPlus sunix v1.1 kernel
+             not yet working
+
+2021.06.19 - added decode-vsrom tool 
+
+2021.06.09 - Issue with floppy emulation caused wrong interrupt service routine
+             vector execution since it happened inside an opcode before the
+             PC got updated with the size of the opcode. Detected in UniPlus
+             kernel v1.1 sunix installer
+
+2021.06.06 - got UniPlus v1.4 kernel booting up (used a pre-installed UniPlus
+             BLU image from widget converted to dc42)
 
 2021.05.12 - added some new dc42/*raw conversion tools and added -i,-d,-s
              options to existing disk tools to turn de/interleave on/off.
@@ -15,6 +40,9 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              move a Cameo/Aphid image to LisaEm, likely
              dc42-to-raw -i lisaem-profile.dc42 should copy a LisaEm
              image to Cameo/Aphid.
+
+2021.05.07 - added some 6504 code for MW+II, but it hangs before it does
+             the PFG detection, also display has some junk
 
 2021.05.02 - still trying to get UniPlus to work with the emulated ProFile
 

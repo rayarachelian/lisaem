@@ -31,6 +31,12 @@
 *                                                                                      *
 \**************************************************************************************/
 
+#define PROLOOP_EV_IRB 0                   // event=0 <- Read from IRB
+#define PROLOOP_EV_IRA 1                   // event=1 <- Read from IRA
+#define PROLOOP_EV_ORA 2                   // event=2 <- write to ORA
+#define PROLOOP_EV_ORB 3                   // event=3 <- write to ORB
+#define PROLOOP_EV_NUL 4                   // event=4 <- null event - called occasionally by event handling to allow timeouts
+
 
 #define FIX_VIA_IFR(vianum)  {                                                               \
                                if ( via[vianum].via[IFR] & 127) via[vianum].via[IFR]|=128;   \
@@ -186,7 +192,7 @@ void VIAProfileLoop(int vianum, ProFileType *P, int event)
     if (event<0) return;
 
     int BSY=(!(P->BSYLine!=0));     // before
-    ProfileLoop(P,event); // ignore null events
+    if (event!=100) ProfileLoop(P,event); // ignore null events - 2021.06.06
     int NBSY=(!(P->BSYLine!=0));    // after
 
     // IF BSY has changed, and CA1 IRQ's are enabled, then, see if we need to send an IRQ based on polarity in PCR CA1 bit
@@ -1389,8 +1395,12 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
     via[1].active=1;                        // these are always active as they're on the
     via[2].active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"writing %02x to register %d (%s) @%08x", xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
-
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 writing to register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+       DEBUG_LOG(0,"writing %02x to register %d (%s) @%08x", xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #endif
 
     switch (addr & 0x79)  // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
     {
@@ -1804,12 +1814,25 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
     via[1].active=1;                        // these are always active as they're on the
     via[2].active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"reading from register %d (%s)", ((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 reading from register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+       DEBUG_LOG(0,"reading from register %d (%s)", ((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #endif
+
+
+
+    
+
+    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_NUL); // 2021.05.24
 
     switch (addr & 0x79)                // was 7f, changing to 79
     {
         case IRB2   :
                     {
+                    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRB); // 2021.05.24
+
                      #ifdef DEBUG
                      uint8 flipped=via[2].via[IRBB];
                      #endif
@@ -1864,6 +1887,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
                       }
 
         case IRANH2 : via[2].last_a_accs=0;
+                      //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRA); // 2021.05.24
+
                       if (via[2].ProFile) via[2].ProFile->last_a_accs=0;
 
                       via[2].via[IRAA]=(via2_ira(15));
@@ -1874,6 +1899,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
 
         case IRA2   : via[2].last_a_accs=0;
+                      //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRA); // 2021.05.24
+
                       if (via[2].ProFile) via[2].ProFile->last_a_accs=0;
 
 
@@ -2221,8 +2248,14 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
     via[2].active=1;                     // these are always active as they're on the
     V->active=1;                         // motherboard of the machine...
 
-    DEBUG_LOG(0,"VIA:%d reading from register %d (%s)", V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #ifdef DEBUG
+    if (V->ProFile)
+       {DEBUG_LOG(0,"profile.c:State:%d VIA:%d reading from register %d (%s)", V->ProFile->StateMachineStep,V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));}
+    else
+       {DEBUG_LOG(0,"VIA:%d reading from register %d (%s)", V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));}
+    #endif
 
+    if (V->ProFile) VIAProfileLoop(V->vianum,V->ProFile,PROLOOP_EV_NUL);  // 2021.05.24
 
     switch (addr & 0x79)                // was 7f, changing to 79
     {
@@ -2401,7 +2434,12 @@ void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
     via[1].active=1;                    // these are always active as they're on the
     V->active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"VIA:%d writing %02x to register %d (%s) @%08x", V->vianum,xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 writing to register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+           DEBUG_LOG(0,"VIA:%d writing %02x to register %d (%s) @%08x", V->vianum,xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #endif
 
 
     switch (addr & 0x79)  // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!

@@ -474,7 +474,7 @@ ACGLOBAL(uint8,highest_bit_val_inv[],
 #define IRQ_SCC        6            // Serial port
 #define IRQ_VIA1       2            // Keyboard/Mouse/Clock (COPS controller)
 #define IRQ_COPS       2            // Keyboard/Mouse/Clock (COPS controller)
-#define IRQ_VIA2       1             // Parallel Port VIA
+#define IRQ_VIA2       1            // Parallel Port VIA
 #define IRQ_SLOT0      5            // Expasion Slot IRQ's
 #define IRQ_SLOT1      4
 #define IRQ_SLOT2      3
@@ -1531,7 +1531,7 @@ extern void on_lisa_exit(void);
                       snprintf(msg2,1024-100, fmt, ## args);                                                                                      \
                       snprintf(msg,1024,"We've encountered a problem!\n%s\nStopped at %s:%s:%d with code :%d", msg2,                              \
                             __FILE__,__FUNCTION__,__LINE__,x);                                                                                    \
-                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
+                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1023);                                                                      \
                       fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
                       messagebox(msg,"Emulation aborted!");                                                                                       \
                       fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
@@ -1545,7 +1545,7 @@ extern void on_lisa_exit(void);
                       snprintf(msg2, 2048-100, fmt, ## args);                                                                                     \
                       snprintf(msg,1024,"Sorry, the emulation aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2,         \
                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
-                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
+                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1023);                                                                      \
                       fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
                       messagebox(msg,"Emulation aborted!");                                                                                       \
                       fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
@@ -1558,7 +1558,7 @@ extern void on_lisa_exit(void);
                       snprintf(msg2, 1024-100, fmt, ## args);                                                                                     \
                       snprintf(msg,1024,"I'm sorry, the emulation has aborted due to a fatal error\n%s\nStopped at %s:%s:%d with code :%d", msg2, \
                            __FILE__,__FUNCTION__,__LINE__,x);                                                                                     \
-                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1024);                                                                      \
+                      if (!cmd) strncat(msg,"\nLisaEM will now quit.",1023);                                                                      \
                       fprintf((buglog ? buglog:stderr),"%s:%s:%d: exit with code :%d\n%s\n",__FILE__,__FUNCTION__,__LINE__,x,msg2);               \
                       messagebox(msg,"Emulation aborted!");                                                                                       \
                       fflush(buglog); if (!cmd) on_lisa_exit();                                                                                   \
@@ -2556,7 +2556,7 @@ extern CPP2C int yesnomessagebox(char *s, char *t);
 extern CPP2C void floppy_motor_sounds(int track);
 extern CPP2C void eject_floppy_animation(void);
 extern CPP2C void save_pram(void);
-extern CPP2C int pickprofilesize(char *filename);
+extern CPP2C int pickprofilesize(char *filename, int allowexisting);
 
 //extern CPP2C char *getDocumentsDir(void);
 //extern CPP2C char *getResourcesDir(void);

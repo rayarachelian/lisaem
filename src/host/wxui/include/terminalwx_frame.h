@@ -1,6 +1,9 @@
 #ifndef TERMWXFRAME_H
 #define TERMWXFRAME_H
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <wx/menu.h>
 #include <wx/statusbr.h>
 #include <wx/frame.h>

@@ -289,13 +289,13 @@ cd ..
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd ../lib/
+      cd ${XTLD}/lib/ || (echo "from $(pwd)" 1>&2; exit 1;)
       echo Installing libGenerator $VERSION
       mkdir -pm755 "$PREFIX/lib"
       cp libdc42-$VERSION.a "$PREFIX/lib/"
       [ -n "$DARWIN" ] && cp libdc42.${VERSION}.dylib "$PREFIX/lib/"
       cd "$PREFIX/lib"
-      ln -s libdc42-$VERSION.a libdc42.a
+      ln -sf libdc42-$VERSION.a libdc42.a
 fi
 echo
 [[ -z "$NOBANNER" ]] && echo "libdc42 build done"

@@ -2110,6 +2110,8 @@ void disable_4MB_macworks(void) {
   ALERT_LOG(0,"Need to implement me. or maybe just reset");
 }
 
+extern void refresh_vidram_fns(void);
+
 void enable_4MB_macworks(void) {
 
   ALERT_LOG(0,"\n\n\n\n\n\n");
@@ -2178,7 +2180,7 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
    // avoid bus/addr error repeats on multi-operand opcodes...
     if  (lastclk==cpu68k_clocks && lastvno==vno)
         {
-          DEBUG_LOG(0,"Suppressing internal_vector - VECTOR:%ld, oldpc:%08lx clk:%016llx",(long)vno,(long)oldpc,(long long)cpu68k_clocks);
+          DEBUG_LOG(0,"Suppressing duplicate internal_vector - VECTOR:%ld, oldpc:%08lx clk:%016llx",(long)vno,(long)oldpc,(long long)cpu68k_clocks);
           return;
         }
 

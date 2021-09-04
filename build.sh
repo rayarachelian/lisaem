@@ -1,6 +1,3 @@
-#!/bin/bash
-
-
 #!/usr/bin/env bash
 
 #------------------------------------------------------------------------------------------#
@@ -38,7 +35,7 @@ fi
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
     STABILITY="PRE-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2021.05.12"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2021.09.03"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -46,6 +43,7 @@ fi
           URL="http://lisaem.sunder.net"  # url to website of package
 COPYRIGHTYEAR="2021"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR, All Rights Reserved"
+LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
 VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
@@ -61,7 +59,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 
 # you'll have to rewrite (or at least customize) the rest of this script in a similar manner for your own package
 
-# ensure the sub-builds are executables
+# ensure the sub-builds are executable to avoid git caused issues
 chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build.sh  2>/dev/null
 
 #--------------------------------------------------------------------------------------------------------
@@ -93,6 +91,9 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 #VERSION="1.0.0-RELEASE_2007.07.07"
 #VERSION="1.0.0-RC2_2007.06.27"
 #--------------------------------------------------------------------------------------------------------
+
+# hooks for my own selfish experimentation
+[[ -f experimental/experimental-hooks.sh ]] && ./experimental/experimental-hooks.sh
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 LIBGENOPTS=""            # passthrough to libGenerator
@@ -181,7 +182,7 @@ then
   echo " |+---------+     . |        The Lisa Emulator Project            "
   echo " +------------------+ Copyright (C) ${RELEASEDATE:0:4} ${AUTHOR}"
   echo " /=______________#_=\\           All Rights Reserved               "
-  echo "                     Released under the terms of the GNU GPL v2.0"
+  echo "                     ${LICENSERELEASE}"
   )
 fi
 
@@ -204,7 +205,7 @@ for j in $@; do
                 echo -n "Done. "
                 elapsed=$(get_elapsed_time)
                 [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
-                rm -f .env-* bin/hashes.txt bin/gdb-run obj/build-warnings.txt obj/get-uintX-types .env-saved .last-opts
+                rm -f .env-* bin/hashes.txt bin/gdb-run obj/build-warnings.txt obj/get-uintX-types .last-opts
                 exit 0
             fi
 
@@ -277,6 +278,10 @@ for j in $@; do
  --no-debug)
             export WITHDEBUG=""
             export LIBGENOPTS=""                                     ;;
+
+ --allow2mbram)    export WITHDEBUG="$WITHDEBUG -DALLOW2MBRAM"              ;;
+ --full2mbram)     export WITHDEBUG="$WITHDEBUG -DALLOW2MBRAM -DFULL2MBRAM" ;;
+ --enableseriala)  export WITHDEBUG="$WITHDEBUG -DALLOWSERIALA"             ;;
 
  --valgrind)
             export GDB="$(which valgrind)"
@@ -433,6 +438,9 @@ Options:                (can skip with- and use no- instead of without)
 --without-optimize      Disables optimizations
 --without-upx           Disables UPX compression (no upx on some macos x)
 --without-strip         Disable strip when compiling without debug
+--allow2mbram           Allow 2MB RAM for LOS (actually 2MB-128K)
+--full2mbram            Allow real 2MB RAM, but won't work with H-ROM or LOS
+--enableseriala         Enable Serial Port A - broken in LOS causes crashes
 
 -DFOO                   Pass extra defines to C/C++ compilers
 -DFOO=BAR
@@ -892,8 +900,8 @@ if  [[ -f "$LISANAME" ]]; then
       if [[ -n "$INSTALL" ]]; then
     
         if [[ -n "$CYGWIN" ]]; then
-              #PREFIX   ="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
-              #PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+              # PREFIX+PREFIXLIB will go to: "/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+              # these are set in the bashbuild {OS}.sys file
               echo "* Installing skins in $PREFIXLIB/LisaEm"
               mkdir -pm755 "$PREFIX"
               (cd "${TLD}/resources"; tar cpf - skins) | (cd "$PREFIX"; tar xpf - )
@@ -904,14 +912,16 @@ if  [[ -f "$LISANAME" ]]; then
               [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
               exit 0
         else
-          #   PREFIX="/usr/local/bin"
-          #   PREFIXLIB="/usr/local/share/"
-    
+          # PREFIX="/usr/local/bin" PREFIXLIB="/usr/local/share/" - these are set in bashbuild/${OS}.sys file    
           echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
-          mkdir -pm755 $PREFIXLIB/LisaEm/ $PREFIX
-          cp ../resources/*.wav ../resources/*.png "$PREFIXLIB/lisaem/"
+          mkdir -pm755 $PREFIXLIB/lisaem $PREFIX
+          cp -r ../resources/skins "$PREFIXLIB/lisaem/"
+          echo "* Installing launcher in $PREFIXLIB/applications" 1>&2
+          mkdir -pm755 "$PREFIXLIB/icons/hicolor/128x128/apps" 2>/dev/null #incase it doesn't exist
+          cp ../resources/lisaem.png "$PREFIXLIB/icons/hicolor/128x128/apps"
+          cp ../resources/lisaem.desktop "$PREFIXLIB/applications"
           echo "* Installing lisaem binary in $PREFIX/lisaem" 1>&2
-          cp lisaem "$PREFIX"
+          cp ../bin/lisaem "$PREFIX"
           echo -n "  Done Installing." 1>&2
           elapsed=$(get_elapsed_time)
           [[ -n "$elapsed" ]] && echo "$elapsed seconds" 1>&2 || echo 1>&2

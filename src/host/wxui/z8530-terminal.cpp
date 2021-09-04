@@ -59,9 +59,6 @@
 #include <wx/utils.h> 
 #include <wx/dnd.h>
 
-
-
-
 #include <machine.h>
 #include <fliflo_queue.hpp>
 extern "C" {
@@ -748,10 +745,11 @@ extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
         }
         lastchars[0]=0;
         #ifdef __MSVCRT__
-        fputc(data,capture);             // on windows append LF to CR
-        if (data=13) fputc(10,capture);
+	// on windows we want CRLF line terminators in files.
+        fputc(data,TerminalFrame[portnum]->capture);
+        if (data=13) fputc(10,TerminalFrame[portnum]->capture);
         #else
-        if (data==13) data=10;                            // on unixy systems,replace CR with NL
+        if (data==13) data=10; // on unixy systems, replace CR with NL in files
         fputc(data,TerminalFrame[portnum]->capture);
         #endif
     }

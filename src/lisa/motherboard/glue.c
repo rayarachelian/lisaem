@@ -314,8 +314,10 @@ int check_running_lisa_os(void)
             return running_lisa_os;
       }
    else
-   if ((v1 & 0x00ff0000) ==0x00520000  && (v2 & 0x00ff0000)==0x00520000)           // Lisa OS + Workshop
+   if (((v1 & 0x00ff0000) ==0x00520000  && (v2 & 0x00ff0000)==0x00520000) ||          // Lisa OS 3.x + Workshop
+       ((v1 & 0x00ff0000) ==0x00500000  && (v2 & 0x00ff0000)==0x00500000) )           // LOS 1.2
       {
+        // LOS 1.2: v1=0050080e v2=0050098c; test1,2,3: 426effe8, e5402070, 00363d68
         //if (lisa_os_mouse_x_ptr!=0x00cc00f0) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to cc00f0",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr =0x00cc00f0;   lisa_os_mouse_y_ptr=0x00cc00f2;
             mouse_x_tolerance=4;   mouse_y_tolerance=4;
@@ -392,7 +394,8 @@ int check_running_lisa_os(void)
             DEBUG_LOG(0,"UniPlus sunix v1.1 kernel Running: v1=%08x v2=%08x",v1,v2);
             return running_lisa_os;
       }
-// src/lisa/motherboard/glue.c:check_running_lisa_os:382:Unknown OS Running: v1=0001c4ac v2=0001c4b0| 20:10:38.8 441279005
+      // LOS 1.2: v1=0050080e v2=0050098c; test1,2,3: 426effe8, e5402070, 00363d68
+      // src/lisa/motherboard/glue.c:check_running_lisa_os:382:Unknown OS Running: v1=0001c4ac v2=0001c4b0| 20:10:38.8 441279005
 
    abort_opcode=2; uint32 test1=fetchlong(0x400040); abort_opcode=0;
    abort_opcode=2; uint32 test2=fetchlong(0x400080); abort_opcode=0;

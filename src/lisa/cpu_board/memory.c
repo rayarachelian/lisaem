@@ -1539,7 +1539,7 @@ void getflopramaddr(uint32 a)
 
  if (!debug_log_enabled) return;
 
- DEBUG_LOG(100," floppy_ram (fdir=%d wait=%d timer:%ld) %08x::(%02x) ",floppy_FDIR,floppy_6504_wait,fdir_timer,
+ DEBUG_LOG(100," floppy_ram (fdir=%d [via1 bit 4] wait=%d timer:%ld) %08x::(%02x) ",floppy_FDIR,floppy_6504_wait,fdir_timer,
         a,floppy_ram[(a & 0x7ff)>>1]);
  switch(a|1)
  {

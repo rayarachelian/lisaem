@@ -301,7 +301,6 @@ return codes:
 //
 #define USE_LZHUF  1
 
-
 // needed for LisaEm compatibility, you can remove this, but you must
 // define int8, int16, int32, uint8, uint16, uint32.
 #include <machine.h>
@@ -314,13 +313,16 @@ return codes:
 #include <unistd.h>
 #include <fcntl.h>
 
-// Windows lacks MMAP functions
+// Windows lacks MMAP, strcasestr functions
 #ifndef __MSVCRT__
 #include <sys/mman.h>
 #include <glob.h>
 #define HAVE_MMAPEDIO
+#else
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+extern char *strcasestr(const char *haystack, const char *needle);
 #endif
-
 
 #include <errno.h>
 #include <string.h>

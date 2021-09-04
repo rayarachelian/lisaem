@@ -46,7 +46,7 @@ char *getvector(int v)
 
      case 24:     sprintf(vectxt,"0x%x (%d) spurious irq - buserr during irq processing causes this",v,v); return vectxt;
 
-     case 25:     sprintf(vectxt,"0x%x (%d) other (disk,vertical,via) autovect #1 ",v,v); return vectxt;
+     case 25:     sprintf(vectxt,"0x%x (%d) other (disk,VTIR,via2,profile) autovector:1 ",v,v); return vectxt;
      case 26:     sprintf(vectxt,"0x%x (%d) keybd autovect #2 ",v,v); return vectxt;
      case 27:     sprintf(vectxt,"0x%x (%d) slot2 autovect #3 ",v,v); return vectxt;
      case 28:     sprintf(vectxt,"0x%x (%d) slot1 autovect #4 ",v,v); return vectxt;

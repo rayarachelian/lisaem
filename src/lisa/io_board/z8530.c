@@ -213,11 +213,15 @@ extern char read_serial_port_pty(unsigned int port);
 extern void write_serial_port_pty(unsigned int port, char c);
 extern void init_pty_serial_port(int portnum);
 
-extern int  read_serial_port_tty(unsigned int port);
+extern char read_serial_port_tty(unsigned int port);
 extern void write_serial_port_tty(unsigned int port, char c);
 extern void init_tty_serial_port(int portnum);
 extern void set_port_baud_tty(int port, int baud);
 
+#else
+// temp disable for windows until we flesh these guys out
+char read_serial_port_pty(unsigned int port) {return 0;}
+int  poll_telnet_serial_read(int portnum)    {return 0;}
 #endif
 
 void write_serial_port_terminal(int port, uint8 data);
@@ -1817,4 +1821,8 @@ void write_serial_port(unsigned port, char data)
 
     return;
 }
+
+
+// 30156-/usr/bin/x86_64-w64-mingw32-ld: obj/z8530.o:z8530.c:(.text+0x6fb): undefined reference to `read_serial_port_pty'
+// 30157-/usr/bin/x86_64-w64-mingw32-ld: obj/z8530.o:z8530.c:(.text+0x8e9): undefined reference to `poll_telnet_serial_read'
 

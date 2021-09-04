@@ -54,7 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar"
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw decode-vsrom dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar"
 
 
 
@@ -104,7 +104,7 @@ for i in $@; do
             echo "* Removing fsh tools objs and bins"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types*
             cd "${XTLD}/bin/${MACOSX_MAJOR_VER}/" && for b in $SRCLIST; do rm -f ${b}${EXT}; rm -rf "${b}.dSYM"; done
-
+            ln -s ../../bin 2>/dev/null
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
             [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
@@ -295,13 +295,13 @@ if [[ -z "$XTLD" ]]; then
    exit 99
 fi
 
-cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
+cd "${TLD}/bin/$MACOSX_MAJOR_VER"
 strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd "${XTLD}/bin/x/$MACOSX_MAJOR_VER"
+      cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
       [[ -n "$DARWIN" ]] && PREFIX=/usr/local/bin  # these shouldn't go into /Applications
       echo "Installing tools to $PREFIX/bin"
       mkdir -pm755 "$PREFIX/bin" 2>/dev/null

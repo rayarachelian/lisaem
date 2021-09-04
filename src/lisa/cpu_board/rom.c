@@ -193,7 +193,11 @@ void fixromchk(void)
                
                rom_profile_read_entry|=0x00fe0000;
 
-               ALERT_LOG(0,"Applied HLE ProFile ROM patch to fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #    ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #    #       Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#### #    ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #    #       Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #### ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
              }
 
     /* Simulate all but the final add of the ROM checksum routine */
@@ -516,8 +520,10 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
 
 
 /**************************************************************************************\
-* This function loads in a straight/raw 16k rom dump.                                      *
+* This function loads in a straight/raw 16k rom dump.                                  *
 \**************************************************************************************/
+
+extern void enable_4MB_macworks(void);
 
 int16 read_rom(char *filename, uint8 *ROMMX)
 {
@@ -538,10 +544,14 @@ int16 read_rom(char *filename, uint8 *ROMMX)
 
     ALERT_LOG(0,"Lisa ROM CHKSUM is %02x%02x version:%02x.%c (%02x)",ROMMX[0x3ffe],ROMMX[0x3fff],ROMMX[0x3ffc],ROMMX[0x3ffd],ROMMX[0x3ffd]);
 #ifdef DEBUG
-    if (lisarom[0x3ffd]<'F') debug_on("C-ROM");
+//    if (lisarom[0x3ffc]==2 && lisarom[0x3ffd]<'F') debug_on("C-ROM");
 #endif    
-    return 0;
 
+    if (lisarom[0x3ffc]==3 && lisarom[0x3ffd]>='A') { // 3A ROM
+       if (macworks4mb) enable_4MB_macworks();
+    }
+
+    return 0;
 }
 
 extern int romless_dualparallel(void);

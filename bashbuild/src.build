@@ -193,10 +193,11 @@ function strip_and_compress() {
   waitqall
 
   # hashes are relatively fast, don't bother producing output
+  rm -f hashes.txt
   for app in $@; do
-      [[ -n "$MD5SUM"  ]] && qjob "" $MD5SUM  $HASOPTS "${app}" ">>hashes.txt"
-      [[ -n "$SHA1SUM" ]] && qjob "" $SHA1SUM $HASOPTS "${app}" ">>hashes.txt"
-      [[ -n "$SHA256"  ]] && qjob "" $SHA256  $HASOPTS "${app}" ">>hashes.txt"
+      [[ -n "$MD5SUM"  ]] && $MD5SUM  $HASOPTS "${app}" >>hashes.txt 2>/dev/null
+      [[ -n "$SHA1SUM" ]] && $SHA1SUM $HASOPTS "${app}" >>hashes.txt 2>/dev/null
+      [[ -n "$SHA256"  ]] && $SHA256  $HASOPTS "${app}" >>hashes.txt 2>/dev/null
   done
   waitqall
   sync

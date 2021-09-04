@@ -303,14 +303,14 @@ void parse_arg(int argc, char *argv[]) {
       // why the fuck is gcc 9.3.0 on linux claiming   warning: comparison between pointer and integer  here? strcasestr returns a char *, null is a void *, wtf.  originally had !=NULL but got the same
       // including string.h does not remove this warning.
       
-      if ( strcasestr(v,"reset") != NULL)  {
+      if ( strcasestr(v,"reset") )  {
           if (argc!=3) {fprintf(stderr,"Nope, nope, nope! Can't use any other arguements with 'reset'\n"); exit(2);}
           equal=strchr(v,'='); if (equal!=NULL) {help(); fprintf(stderr,syntax2,v); exit(1);}
           reset_to_default();
           return; // ignore all other options.
       }
     
-      if ( strcasestr(v,"disk=")!=NULL || (strcasestr(v,"size=")!=NULL) )   {
+      if ( strcasestr(v,"disk=") || (strcasestr(v,"size=") ) )   {
          equal=strchr(v,'='); if (!equal) {help(); fprintf(stderr,syntax,v); exit(1);}
          equal++;
          disk=parse_blocks(equal);
@@ -321,14 +321,14 @@ void parse_arg(int argc, char *argv[]) {
          continue;
       }
     
-      if ( strcasestr(v,"root=")!=NULL)  {
+      if ( strcasestr(v,"root="))  {
          equal=strchr(v,'='); if (!equal) {help(); fprintf(stderr,syntax,v); exit(1);}
          equal++;
          root=parse_blocks(equal);
          continue;    
       }
     
-      if ( strcasestr(v,"swap=")!=NULL ) {
+      if ( strcasestr(v,"swap=") ) {
          equal=strchr(v,'=');
          equal++;
          swap=parse_blocks(equal);
@@ -336,7 +336,7 @@ void parse_arg(int argc, char *argv[]) {
          continue;
       }
 
-      if ( strcasestr(v,"write=")!=NULL ) {
+      if ( strcasestr(v,"write=") ) {
          equal=strchr(v,'=');
          equal++;
          save=parse_blocks(equal);

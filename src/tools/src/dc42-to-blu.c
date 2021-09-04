@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
      //                                                                 0123456789012345678901
      if (profile_ffffff==2) memcpy((void *)(&ProFile_Spare_table[  0]),"Widget-10    ",13);  
      if (widget)            memcpy((void *)(&ProFile_Spare_table[  0]),"Lisa HD Img BLUV0.90N",21);
-     fwrite(ProFile_Spare_table,(F.tagsize ? (F.sectorsize+F.tagsize) : F.sectorsize),1,raw);
+     fwrite(data,(F.tagsize ? (F.sectorsize+F.tagsize) : F.sectorsize,1,raw);
      }
 
   for (x=0; x<F.numblocks; x++)

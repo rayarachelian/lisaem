@@ -134,7 +134,7 @@ int fliflo_buff_add(FLIFLO_QUEUE_t *b,uint8 data)  // checked
     if ((b->start)> (b->size))  {EXITR(179,0,"ERROR! start:%d pointer>size! %d",b->start,b->size);}
    #endif
 
-   ALERT_LOG(0,"adding %d to buffer at index:%d",data,b->end);
+   DEBUG_LOG(0,"adding %d to buffer at index:%d",data,b->end);
    //BUG://b->buffer[b->start]=data; // this will be replaced because start will not change! should add to the end?
    b->buffer[b->end]=data; // this will be replaced because start will not change! should add to the end?
 

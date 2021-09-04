@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# usage: build-wx3.1.5-modern-macosx.sh {options} 
+#
+# options -m|--without-minimum-macos|--no-minimum-macos - disable passing minimum macos to wxWidgets build.
+#
+
 export OSVER="macOS-$(A=$(sw_vers -productVersion); MAJOR=$(echo ${A} | cut -f1 -d '.'); MID=$(echo ${A} | cut -f2 -d'.'); printf "%02d.%02d" ${MAJOR} ${MID} )"
 
 export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
@@ -48,10 +53,16 @@ CCXXFLAGS='CXXFLAGS="-std=c++0x"
 [[ "$OSVER" > "macOS-10.14" ]] && export CPUS="x86_64"       XLIBS=""
 [[ "$OSVER" > "macOS-11.00" ]] && export CPUS="x86_64,arm64" XLIBS="" CCXXFLAGS="-std=c++0x"
 
+MINIMUMMACOS="--with-macosx-version-min=$MIN_MACOSX_VERSION"
+
+[[ "$1" == "--without-minimum-macos" ]]  && MINIMUMMACOS=""
+[[ "$1" == "--no-minimum-macos"      ]]  && MINIMUMMACOS=""
+[[ "$1" == "-m"                      ]]  && MINIMUMMACOS=""
+
 TYPE=cocoa-${OSVER}-${CPUS}
 ../configure --enable-monolithic --enable-unicode --with-cocoa ${CCXXFLAGS} ${XLIBS} \
              --enable-universal-binary=${CPUS} \
-             --with-macosx-version-min=$MIN_MACOSX_VERSION \
+             "${MINIMUMMACOS}" \
              --disable-richtext  --disable-debug --disable-shared --without-expat  \
              --with-libtiff=builtin --with-libpng=builtin --with-libjpeg=builtin --with-libxpm=builtin --with-zlib=builtin \
              --with-sdl \

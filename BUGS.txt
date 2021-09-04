@@ -1,12 +1,12 @@
 Here's a list of some of the current known issues, there are likely many others.
 
 * Terminal code isn't complete - menus don't work, Xmodem isn't complete.
-* serial port A is broken on Lisa Office System so it's disabled by default
+* serial port A is broken on Lisa Office System (causes a lockup on access to the port) so it's disabled by default, there's a build script option to force enable it anyway.
 * UniPlus + Xenix still don't fully boot.
-* MacWorks XL 3.0 sometimes works, other times crashes.
-
+* If you have a preinstalled UniPlus, you can now image it with BLU, convert the image with blu-to-dc42 and it will work in LisaEm, however, fresh installs will not work.
+* MacWorks XL 3.0 mostly Works, but requires booting from floppy
 * Various sound generation issues across several platforms, but works on 
-GTK if SDL is enabled, so turning on SDL for build wx scripts. 
+GTK if SDL is enabled, so turning on SDL for build wx scripts, though sometimes I see alerts for not being able to open ALSA, you may need to also install the pulseaudio/ALSA proxy package
 
 * Mouse tracking fails to work under high load throttle- noticed on GTK.
 On my system when using a debug compiled binary and throttle set to 100MHz,
@@ -36,9 +36,4 @@ other macos x versions, based on old memories, I remember it working on PPC32/64
 on macos 10.4, not sure about 10.5-10.7. This also affects command line tools
 such as lisafsh-tool.
 
-* blu-to-dc42
-This code does not work well enough to convert Widget or Profile dumped via BLU
-to be bootable, nor mountable in LisaEm, although lisafsh-tool can get a 
-directory of the resulting image, not yet sure what's wrong.
-
-* dc42-to-tar not yet complete - contains bugs
+* dc42-to-tar is mostly working, except for a few edge cases.

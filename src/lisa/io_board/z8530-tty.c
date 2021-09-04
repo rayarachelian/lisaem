@@ -31,10 +31,11 @@
 // Based on code from: mypty3 http://rachid.koucha.free.fr/tech_corner/pty_pdip.html
 // and https://www.cmrr.umn.edu/~strupp/serial.html#2_5_2
 
+#ifndef __MSVCRT__
+
 #include <vars.h>
 #include <z8530_structs.h>
 
-#ifndef __MSVCRT__
 #include <stdlib.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -53,8 +54,6 @@
 
 #ifndef sun
 #include <err.h>
-#endif
-
 #endif
 
 #define _XOPEN_SOURCE 600
@@ -217,7 +216,7 @@ int poll_tty_serial_read(int port) {
     return rc; //return (FD_ISSET(0, &fd_in));
 }
 
-int read_serial_port_tty(int port) {
+char read_serial_port_tty(int port) {
   int rc=0;
 
   if (poll_tty_serial_read(port)>0) {
@@ -242,3 +241,14 @@ void close_tty(int port) {
   close(fd[port]);
   fd[port]=-1;
 }
+
+#else
+
+#include <vars.h>
+// fake out fn
+
+char read_serial_port_tty(int port) {return 0;}
+void write_serial_port_tty(int port, uint8 data) {};
+int poll_tty_serial_read(int port) {return 0;}
+
+#endif

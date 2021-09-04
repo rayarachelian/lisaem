@@ -69,12 +69,17 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-// Windows lacks POSIX MMAP functions.
+// Windows lacks MMAP, strcasestr functions
 #ifndef __MSVCRT__
 #include <sys/mman.h>
 #include <glob.h>
 #define HAVE_MMAPEDIO
+#else
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#include <strcasestr.h>
 #endif
+
 
 
 #include <errno.h>
@@ -814,7 +819,7 @@ int dc42_is_valid_image(char *filename)
 
 
 
-    if (filesizetotal>4294967290) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
+//    if (filesizetotal>4294967290) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
 
     if (F->fd>2)
        {
@@ -900,7 +905,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
     F->dc42seekstart=0;
 
-    if (filesizetotal>4294967296) DC42_RET_CODE(F,88,"File too large to be a valid disk image",return F->retval);
+    //if (filesizetotal>4294967296) DC42_RET_CODE(F,88,"File too large to be a valid disk image",return F->retval);
 
     if (F->fd>2)
        { int i;

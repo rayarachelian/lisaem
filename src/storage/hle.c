@@ -268,6 +268,15 @@ void apply_mw30_hacks(void) {
   if (lisa_rl_ram(0x00163946)==0x1010b101 && lisa_rl_ram(0x0016394a)==0x14c01010) {
       lisa_ww_ram(0x00163946,0xf33d);
       lisa_ww_ram(0x00163ade,0xf33d);
+
+      ALERT_LOG(0,"#  # #    #### Patching for MacWorks XL 3.0 ProFile");
+      ALERT_LOG(0,"#  # #    #    Patching for MacWorks XL 3.0 ProFile");
+      ALERT_LOG(0,"#### #    #### Patching for MacWorks XL 3.0 ProFile");
+      ALERT_LOG(0,"#  # #    #    Patching for MacWorks XL 3.0 ProFile");
+      ALERT_LOG(0,"#  # #### #### Patching for MacWorks XL 3.0 ProFile");
+
+
+
      }
 
   macworks_hle=0;
@@ -295,6 +304,12 @@ void apply_los31_hacks(void) {
       lisa_ww_ram(0x00c08a2e,0xf33d);          // read 1x
       lisa_ww_ram(0x00c08d0a,0xf33d);          // write 3x
       lisa_ww_ram(0x00c08c86,0xf33d);          // write 512
+
+      ALERT_LOG(0,"#  # #    #### Patching for LOS3.1 ProFile");
+      ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
+      ALERT_LOG(0,"#### #    #### Patching for LOS3.1 ProFile");
+      ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
+      ALERT_LOG(0,"#  # #### #### Patching for LOS3.1 ProFile");
   }
 
   los31_hle=0;
@@ -326,6 +341,13 @@ void  hle_intercept(void) {
           if (P)
           {
              switch(reg68k_pc) {
+               // uniplus lock speedup by pushing to next frame, and hopefully the next IRQ or timer event
+               case 0x0000c188: if (!reg68k_sr.sr_struct.z) 
+                                   {reg68k_pc=0x0000c182; cpu68k_clocks=cpu68k_clocks_stop+24;}
+                                else 
+                                   {reg68k_pc=0x0000c18c; cpu68k_clocks+=24;}
+                                break; 
+
                case 0x00020c64: size=  4; reg68k_pc=0x00020c74; ALERT_LOG(0,"profile.c:hle:read status");
                                           P->indexread=0;                                   
                                           P->indexwrite=4;
@@ -342,7 +364,7 @@ void  hle_intercept(void) {
     
                // write tag/sector specific
                case 0x00020ebc:           regs.pc=pc24=reg68k_pc=0x00020ef0; ALERT_LOG(0,"profile.c:state:hle:write sector+tags");  // write tags and data in one shot, then return to 0x00020ef0
-                                size=D5; // d5
+                                size=D0; // d5
                                 a4=A4;
                                 while(size--) {
                                                  if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;}
@@ -411,34 +433,39 @@ void apply_uniplus_hacks(void)
       //v1.1 /sunix patch
       if (r==0x60)
       {
+          ALERT_LOG(0,"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
           ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
           ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
           ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
-          ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
+          ALERT_LOG(0,"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 
-          lisa_wb_ram(0x0001fe24,0x60); // skip assert BSY 1
-          lisa_wb_ram(0x0001ff38,0x01); // increase timeout to ludicrous length
+          lisa_wb_ram(0x0001fe24,0x60);   // skip assert BSY 1
+          lisa_wb_ram(0x0001ff38,0x01);   // increase timeout to ludicrous length
+          lisa_wl_ram(0x0000c188,0xf33d); // time speedup patch   TST.W      $00022d46/BNE.W      $0000c182 
 
           uniplus_hacks=0; // turn off short-circuit logic-AND flag
       }
 
       // v1.4 /unix patch
        if (r==0x67) { // v1.4 this checks to ensure that the pro.c driver is loaded before we modify it. Likely not necessary.
+           ALERT_LOG(0,"====================================================================");
            ALERT_LOG(0,"Patching for UNIPLUS v1.4");
            ALERT_LOG(0,"Patching for UNIPLUS v1.4");
            ALERT_LOG(0,"Patching for UNIPLUS v1.4");
-           ALERT_LOG(0,"Patching for UNIPLUS v1.4");
+           ALERT_LOG(0,"====================================================================");
 
            // these two are needed to pass handshaking in Uni+ with our shitty profile emulation
            lisa_wb_ram(0x00020f9c,0x60);   // skip assert BSY
            lisa_wb_ram(0x000210b0,0x01);   // increase timeout to ludicrous length
+           lisa_wl_ram(0x0000c188,0xf33d); // time speedup patch   TST.W      $00022d46/BNE.W      $0000c182 
 
            // these are optional for HLE acceleration of ProFile reads/writes
            if  (hle) {
-               ALERT_LOG(0,"Patching for UNIPLUS v1.4 HLE");
-               ALERT_LOG(0,"Patching for UNIPLUS v1.4 HLE");
-               ALERT_LOG(0,"Patching for UNIPLUS v1.4 HLE");
-               ALERT_LOG(0,"Patching for UNIPLUS v1.4 HLE");
+               ALERT_LOG(0,"#  # #    #### Patching for UNIPLUS v1.4 HLE");
+               ALERT_LOG(0,"#  # #    #    Patching for UNIPLUS v1.4 HLE");
+               ALERT_LOG(0,"#### #    #### Patching for UNIPLUS v1.4 HLE");
+               ALERT_LOG(0,"#  # #    #    Patching for UNIPLUS v1.4 HLE");
+               ALERT_LOG(0,"#  # #### #### Patching for UNIPLUS v1.4 HLE");
 
                lisa_ww_ram(0x00020c64,0xf33d); // read 4 status bytes into A4, increase a4+=4, PC=00020c74
                lisa_ww_ram(0x00020d1e,0xf33d); // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26

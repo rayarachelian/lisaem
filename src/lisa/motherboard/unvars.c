@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-PRE-RC4-UNSTABLE_2021.03.23                    *
+*              The Lisa Emulator Project  1.2.7-PRE-RC4-UNSTABLE_2021.08.10                    *
 *                  Copyright (C) 2021 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *

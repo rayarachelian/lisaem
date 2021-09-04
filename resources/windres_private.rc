@@ -1,0 +1,39 @@
+#include <windows.h> // include for version info constants
+
+A ICON MOVEABLE PURE LOADONCALL DISCARDABLE "lisaem.ico"
+
+//
+// SUPPORT FOR WINDOWS XP THEMES:
+// THIS WILL MAKE THE PROGRAM USE THE COMMON CONTROLS
+// LIBRARY VERSION 6.0 (IF IT IS AVAILABLE)
+//
+1 24 "lisaem.exe.Manifest"
+
+1 VERSIONINFO
+FILEVERSION 1,2,7,0
+PRODUCTVERSION 1,2,7,0
+FILETYPE VFT_APP
+{
+  BLOCK "StringFileInfo"
+         {
+                 BLOCK "040904E4"
+                 {
+                         VALUE "CompanyName", "Sunder.NET"
+                         VALUE "FileVersion", "1.2.7-PRE-RC4-UNSTABLE_2021.08.10"
+                         VALUE "FileDescription", "The first fully functional Lisa Emulator™"
+                         VALUE "InternalName", "http://lisaem.sunder.net"
+                         VALUE "LegalCopyright", "Copyright © 2021 Ray Arachelian, All Rights Reserved"
+                         VALUE "LegalTrademarks", ""
+                         VALUE "OriginalFilename", "LisaEm"
+                         VALUE "ProductName", "LisaEm"
+                         VALUE "ProductVersion", "1.2.7-PRE-RC4-UNSTABLE_2021.08.10"
+                 }
+         }
+  BLOCK "VarFileInfo"
+         {
+                 VALUE "Translation", 0x0409, 1252
+         }
+}
+
+lisa2icon   ICON   "lisa2icon.ico"
+#include <wx/msw/wx.rc>

@@ -10,6 +10,7 @@
 
 //    Because there's nothing quite like the thrill of reinventing the wheel again!   //
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
