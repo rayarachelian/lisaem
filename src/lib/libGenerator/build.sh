@@ -253,8 +253,8 @@ fi
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -271,7 +271,7 @@ fi
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
 echo "LASTBLITS=\"$WITHBLITS\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 ###########################################################################
 echo Building libGenerator...
@@ -294,24 +294,31 @@ export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES"
 
 if [[ "$DEPS" -gt 0 ]] ######################################################################
 then
+
+  # when cross compiling, we need def68k and gen68k to be native as they generate C code locally
+  # on macos x 10.5 rosetta works from i386 on ppc, but not here.
+
+  export ZARCH="$ARCH"
+  [[ -n "$DARWIN" && "$OSVER" > "11.0" ]] && [[ "$OMACHINE" == "x86_64" || "$OMACHINE" == "arm64" ]] && export ZARCH="   -m64 -arch x86_64 -arch arm64   "
+
   export COMPILEPHASE="gen"
   export PERCENTJOB=0 NUMJOBSINPHASE=24
   export OUTEXT=""
-  export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $ARCH -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
+  export COMPILECOMMAND="$CC $ZARCH $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
   LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiled COMPILELIST tab68k def68k )
 
   cd ${XTLD}/obj
   waitqall
-  $CC $CLICMD $ARCH  -o def68k tab68k.o def68k.o
+  echo $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
+  $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
 
   cd ${XTLD}/cpu68k
   echo -n "  "
   ../obj/def68k || exit 1
 
   echo "  Compiled gen68k.c..."
-  $CC $CLICMD $ARCH $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
-
-  $CC $CLICMD $ARCH $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o 
+  $CC $ZARCH $CLICMD  $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
+  $CC $ZARCH $CLICMD  $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o 
   echo -n "  "
   ${XTLD}/obj/gen68k || exit 1
 

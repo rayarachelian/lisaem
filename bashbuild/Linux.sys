@@ -17,6 +17,10 @@ export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} -fcommon -fwrapv -fno-strict-aliasi
 #export SYSLIBS=""
 #export GCCSTATIC=""
 
+export LINUX="Linux"
+export MACHINE="$( uname -m )"
+export OMACHINE="$( uname -m )"
+
 export AROPTS="crD"
 [[ -z "$AR"     ]] && export AR="$( which ar )"
 [[ -z "$RANLIB" ]] && export RANLIB="$( which ranlib )"

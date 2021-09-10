@@ -35,14 +35,14 @@ fi
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
     STABILITY="PRE-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2021.09.03"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2021.09.13"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
           URL="http://lisaem.sunder.net"  # url to website of package
 COPYRIGHTYEAR="2021"
-COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR, All Rights Reserved"
+COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
@@ -174,15 +174,15 @@ export COMPILEPHASE="preparing"
 if [ -z "`echo $BUILDARGS | egrep -- '--quiet|--stfu'`" ]
 then
   image resources/lisaem-banner.png || (
-  echo 
+  echo #                       12345678901234567890123456789012345678901234
   echo " +------------------+  Apple Lisa 2 Emulator -Unified Build Script"
   echo " |+---------+ _____ |                                             "
-  echo " ||         | _____ |       LisaEm $VERSION"
+  echo " ||         | _____ |  $(center 44 ${SOFTWARE}\ ${VERSION})"
   echo " ||         |  ---= |        http://lisaem.sunder.net             "
   echo " |+---------+     . |        The Lisa Emulator Project            "
-  echo " +------------------+ Copyright (C) ${RELEASEDATE:0:4} ${AUTHOR}"
+  echo " +------------------+ ${COPYRIGHTLINE}"
   echo " /=______________#_=\\           All Rights Reserved               "
-  echo "                     ${LICENSERELEASE}"
+  echo "                      ${LICENSERELEASE}"
   )
 fi
 
@@ -216,20 +216,30 @@ for j in $@; do
   --prefix=*)     export    PREFIX="${i:9}" ;;
   --pkg-prefix=*) export PKGPREFIX="${i:9}" ;;
 
+
+  package)  if  [[ -z "${DARWIN}${CYGWIN}" ]]; then
+                echo "This is only implemented on macos and windows currently" 1>&2
+                exit 1
+            fi
+            export WITHPKG="yes"
+
+            if  [[ -n "$CYGWIN" ]] && [[ -z "$HASPERMISSION" ]]; then
+                export INSTALL=1
+		echo "NOTE: On Windows package will also install" 1>&2
+		echo "Command: $0 $@"                             1>&2
+		CygwinSudoRebuild install package \
+			$( for i in $@; do if [[ "$i" != "package" ]] && [[ "$i" != "install" ]]; then echo "$i"; fi; done )
+		exit $?
+            fi
+            ;;
+
   install)
             if  [[ -z "$CYGWIN" ]]; then
                 [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
             else
-                CygwinSudoRebuild $@
+                [[ -z "$HASPERMISSION" ]] && CygwinSudoRebuild $@
             fi
             export INSTALL=1
-            ;;
-
-  package)  if  [[ -z "$DARWIN" ]]; then
-                echo "This is only implemented on macos x currently" 1>&2
-                exit 1
-            fi
-            export WITHPKG="yes"
             ;;
 
   uninstall)
@@ -261,15 +271,15 @@ for j in $@; do
 
   -64|--64|-m64)                export SIXTYFOURBITS="--64"; 
                                 export THIRTYTWOBITS="";
-                                export ARCH="-m64"; export SARCH="-m64" ;;
+                                export ARCH="-m64"; export SARCH="-m64"     ;;
 
   -32|--32|-m32)                export SIXTYFOURBITS=""; 
                                 export THIRTYTWOBITS="--32"; 
                                 [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
-                                export ARCH="-m32"; export SARCH="-m32"       ;;
+                                export ARCH="-m32"; export SARCH="-m32"     ;;
 
-  -march=*)                     export ARCH="${opt} $ARCH"                ;;
-  -arch=*)                      export ARCH="$(echo ${opt} | sed -e 's/=/ /g') $ARCH"
+  -march=*|--march=*)           export ARCH="${opt} $ARCH"                  ;;
+  -arch=*|--arch=*)             export ARCH="$(echo ${opt} | sed -e 's/=/ /g') $ARCH"
                                 export ARCHOVERRIDE="$(echo ${opt} | cut -d= -f2 )"
                                 export SARCH="$opt $SARCH" ;;
 
@@ -908,8 +918,22 @@ if  [[ -f "$LISANAME" ]]; then
               echo "* Installing lisaem.exe binary in $PREFIX/lisaem"
               cp "${TLD}/bin/lisaem.exe" "$PREFIX"
               echo -n "  Done Installing."
+
+              if  [[ -n "$WITHPKG" ]]; then
+		  [[ -z "$MACHINE" ]] && export MACHINE="$( uname -m )"
+		  PKGNAME="${TLD}/pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-win10-${MACHINE}.zip"
+		  echo "Creating ZIP Windows Package: $PKGNAME" 1>&2
+		  cd "$PREFIX/../.." || exit 1
+                  zip -r -9 "${PKGNAME}" ./Sunder.NET/LisaEm || exit $?
+                  echo "Created zip package: ${PKGNAME}" 1>&2
+
+                  elapsed=$(get_elapsed_time)
+                  [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+	      fi
+
               elapsed=$(get_elapsed_time)
               [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+
               exit 0
         else
           # PREFIX="/usr/local/bin" PREFIXLIB="/usr/local/share/" - these are set in bashbuild/${OS}.sys file    

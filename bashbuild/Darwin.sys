@@ -15,6 +15,7 @@ export GCCCOLORIZED=""
 
 export DARWIN="Darwin"
 export MACHINE="$( uname -m )"
+export OMACHINE="$( uname -m )"
 # ::TODO:: check 32 bit vs 64 bit for PowerMac G5
 
 export OSVER=$( sw_vers -productVersion        )
@@ -66,6 +67,7 @@ fi
 
 export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -std=c99"
 export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer $NOUNKNOWNWARNING $NOCPP11EXT"
+export CXXFLAGS="$CXXFLAGS -d_MACOSMAJOR=$OSMAJOR -d_MACOSMIDDLE=$OSMIDDLE -d_MACOSVER=${OSMAJOR}${OSMIDDLE}"
 
 export SYSLIBS=""
 # Since we don't want to require the end user have wxWidgets as a dylib preinstalled

@@ -39,3 +39,10 @@ function ansi_set_cursor_xy()   { printf "\x1B[${1};${2}H" 1>&2; }
 function ansi_set_cursor_home() { printf '\x1B[H'          1>&2; }
 function ansi_save_cursor()     { printf "\x1B7"           1>&2; }
 function ansi_restore_cursor()  { printf "\x1B8"           1>&2; }
+
+# shamelessly stolen from: https://unix.stackexchange.com/a/267730 @Wildcard
+center() {
+  width="$1"
+  left="$(printf '%0.1s' ={1..256})"
+  printf '%*.*s %s %*.*s\n' 0 "$(((width-${#2})/2))" "$left" "$2" 0 "$(((width-${#2})/2))" "$left"
+}

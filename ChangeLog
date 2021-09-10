@@ -3,6 +3,22 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 TBA 1.2.7  - Release on 2021.XX.YY (TBA) (Major release for all platforms)
 
+2021.09.10 - fixed crash on macos 11.x - wxDisplay constructor parent param
+           - added _MACOSVER define to help select wxDisplay parent params
+           - non-production macos beta/RC releases will be renamed in the dmg 
+	           with the version info, releases will remain named LisaEm.app
+	         - Added --clean-preferences to macos x lisaem.sh to clear
+	           saved preferences incase LisaEm is misbehaving.
+           - Added package option to windows build (implies install), makes a
+             zip file which you'll extract in C:\Program Files - this is not
+             a real installer yet, sorry.
+
+2021.09.08 - added --list option to lisaem.sh to show available binaries for
+             macos obese binaries.
+
+2021.09.06 - added back lost --diet option to macos lisaem.sh option to remove
+             unusable obese/universal binaries on your specific system.
+           - modifications to allow cross platform build from x86_64 to M1 arm
 
 2021.09.03 - fix macos missing ptsname_r (only exists in linux)
            - unstable push

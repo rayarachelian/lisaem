@@ -1998,11 +1998,22 @@ LisaWin::LisaWin(wxWindow *parent)
 
     rawidx=0;
 
+    ALERT_LOG(0,"========================================================================");
     SetExtraStyle(wxWS_EX_PROCESS_IDLE );
 
     int screensizex,screensizey;   // my_lisaframe is still null.
-    //wxDisplaySize(&screensizex,&screensizey);
-    wxDisplay display(wxDisplay::GetFromWindow(parent));
+    ALERT_LOG(0,"========================================================================");
+   
+#ifdef _MACOSVER
+#if _MACOSVER < 1012
+                                wxDisplay display( wxDisplay::GetFromWindow(parent));
+#else
+    if   (my_lisaframe != NULL) wxDisplay display( my_lisaframe); 
+    else                        wxDisplay display( wxDisplay::GetFromWindow(parent));
+#endif
+#else
+                                wxDisplay display( wxDisplay::GetFromWindow(parent));
+#endif
     ALERT_LOG(0,"========================================================================");
     
     ALERT_LOG(0,"wxWidgets version aggregate:%d", ((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) )
@@ -8315,7 +8326,6 @@ extern "C" int pickprofilesize(char *filename, int allowexisting)
                                        {filename[0]=0; check=0; r=-1;}
     }
 
-    delete d;
   } ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   delete d;

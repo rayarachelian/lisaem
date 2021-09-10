@@ -50,8 +50,8 @@ CCXXFLAGS='CXXFLAGS="-std=c++0x"
 [[ "$OSVER" < "macOS-10.09" ]] && export XLIBS="" CCXXFLAGS=""
 
 # macos 10.14-10.15 build only x86_64, 11.0+ build for both x86_64 and arm64.
-[[ "$OSVER" > "macOS-10.14" ]] && export CPUS="x86_64"       XLIBS=""
-[[ "$OSVER" > "macOS-11.00" ]] && export CPUS="x86_64,arm64" XLIBS="" CCXXFLAGS="-std=c++0x"
+[[ "$OSVER" > "macOS-10.14"  ]] && export CPUS="x86_64"       XLIBS=""
+[[ "$OSVER" > "macOS-10.99"  ]] && export CPUS="x86_64,arm64" XLIBS="" # CCXXFLAGS="-std=c++0x"
 
 MINIMUMMACOS="--with-macosx-version-min=$MIN_MACOSX_VERSION"
 

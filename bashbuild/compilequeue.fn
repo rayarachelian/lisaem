@@ -20,7 +20,7 @@ function trim_duplicate_args() {
   local SEEN=""
   local ARGS=""
   for var in "$@"; do
-      if [[ -z "$( echo $SEEN | grep :::$var::: | egrep -v ':::-L:::|:::-I:::|:::-framework:::' )" ]]; then
+      if [[ -z "$( echo $SEEN | grep :::$var::: | egrep -v ':::-L:::|:::-I:::|:::-framework:::|:::-arch:::' )" ]]; then
          ARGS="$ARGS $var"
          SEEN="$SEEN :::$var::: "
       fi

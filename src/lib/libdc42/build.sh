@@ -241,8 +241,8 @@ fi
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -259,7 +259,7 @@ fi
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
 echo "LASTBLITS=\"$WITHBLITS\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 
 [[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1 COMPILEPHASE="libdc42"

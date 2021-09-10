@@ -228,8 +228,8 @@ create_machine_h
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -243,7 +243,7 @@ if [[ "$needclean" -gt 0 ]]; then
 fi
 
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 ###########################################################################
 
