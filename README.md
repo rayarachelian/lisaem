@@ -13,6 +13,10 @@
 
 ------------------------------------------------------------------------------
 
+## New branch notice
+
+Since RC3a, I've added quite a bit of code to the "UNSTABLE" branch. If you're interested in the latest and greatest, and possibly most buggy, take a look there as well.
+
 ## What is this thing?
 
 You're looking at the repository for the source code for LisaEm 1.2.7. 
