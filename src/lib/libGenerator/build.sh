@@ -125,7 +125,7 @@ for j in $@; do
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
             rm -f /tmp/slot.*.sh*
 
-            if [[ -n "`which ccache`" ]]; then ccache -c >/dev/null 2>/dev/null; fi
+            if [[ -n "`which ccache 2>/dev/null`" ]]; then ccache -c >/dev/null 2>/dev/null; fi
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"

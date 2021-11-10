@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# simple silly little script to tar up the source code, get the SHA256
+# and size and write them to the port distfile + copy the soruce tarball
+# to /usr/port/distfiles so it's locally available for use by the ports
+# you'll need to change it to fit your purposes.
+#
+# i.e. this assumes LisaEm is in /home/$USER/code/lisaem-1.2.7 which
+# will vary on your system or may go out of date when 1.2.8 is released,
+# etc.
+
+TAR=lisaem-1.2.7.tar
+TARXZ=lisaem-1.2.7.tar.xz
+
+pushd .. >/dev/null
+./build.sh clean || exit $?
+cd ..
+
+rm $TARXZ
+tar cpf $TAR lisaem-1.2.7
+xz -zveT2 $TAR
+
+(  cksum  -b -a sha256 $TARXZ; echo -n "SIZE ($TARXZ) = "; stat -r $TARXZ | awk '{print $8}' ) >distinfo
+
+sudo cp $TARXZ   /usr/ports/distfiles/$TARXZ
+sudo cp distinfo /usr/ports/emulators/lisaem/distinfo
+
+sudo cat >/usr/ports/emulators/lisaem/Makefile<<END
+# $OpenBSD: Makefile.template,v 1.90 2021/02/25 21:59:27 sthen Exp $
+
+COMMENT=                Apple Lisa 2 Emulator
+DISTNAME=               lisaem-1.2.7
+CATEGORIES=             emulators
+MAINTAINER=             Ray Arachelian <ray@arachelian.com>
+HOMEPAGE=               http://lisaem.sunder.net
+# GPLv2+ GPLv3
+PERMIT_DISTFILES =      Yes
+PERMIT_PACKAGE =        Yes
+MASTER_SITES=           https://lisaem.sunder.net/downloads/
+NO_TEST=                Yes
+CONFIGURE_STYLE=        gnu
+EXTRACT_SUFX =          .tar.xz
+# would prefer wxWidgets 3.1.5 but not available in obsd 7.0, only 3.0.5
+WANTLIB += ${COMPILER_LIBCXX} c m wx_baseu-3.0 wx_baseu_net-3.0
+WANTLIB += wx_baseu_xml-3.0 wx_gtk3u_adv-3.0 wx_gtk3u_core-3.0
+WANTLIB += wx_gtk3u_html-3.0 wx_gtk3u_qa-3.0 wx_gtk3u_xrc-3.0
+WANTLIB += z
+
+BUILD_DEPENDS=          shells/bash
+LIB_DEPENDS=            x11/wxWidgets
+
+.include <bsd.port.mk>
+END

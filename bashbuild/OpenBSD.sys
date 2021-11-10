@@ -11,7 +11,7 @@ export GCCCOLORIZED=""
 [[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
 [[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
 
-export FREEBSD="FreeBSD"
+export OPENBSD="OpenBSD"
 
 export HASHOPTS="-b --tag"
 export PREFIX="/usr/local/bin"
@@ -23,7 +23,7 @@ export SYSLIBS=""
 export GCCSTATIC=""
 
 export NOWARNFORMATTRUNC=""
-# is this needed for FreeBSD?
+# is this needed for OpenBSD?
 # fix to alow modern XCode/stdc++ clang compilation, see: https://stackoverflow.com/questions/12920891/std-linker-error-with-apple-llvm-4-1
 # and https://apple.stackexchange.com/questions/350627/how-can-i-specify-the-c-version-to-use-with-xcode
 # wxWidgets may also need patching, see: https://stackoverflow.com/a/37632111
@@ -48,58 +48,110 @@ function windres() {
 true 
 }
 
-function FreeBSDPackage() {
+function OpenBSDPackage() {
 
   pushd . >/dev/null 2>/dev/null
 
   SUFFIX=""
   [[ "${STABILITY}" != "RELEASE" ]] && [[ "${STABILITY}" != "PRODUCTION" ]] && export SUFFIX="-${STABILITY}-${RELEASEDATE}"
 
-  export STAGEDIR="${XTLD}/pkg/build/tmp/freebsd/"
-  export MANIFEST="${XTLD}/pkg/build/tmp/freebsd/+MANIFEST"
+  export STAGEDIR="${XTLD}/pkg/build/tmp/openbsd/"
+  export DESC="${XTLD}/pkg/build/tmp/openbsd/+DESC"
+  export CONTENTS="${XTLD}/pkg/build/tmp/openbsd/+CONTENTS"
 
-  rm -rf "${STAGEDIR}"
+  rm -rf       "${STAGEDIR}"
   mkdir -pm755 "${STAGEDIR}"
+  cd           "${STAGEDIR}"
 
-cat >"${MANIFEST}" <<ENDFBSDMANIFESTEND
-name: ${LCNAME}
-version: "${VER}${SUFFIX}"
-origin: ${FREEBSDORIGIN}
-comment: "${DESCRIPTION}"
-desc: "${DESCRIPTION}"
-maintainer: "${AUTHEMAIL}"
-www: ${URL}
-prefix: /
-ENDFBSDMANIFESTEND
+cat >"${DESC}" <<ENDOBSDDESCEND
+${SOFTWARE} ${VER}${SUFFIX}
 
-  # copy/override any other manifests
-  cp "${XTLD}/pkg/templates/freebsd-package/"+* "${STAGEDIR}/" 2>/dev/null
+comment: ${DESCRIPTION}
 
-  # copy our artifacts to the staging area
+maintainer: ${AUTHOR} <${AUTHEMAIL}>
+WWW: ${URL}
+ENDOBSDDESCEND
 
-  if [[ ! -d "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" ]]; then
-     echo "PREFIX ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/ is missing, did build/install fail?" 1>&2
-     exit 1
-  fi
+
+deps="$(for i in $OPENBSDDEPENDS; do echo @depend $i; done )"
+
+#deps=""
+#
+#for i in $OPENBSDDEPENDS; do
+#  deps="@depend $( printf ${i}\\n )"
+#done
+
+wantlib="$(for i in $OPENBSDWANTLIB; do echo @wantlib $i; done )"
+#wantlib=""
+#for i in $OPENBSDWANTLIB; do
+#  wantlib="$wantlib $( printf \"${i}\\n\" )"
+#done
+
+# have to do the depends and wantlibs here as well as pkgpath comment.
+# have to do the prefix, prefixlib, pkgprefix pkgprefixlibs
+
+cat >"${CONTENTS}" <<ENDOBSDCONTENTSEND
+@comment $OpenBSD: PLIST-main,v $
+@name ${LCNAME}-${VER}
+@comment pkgpath=${OPENBSDORIGIN} ftp=no
+@arch $(uname -m)
++DESC
+@sha$( cksum  -b -a sha256 "+DESC" | cut -d= -f2- )
+$( stat -r "+DESC" | awk '{print "@size "$8}')
+${deps}
+${wantlib}
+@cwd /usr/local
+ENDOBSDCONTENTSEND
 
   # copy from install dir
-  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+  if [[ -n "$( echo $PREFIX | grep '\/usr\/local' )" ]]; then
+     (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/usr/local" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+  else
+     (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+  fi
 
-  # create plist
-  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && find . -type f -print | cut -c2- > "${STAGEDIR}/plist" )
+  # add file info to +CONTENTS, mark binaries with @bin bin/filename...
+  (
+    # add everything but +DESC and +CONTENTS which we previously added.
+    find . -type f -print | sort | grep -v -- +DESC | grep -v -- +CONTENTS | cut -c3- | while read line; do
 
-  cd "${STAGEDIR}"
+      # tag binaries with @bin
+      if [[ "${line:0:13}" == "usr/local/bin" ]] || [[ "${line:0:7}" == "usr/bin" ]] || [[ "${line:0:3}" == "bin" ]]; then
+         echo -n "@bin "
+      fi
+      # tag man pages with @man
+      if [[ "${line:0:13}" == "usr/local/man" ]] || [[ "${line:0:7}" == "usr/man" ]] || [[ "${line:0:3}" == "man" ]]; then
+         echo -n "@man "
+      fi
+      if [[ -n "$(  echo $line | grep rc.d )" ]]; then
+         echo -n "@rcscript "
+      fi
+      if [[ -n "$(  echo $line | grep lib )" ]]; then
+         echo -n "@lib "
+      fi
 
-  # add dependencies to the manifest
-  ( echo 'deps: {'
-     for pkg in $( echo "${FREEBSDDEPENDS}" | sed -e 's/,//g' ); do
-         pkg query "  %n: { version: \"%v\", origin: %o }" ${pkg}
-     done
-     echo '}'
-  ) 2>/dev/null >>"${MANIFEST}"
+      #                      remove /usr/local  remove /usr     remove ^/ (leading / )
+      echo "$line" | sed -e 's/^.*local//g' -e 's/^.*usr//g' -e 's/^\///'
 
-  cd "${XTLD}/pkg"
-  pkg create -m "${STAGEDIR}/" -r "${STAGEDIR}/" -p "${STAGEDIR}/plist" -o .
+      echo -n '@sha '; cksum  -b -a sha256 "$line" | awk '{print $4}'
+      stat -r "$line" | awk '{print "@size",$8}'
+      stat -r "$line" | awk '{print "@ts",$10}'
+
+    done
+
+    echo '@tag update-desktop-database'
+    echo '@tag gtk-update-icon-cache %D/share/icons/hicolor'
+    echo '@tag update-mime-database'
+  ) >>"${CONTENTS}"
+
+  # copy/override any other +files
+  cp "${XTLD}/pkg/templates/openbsd-package/"+* "${STAGEDIR}/" 2>/dev/null
+
+  cd "${XTLD}/pkg/build/tmp/openbsd"
+  pkg_create -f +CONTENTS 2>&1 | tee "${XTLD}/pkg/openbsd-pkg_create.log"
+  #echo "  + Using sudo to set perms and tarring, cleaning" 1>&2
+  #sudo bash -c "chown -R root:wheel .; chown root:bin +*; tar czf ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz *; cd ..; rm -rf openbsd"
+  echo "  + Created ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz - rename to ${LCNAME}-${VERSION}.tgz and then run pkg_sign" 1>&2
    
   popd . >/dev/null 2>/dev/null
 }
@@ -117,6 +169,7 @@ function getcpus()
   if [[ -z "$NUMCPUS" ]]; then
      export NUMCPUS="$(  sysctl hw.model hw.machine hw.ncpu | grep hw.ncpu: | cut -d: -f2 | sed -e's/ //g' )"
   fi
+  [[ "$NUMCPUS" -lt 2 ]] && NUMCPUS=2
 }
 
 

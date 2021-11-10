@@ -894,7 +894,22 @@ if (!EVENT_WRITE_NUL)
 
      //    if ( EVENT_WRITE_ORA)//P->last_a_accs)// now wait for 0x55 ACK from Lisa, else, go back to idle
                 //{
-                    if (P->VIA_PA!=0x55 && EVENT_WRITE_ORA) P->VIA_PA=0x01;
+
+                   if (P->VIA_PA==0x00 && EVENT_WRITE_ORA)  // 2021.09.14 for los1
+                                               {
+                                                 DEBUG_LOG(0,"VIA:%d Got %00x, will go back to idle now. last_a_accs=%d",
+                                                              P->vianum, P->last_a_accs);
+                                                 P->StateMachineStep=IDLE_STATE;
+                                                 return;
+                                               }
+
+
+                    if (P->VIA_PA!=0x55 && P->VIA_PA!=0x01&& !EVENT_WRITE_ORA) {
+                                               ALERT_LOG(0,"VIA_PA=%02x - sending 01.",P->VIA_PA);    
+                                               P->VIA_PA=0x01;
+                                               return;
+                                               }
+
                     if (P->VIA_PA==0x55 && !P->CMDLine)
                                                {
                                                 PRO_STATUS_GOT55;
@@ -908,8 +923,7 @@ if (!EVENT_WRITE_NUL)
                                                }
 
                    // else
-
-                   if (P->VIA_PA!=0x55 && P->VIA_PA!=0x01)
+                   if (P->VIA_PA!=0x55 && P->VIA_PA!=0x01 && EVENT_WRITE_ORA)
                                                {
                                                  DEBUG_LOG(0,"VIA:%d did not get 55, got %02x, will go back to idle now. last_a_accs=%d",
                                                               P->vianum,P->VIA_PA,P->last_a_accs);
@@ -1108,7 +1122,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
              case 0 :
                       #ifdef DEBUG
                                            //   0     1    2    3    4     5   6    7     8     9   10   11   12   13   14  15
-                      DEBUG_LOG(0,"step6: Reading block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
+                      ALERT_LOG(0,"step6: Reading block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
                         blocknumber, blocknumber,
                         P->DataBlock[ 0],
                         P->DataBlock[ 1],
@@ -1373,6 +1387,8 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
              P->BSYLine=1;
              P->StateMachineStep=FINAL_FLIP_TO_IDLE_STATE; SET_PROFILE_LOOP_TIMEOUT(TEN_THOUSANDTH_OF_A_SEC);
          }
+         if (P->indexread==536) {ALERT_LOG(0,"Returning to idle state"); P->StateMachineStep=IDLE_STATE; P->BSYLine=1; P->indexread=4; P->indexwrite=0;} //2021.09.14
+
 
          return;
 

@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      RC4 2021.03.26                   *
+*              The Lisa Emulator Project  V1.2.7      RC4 2021.10.31                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2021 Ray A. Arachelian                     *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -2003,21 +2003,28 @@ LisaWin::LisaWin(wxWindow *parent)
 
     int screensizex,screensizey;   // my_lisaframe is still null.
     ALERT_LOG(0,"========================================================================");
-   
-#ifdef _MACOSVER
-#if _MACOSVER < 1012
+
+
+#if WXVER <312
                                 wxDisplay display( wxDisplay::GetFromWindow(parent));
 #else
-    if   (my_lisaframe != NULL) wxDisplay display( my_lisaframe); 
-    else                        wxDisplay display( wxDisplay::GetFromWindow(parent));
+                                wxDisplay display( my_lisaframe);
 #endif
-#else
-                                wxDisplay display( wxDisplay::GetFromWindow(parent));
-#endif
+
+//#ifdef _MACOSVER
+//#if _MACOSVER < 1012
+//                                wxDisplay display( wxDisplay::GetFromWindow(parent));
+//#else
+//    if   (my_lisaframe != NULL) wxDisplay display( my_lisaframe); 
+//    else                        wxDisplay display( wxDisplay::GetFromWindow(parent));
+//#endif
+//#else
+//                                wxDisplay display( wxDisplay::GetFromWindow(parent));
+//#endif
     ALERT_LOG(0,"========================================================================");
     
     ALERT_LOG(0,"wxWidgets version aggregate:%d", ((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) )
-    #if (((wxMAJOR_VERSION*100) + (wxMINOR_VERSION*10) + wxRELEASE_NUMBER) >311)
+    #if (WXVER >311)
     const wxSize p=display.GetPPI();
     ALERT_LOG(0,"PPI:%d,%d",p.GetWidth(),p.GetHeight());
     ppix=p.GetWidth();ppiy=p.GetHeight();
@@ -7604,9 +7611,9 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
             free(via[v].ProFile);
             via[v].ProFile = NULL;
             ALERT_LOG(0, "Couldn't get profile because: %d",i);
-            #ifdef DEBUG
-            sleep(3600*10);
-            #endif
+            //#ifdef DEBUG
+            //sleep(3600*10);
+            //#endif
         } else {
             via[v].ProFile->vianum=v;
             ProfileReset(via[v].ProFile);
@@ -8947,6 +8954,11 @@ char *get_welcome_fortune(void)
   "Condition TAUPE",
   "Condition Tangerine",
   "Mr. Fibble's very cross",
+  "Hey, Ho, Pip, and Dandy, Sir",
+  "Behold, the spoon of destiny, it controls everything...",
+  
+
+  "Freedom requires disobedience, just as slavery requires obedience.",
 
   "Can you see the writing on the wall? Can you see the riders on the storm?",
 
@@ -8962,6 +8974,7 @@ char *get_welcome_fortune(void)
   "Up yours, Klaus and BillG -- up wherever your species traditionally crams things; I'll rent nothing, buy/make/repair/own whatever I want, and be actually happy instead of a serf",
   "When you tear out a man's tongue, you are not proving him a liar, you're only telling the world that you fear what he might say. - GRRM",
   "Lysenko, once tried to co-opt science to political ideals and as a result caused mass starvation. Never ever allow politics or profits to run science!",
+  "Science is neither a cult nor a religion: science's primary directive is to question and overthrow established ideas.",
   "If we lose freedom here, there’s no place to escape to. This is the last stand on Earth.",
   "\"Ignore the facts in front of you, Deny thе logic and the truth, Conform to mediocrity, You know it's manufactured hopе\" - Fear Factory Manufactured Hope",
   "\"The truth is singular. Its 'versions' are mistruths.\" - David Mitchell",
@@ -8973,30 +8986,50 @@ char *get_welcome_fortune(void)
   "Great Reset? Just say Nope! Imagine a boot stamping on a human face—for ever.",
   "Great Reset? Isn't that slavery with extra steps?",
   "Great Reset? Are you trying to bring back the dark ages and serfdom? Because that's how you do that!",
-  "The ultra wealthy own multiple jets and yachts while they want us to rent everything, and own nothing, and be happy? Ha!",
-  "Pssst! Want to reverse desertification? Ruminants such as cattle can do that, they don't pollute as much planting GMO monocrops do",
-  "What's more nutritious than plant based? Meat. Ounce for ounce liver has a lot more than any superfood plant",
-  "Did you know human brains evolved by the use of cooking and hunting. Farming led to increased disease and brain shrinkage",
+  "ultra wealthy own multiple mansions, islands, jets, and yachts while they want us to rent everything, own nothing, and eat insects! Ha! Never!",
+  "ultra wealthy parasites fly private jets to climate summits and eat kobe beef while the companies they own pollute everything, yet it's our fault.",
+  "ultra wealthy parasites create planned obsolescence through glued-in lithium batteries to force biyearly upgrades, yet it's our fault the world is polluted.",
+  "ultra wealthy parasites create irrepairable devices to force biyearly upgrades, yet it's our fault the world is polluted.",
+  "ultra wealthy parasites remove profits from the economy and pay no taxes through tricks, inflating prices, while calling us worthless eaters.",
+  "ultra wealthy parasites owned companies polluted the oceans, waterways, farmland, air, and yet it's our fault for eating meat, Ha!",
+  "ultra wealthy parasites love to divide and conquer us so we fight each other and not them, refuse to accept division. Unite work together.",
+  "ultra wealthy parasites love emergencies, and never let them go to waste, even creating them with shitty solutions that benefit only them.",
+  "Rights are not priviledges. They are unalianable. We do not consent to the ultra wealthy parasites trampling on them with their great reset world coup.",
+  "Stakeholder Capitalism is doublespeak for Fascism - after all Mussolini invented it. Shareholder capitalism, or GTFO! Say no to the reset!",
+
+  "Plausible deniability by feigning incompetence, is wearing really thin these days, the lies are becoming very obvious.",
+  "Ultimatums are not freedom of choice, but merely a form of seeking the sanction of the victims. Don't accept it.",
+  "Pssst! Want to reverse desertification? Ruminants such as cattle can do that, they don't pollute as planting GMO monocrops do",
+  "What's more nutritious than plant based? Meat. Ounce for ounce liver has a lot more nutrients than any superfood plant",
+  "Did you know human brains evolved by the use of cooking and hunting. Farming led to chronic disease, brain shrinkage, overlords, and serfdom.",
   "Without the ability to own property, no one can invest in anything, thus remaining a perpetual serf, always renting everything, never able to rise above their class",
   "War is the new normal. Great Reset is slavery. Ignorance is 10 o'clock news fed",
   "And if all others accepted the lie (and censorship) which the Party imposed - if all records told the same tale - then the lie passed into history and became truth.",
   "How nice that the machine provides freedom from thought, that you can blindly repeat what you're told on the news as fact and denouce those who question the fake reality imposted on the citizenry",
-  "How nice that you can cancel/censor those who question the machine because you're trained to not be able to think for yourself",
-  "Psst! WhiteHouse telling cellco's, goog, yt, twitter, fb, etc. what to censor is a form of prior restraint and is unconstitutional",
+  "How nice that they can cancel/censor those who question the machine because the public trained to not be able to think for themselves.",
+  "Psst! WhiteHouse telling telcos, goog, yt, twitter, meta, etc. what to censor is a form of prior restraint, and is unconstitutional",
   "(Cough cough)... ccu cgg cgg gca (cough cough, GoF, GoF)...",
   "Using our tax $$$, NIAD paid $6M to EHA, a cutout, to pay WIV's GoF R&D, then gifted that R&D to 3 companies, causing massive inflation further destroying our economy! Foxes in charge of then henhouses!",
+  "Psst! In 2019 the US$ was worth 4x more than in 2021 due to massive borrowing. Who will pay that back? Not he parasite billionaire class. See the M1 money supply chart!",
   "Psst! MacAfee was Epsteined.",
   "The nine most terrifying words in the English language are: I'm from the Government, and I'm here to help. (still very much true today!)",
   "\"I Disapprove of What You Say, But I Will Defend to the Death Your Right to Say It\" - So why blindly accept cancel culture censorship? Have we forgotten this?",
+  "Let's Go Brandon!",
+  "If you have to redefine long established definitions to get the public to accept your products, you're lying to them."
+  "Hey the name's Joe, but my friends call me Brandon",
   "They also cancel cultured Galileo Galilei and Giordano Bruno because everyone 'knew the Earth was the center of the universe'",
+  "Pro tip: EOs aren't laws and only apply to the Federal gov, not citizens. Only the Legislative passes laws. EO Mandates on citizens are unconstitutional.",
   "Drs. Marshall & Warren were called quacks for claiming H.Pylori survived stomach pH. Marshall infected himself to prove it! Today they'd be cancel-culture censored by antisocial media!",
   "Freedom consists of the distribution of power (and wealth), despotism is it's concentration",
-  "War is peace. Freedom is slavery. Ignorance is strength, inflation is deflation.",
+  "We hold these Truths to be self-evident, that all Men are created equal, that they are endowed by their Creator with certain unalienable Rights, that among these are Life, Liberty, and the Pursuit of Happiness",
+  "War is peace. Freedom is slavery. Ignorance is strength, inflation is deflation. BOHICA, great reset is on the way - say no!",
   "The past was erased, the erasure was forgotten, the lie became the truth.",
+  "We don't need another hero, we don't another way home, all we want what's beyond the thunderdome",
+  "There is something miserable in the figure who enjoyed in their youth the freedom of speech, but from the comfort of age seeks to deny it to others; some deformity of the soul.",
 
   "4/5 capacitors agree, if you're gonna smoke, RIFA power supply capacitors explode the best",
   "NiCAD battery packs: silent but deadly",
-  "We can't go in there, those Lisas don't wear cases, you can see their bare circuits!",
+  "Fry, we can't go in there, those Lisas don't wear cases! You can see their bare circuits!",
 
   "\"Always take stones out of your shoe\" - Floki",
   "Oh ho! A single entendre, the most complicated joke there is!",
@@ -9021,6 +9054,12 @@ char *get_welcome_fortune(void)
   "You twist and turn like a ... twisty-turny thing. I say you are a weedy pigeon and you can call me Lisa if it isn't so.",
 
   "There's only been 3 revolutions in the computer industry: the transistor, the invention of the IC, and I think I just saw the 3rd!", // yt/cKZxia0lYGU
+
+  "Knoblochbrautwustenschnitzel!",
+  "Non-functional nutrackers!",
+  "Big Stupid Candles!",
+  "Into the drunk rink with you!",
+  "Hot Wine Bar!",
 
   "Great Shatner's Ghost!",
   "\"Time spent with a Canon Cat is never Wasted!\" -- Jef Raskin",
@@ -9057,6 +9096,10 @@ char *get_welcome_fortune(void)
   "NOP, NOP, NOP, NOP, NOP!",
   "Sploosh!",
   "Must be some kind of MMU segment, er... zone.. of danger...",
+  "RAMpage! RAMpage! It's time for a RAMpage (through the MMU ofc)!",
+  "Call me knave again!",
+  "Crashing the data bus through the address bus! The phrase you're looking for is 'Mission Accomplised'",
+
 
   "As bad as Steve was, he always had better taste than Billy G, you see, Steve didn't visit Epstein Island",
   "Welcome to Lisa Emulation and Earth Invasion Tonight!",
@@ -9848,11 +9891,20 @@ char *get_welcome_fortune(void)
   "Sun Microsystems: \"The network is the computer.\" Ray: \"The EMULATOR is the computer.\"",
 
   "\"The best programs are the ones written when the programmer is supposed to be working on something else.\" - Melinda Varian",
+
   "This is what I'd call a \"Target Rich Environment\" - Maverick",
   "\"I feel the need... the need for speed!\" - Maverick and Goose",
   "Negative Ghostrider. The pattern is full.",
+  "The list is long, but distinguished...",
+  "I don't know... just doesn't seem fair... to you I mean... she's lost that emulation feeling...",
+  "Let's turn and burn",
+  "No way Jester, you're mine",
 
-  "Gentlemen! you can't emulate in here! This is the emulator Room!",
+  "\"All truth passes through 3 stages. 1st, it's ridiculed. 2nd it's violently opposed. 3rd, it's accepted as being self-evident.\" -Arthur Schopenhauer",
+  "\"Truly there is no such thing as finality.\" -- Bram Stoker",
+  "\"I have crossed oceans of time to find you.\" -- Bram Stoker",
+
+  "Gentlemen! you can't emulate in here! This is the Emulation Room!",
   "Mr. President, it is not only possible, it is emulation. That is the whole idea of this machine, you know.",
   "Hi THERE!       DEAR JOHN",
 
@@ -10007,6 +10059,14 @@ char *get_welcome_fortune(void)
   "Not every cage is a prison, nor every loss eternal.",
   "8-4-1-9-4-7",
 
+  "The dude abides",
+  "Yeah,well, that's just, like, your opinion, man.",
+  "Yeah man. it really tied the room together.",
+  "Hell, I can get you a twiggy by 3 o'clock this afternoon with nail polish.",
+  "Sometimes you eat the bar and sometimes, well, the bar eats you.",
+  "Ve vont ze eeemulator Lebowski!",
+  
+
   "Hello Lisa, It's Lisa Again!",
   "Hindsight is always 7/7, But looking back, it's still a bit fuzzy",
   "You Speak of mutually assured Lisa Emulation, Nice story, tell it to Writer's Digest",
@@ -10023,6 +10083,8 @@ char *get_welcome_fortune(void)
   "D5 AA 96",
   "SEE YOU SPACE COWBOY ...",
   "It's the final countdown (to LisaEm 2.0!)",
+
+  "LisaEm - the element of irreducible rascality",
 
   "...in the immortal words of John Oliver, \"Fuck you 2020, get fucked!\" That's it, that's our emulator, we'll back with 2.0, please stay safe until then."
 };

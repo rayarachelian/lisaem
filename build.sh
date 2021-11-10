@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-
+unset ARCH # FreeBSD ports presets this to amd64, which causes conflicts for us
 #------------------------------------------------------------------------------------------#
 # Standard block for each bashbuild script - these are used for copyright notices, packages
-# this standard block ends around line 45
+# this standard block ends around line 47
 #------------------------------------------------------------------------------------------#
 
 # ensure we're running from our directory and that we haven't been called from somewhere else
@@ -34,16 +34,19 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="PRE-RC4-UNSTABLE"          # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-  RELEASEDATE="2021.09.13"                # release date.  must be YYYY.MM.DD
+    STABILITY="PRE-RC4"                   # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
+                                          # RELEASE/PRODUCTION - PRE-* keep short
+                                          # snapcraft limits the length of the version
+  RELEASEDATE="2021.10.31"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
-          URL="http://lisaem.sunder.net"  # url to website of package
+          URL="https://lisaem.sunder.net" # url to website of package
 COPYRIGHTYEAR="2021"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
+LICENSESHORT="GPL"                        # for use in RPM packages
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
 VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
@@ -56,15 +59,37 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
-
 # you'll have to rewrite (or at least customize) the rest of this script in a similar manner for your own package
+
+
+# Packaging parameters for various operating system targets
+export DEBDEPENDS="libpangocairo, libgtk-3, libatk1, libcario, Xtst, libpangoft2, libpango-1"
+export RPMDEPENDS="gtk3"
+
+# SNAP PLUGS/DEPENDS must be comma separate single strings for proper snapcraft.yaml syntax
+export SNAPPLUGS="x11, pulseaudio, process-control, network, network-bind"
+export SNAPDEPENDS="libgtk2.0-bin, libgtk2.0-0, libasound2, libasyncns0, libatk-bridge2.0-0, libatk1.0-0, libatspi2.0-0, libcairo-gobject2, libcairo2, libdatrie1, libepoxy0, libflac8, libfontconfig1, libfreetype6, libfribidi0, libgdk-pixbuf2.0-0, libgraphite2-3, libgtk-3-0, libharfbuzz0b, libice6, libogg0, libpango-1.0-0, libpangocairo-1.0-0, libpangoft2-1.0-0, libpixman-1-0, libpng16-16, libpulse0, libsdl2-2.0-0, libsm6, libsndfile1, libthai0, libvorbis0a, libvorbisenc2, libwayland-client0, libwayland-cursor0, libwayland-egl1, libx11-6, libxau6, libxcb-render0, libxcb-shm0, libxcb1, libxcomposite1, libxcursor1, libxdamage1, libxdmcp6, libxext6, libxfixes3, libxi6, libxinerama1, libxkbcommon0, libxrandr2, libxrender1, libxss1, libxxf86vm1"
+export SNAPCONFINEMENT="devmode" # strict # classic
+export SNAPCOMMAND="usr/local/bin/lisaem" # should not be absolute path due to snap install
+
+export FREEBSDORIGIN="emulators/lisaem"
+export FREEBSDDEPENDS="gtk3, gdk-pixbuf2, libtiff"
+export DEBDEPENDS="gtk3, gdk-pixbuf2, libpangocairo, libgtk, libcario, libpangoft2, libpango1, libtiff, libglib"
+
+export OPENBSDORIGIN="emulators/lisaem"
+export OPENBSDDEPENDS="devel/desktop-file-utils:desktop-file-utils-*:desktop-file-utils-0.26 devel/sdl2:sdl2-*:sdl2-2.0.16 misc/shared-mime-info:shared-mime-info-*:shared-mime-info-2.1 x11/gtk+3,-guic:gtk-update-icon-cache-*:gtk-update-icon-cache-3.24.30 x11/gtk+3,-main:gtk+3-*:gtk+3-3.24.30"
+export OPENBSDWANTLIB="GL.17.1 SDL2.0.10 c.96.1 gtk-3.2201.0 m.10.1"
+
+export SUNOSCATEGORY="emulator"
+export SUNOSIPSREPO="${LCNAME}-repository"
+export SUNOSIPSPUBLISHER="sundernet"
 
 # ensure the sub-builds are executable to avoid git caused issues
 chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build.sh  2>/dev/null
-
 #--------------------------------------------------------------------------------------------------------
 # this was old way of version tracking, left here for historical reference as to release dates
 #--------------------------------------------------------------------------------------------------------
+#VERSION="1.2.7-RC3a_2020.08.24"
 #VERSION="1.2.7-RC3_2020.08.19"
 #VERSION="1.2.7-RC2_2020.08.03"
 #VERSION="1.2.7-RC1_2020.05.27"
@@ -97,35 +122,24 @@ chmod 755 src/lib/libdc42/build.sh src/lib/libGenerator/build.sh src/tools/build
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 LIBGENOPTS=""            # passthrough to libGenerator
-#STATIC=--static
 WITHOPTIMIZE="-O2 -ffast-math -fomit-frame-pointer"
 WITHUNICODE="--unicode=yes"
-
-#if compiling for win32, edit WXDEV path to specify the
-#location of wxDev-CPP 6.10 (as a cygwin, not windows path.)
-#i.e. WXDEV=/cygdrive/c/wxDEV-Cpp
-#if left empty, code below will try to locate it, so only set this
-#if you've installed it in a different path than the default.
-
-#WXDEV=""
-
-
-#export DEBUGCOMPILE="yes"
 
 function CLEAN() {
             # note we expect to be inside src at this point, and we'll make our way out as needed.
             echo "* Cleaning..." 1>&2
             cd "${TLD}"
-            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
+            CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k hashes.txt "slot.*.sh" build-warnings.txt windres_private.res
             subbuild src/lib/libGenerator --no-banner clean
             subbuild src/lib/TerminalWx   --no-banner clean
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
-            rm -rf bin/LisaEm.app bin/lisaem bin/${MACOSX_MAJOR_VER}/*.dSYM # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
+            rm -rf bin/${SOFTWARE}.app bin/lisaem bin/${MACOSX_MAJOR_VER}/*.dSYM # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
             rm -f /tmp/slot.*.sh*
-            rm -f ./pkg/build/*; echo "Built packages go here"    >pkg/build/README
+            rm -rf ./pkg/build; mkdir -pm755  pkg/build; echo "Built packages go here" >./pkg/build/README
+            rm -rf scripts/wxWidgets-?\.*
             cd "${TLD}/bin"; ln -sf ../bashbuild/interim-build.sh build.sh
-            if [[ -n "`which ccache 2>/dev/null`" ]]; then echo -n "* "; ccache -c; fi
+            if [[ -n "$(which ccache 2>/dev/null)" ]]; then echo -n "* "; ccache -c; fi
 }
 
 function create_unvars_c {
@@ -178,7 +192,7 @@ then
   echo " +------------------+  Apple Lisa 2 Emulator -Unified Build Script"
   echo " |+---------+ _____ |                                             "
   echo " ||         | _____ |  $(center 44 ${SOFTWARE}\ ${VERSION})"
-  echo " ||         |  ---= |        http://lisaem.sunder.net             "
+  echo " ||         |  ---= |        ${URL}"
   echo " |+---------+     . |        The Lisa Emulator Project            "
   echo " +------------------+ ${COPYRIGHTLINE}"
   echo " /=______________#_=\\           All Rights Reserved               "
@@ -198,8 +212,8 @@ for j in $@; do
   case "$opt" in
     clean)
             CLEAN
-            #if we said clean install or clean build, then do not quit, otherwise we clean and quit
-            Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
+            #if we said clean with install, package, or build, then do not quit after clean
+            Z="`echo $@ | egrep -i 'install|package|pkg|build'`"
             if  [[ -z "$Z" ]]; then
                 echo
                 echo -n "Done. "
@@ -212,34 +226,23 @@ for j in $@; do
   ;;
   build*)    echo ;;    #default - nothing to do here, this is the default.
 
+  -y)             export    YESTOALL="yes"  ;;
 
   --prefix=*)     export    PREFIX="${i:9}" ;;
   --pkg-prefix=*) export PKGPREFIX="${i:9}" ;;
 
 
-  package)  if  [[ -z "${DARWIN}${CYGWIN}" ]]; then
-                echo "This is only implemented on macos and windows currently" 1>&2
-                exit 1
-            fi
-            export WITHPKG="yes"
+  pkg|package)  if ! is_pkg_available; then
+                    echo "This is only implemented on macos, Windows 10, Linux, Open/FreeBSD, and OpenIndiana currently" 1>&2
+                    exit 1
+                fi
 
-            if  [[ -n "$CYGWIN" ]] && [[ -z "$HASPERMISSION" ]]; then
-                export INSTALL=1
-		echo "NOTE: On Windows package will also install" 1>&2
-		echo "Command: $0 $@"                             1>&2
-		CygwinSudoRebuild install package \
-			$( for i in $@; do if [[ "$i" != "package" ]] && [[ "$i" != "install" ]]; then echo "$i"; fi; done )
-		exit $?
-            fi
-            ;;
+                do_fake_install_for_pkg
+                export WITHPKG="yes"
+                AskCygWinSudo
+                ;;
 
-  install)
-            if  [[ -z "$CYGWIN" ]]; then
-                [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
-            else
-                [[ -z "$HASPERMISSION" ]] && CygwinSudoRebuild $@
-            fi
-            export INSTALL=1
+  install)  install_check_sudo_pass
             ;;
 
   uninstall)
@@ -255,16 +258,34 @@ for j in $@; do
             fi
 
             #Linux, etc.
-
             #PREFIX="/usr/local/bin"
             #PREFIXLIB="/usr/local/share/"
 
             echo Uninstalling from $PREFIX and $PREFIXLIB
-            rm -rf $PREFIXLIB/lisaem/
+
+            rm -rf $PREFIXLIB/lisaem/ 
+
+            rm -f  $PREFIX/blu-to-dc42
+            rm -f  $PREFIX/dc42-copy-boot-loader
+            rm -f  $PREFIX/dc42-dumper
+            rm -f  $PREFIX/dc42-resize-to-400k
+            rm -f  $PREFIX/dc42-to-raw
+            rm -f  $PREFIX/dc42-to-rraw
+            rm -f  $PREFIX/dc42-to-split-raw
+            rm -f  $PREFIX/dc42-to-tar
+            rm -f  $PREFIX/decode-vsrom
+            rm -f  $PREFIX/idefile-to-dc42
+            rm -f  $PREFIX/lisa-serial-info
+            rm -f  $PREFIX/lisadiskinfo
             rm -f  $PREFIX/lisaem
             rm -f  $PREFIX/lisafsh-tool
-            rm -f  $PREFIX/lisadiskinfo
+            rm -f  $PREFIX/los-bozo-on
+            rm -f  $PREFIX/los-deserialize
             rm -f  $PREFIX/patchxenix
+            rm -f  $PREFIX/raw-to-dc42
+            rm -f  $PREFIX/rraw-to-dc42
+            rm -f  $PREFIX/uniplus-bootloader-deserialize
+            rm -f  $PREFIX/uniplus-set-profile-size
             exit 0
 
     ;;
@@ -431,9 +452,10 @@ Commands:
   clean build           Remove existing objects, compile everything cleanly
   install               Not yet implemented on all platforms
   uninstall             Not yet implemented on all platforms
-  package               Build a package (Not yet implemented everywhere)
+  package|pkg           Build a package (DEB, RPM: Linux, NSIS/ZIP: windows,
+                        FreeBSD packages, OpenIndiana/Solaris: classic pkg)
 
-Options:                (can skip with- and use no- instead of without)
+Options:                (can skip '--with-', or use '--no-' instead of '--without-')
 --without-debug         Disables debug and profiling
 --with-debug            Enables symbol compilation
 --with-tracelog         Enable tracelog (needs debug on, not on win32)
@@ -448,10 +470,12 @@ Options:                (can skip with- and use no- instead of without)
 --without-optimize      Disables optimizations
 --without-upx           Disables UPX compression (no upx on some macos x)
 --without-strip         Disable strip when compiling without debug
+Crashy options:
 --allow2mbram           Allow 2MB RAM for LOS (actually 2MB-128K)
 --full2mbram            Allow real 2MB RAM, but won't work with H-ROM or LOS
 --enableseriala         Enable Serial Port A - broken in LOS causes crashes
 
+Compiling Options:
 -DFOO                   Pass extra defines to C/C++ compilers
 -DFOO=BAR
 
@@ -512,7 +536,7 @@ export  PHASE2LIST="\
         src/host/wxui/LisaSkin:src/host/wxui/include/LisaSkin.h \
         src/lisa/crt/hqx/hq3x-3x:src/lisa/crt/hqx/include/common.h:src/lisa/crt/hqx/include/hqx.h \
         src/printer/imagewriter/imagewriter-wx:./src/printer/imagewriter/include/imagewriter-wx.h \
-	src/host/wxui/z8530-terminal"
+        src/host/wxui/z8530-terminal"
 # change ^- hq3x vs hq3x-3x here as needed as well as the #define
 
 
@@ -537,7 +561,7 @@ create_unvars_c
 fi
 
 if  [[ -n "$DARWIN" ]]; then
-    LISANAME="LisaEm"
+    LISANAME="${SOFTWARE}"
     # may need to test which versions this works with, etc.
     WITHBLITS="-DUSE_RAW_BITMAP_ACCESS"
 else
@@ -558,7 +582,7 @@ needclean=0
 [[ "$LASTARCH" != "$ARCH"                   ]] && needclean=1 #&& echo "Clean Needed: ARCH Changed" 1>&2
 # display mode changes affect only the main executable, mark it for recomoilation
 if [[ "$WITHBLITS" != "$LASTBLITS" ]]; then
-  # rm -rf ./lisa/lisaem_wx.o ./lisa/lisaem ./lisa/lisaem.exe ./lisa/LisaEm.app;
+  # rm -rf ./lisa/lisaem_wx.o ./lisa/lisaem ./lisa/lisaem.exe ./lisa/${SOFTWARE}.app;
   touch host/wxui/lisaem_wx.cpp
 fi
 
@@ -676,9 +700,9 @@ fi
 
 export WARNINGS="$OWARNINGS"
 
-echo "* Building LisaEm..."
+echo "* Building ${SOFTWARE}..."
 echo
-echo "* LisaEm C Code                (./lisa)"
+echo "* ${SOFTWARE} C Code                (./lisa)"
 
 
 # Compile C
@@ -793,18 +817,18 @@ if  [[ -f "$LISANAME" ]]; then
 
     strip_and_compress "${LISANAME}"
 
-#.
-#└── Contents                                ${TLD}/bin/LisaEm.app/Contents
-#    ├── Info.plist
-#    ├── MacOS                               ${TLD}/bin/LisaEm.app/Contents/MacOS
-#    │   └── LisaEm
-#    ├── PkgInfo
-#    └── Resources                           ${TLD}/bin/LisaEm.app/Contents/Resources
-#        └── skins                           
-#            └── default
-#                ├── default.conf
-#                ├── floppy0.png
-#                ├── floppy1.png
+        #.
+        #└── Contents                                ${TLD}/bin/${SOFTWARE}.app/Contents
+        #    ├── Info.plist
+        #    ├── MacOS                               ${TLD}/bin/${SOFTWARE}.app/Contents/MacOS
+        #    │   └── ${SOFTWARE}
+        #    ├── PkgInfo
+        #    └── Resources                           ${TLD}/bin/${SOFTWARE}.app/Contents/Resources
+        #        └── skins                           
+        #            └── default
+        #                ├── default.conf
+        #                ├── floppy0.png
+        #                ├── floppy1.png
 
     if [[ -n "$DARWIN" ]]; then
         echo "* Creating macos application" 1>&2
@@ -812,12 +836,12 @@ if  [[ -f "$LISANAME" ]]; then
         if [[ -n "$ARCHOVERRIDE" ]]; then
            export BINARYEXTENSION="-${ARCHOVERRIDE}-${OSMAJOR}.${OSMIDDLE}"
         fi
-        CONTENTS="${TLD}/bin/LisaEm.app/Contents/"
-        RESOURCES="${TLD}/bin/LisaEm.app/Contents/Resources"
-        BIN="${TLD}/bin/LisaEm.app/Contents/MacOS"
+        CONTENTS="${TLD}/bin/${SOFTWARE}.app/Contents/"
+        RESOURCES="${TLD}/bin/${SOFTWARE}.app/Contents/Resources"
+        BIN="${TLD}/bin/${SOFTWARE}.app/Contents/MacOS"
 
         PLISTSRC="${TLD}/resources/Info.plist"
-        ICONSRC="${TLD}/resources/LisaEm.icns"
+        ICONSRC="${TLD}/resources/${SOFTWARE}.icns"
         mkdir -pm775 "${BIN}" "${RESOURCES}"
         cp "${TLD}/resources/lisaem.sh"               "${BIN}/lisaem.sh"                               || exit $?
         chmod 755                                     "${BIN}/lisaem.sh"                               || exit $?
@@ -844,17 +868,19 @@ if  [[ -f "$LISANAME" ]]; then
             [[ -n "$( echo $GDB | grep gdb )"  ]] && $GDB -x gdb-run     "$LISANAME"
             [[ -n "$( echo $GDB | grep lldb )" ]] && $GDB -o "run -p" -f "$LISANAME"
         fi
+
         #if we turned on profiling, process the results
         if [[ -n "$WITHPROFILE" ]];then
           $GPROF "${LISANAME}" >lisaem-gprof-out
           echo lisaem-gprof-out created.
         fi
+
         if [[ -n "$INSTALL" ]]; then
-          echo "* Installing LisaEm.app" 1>&2
-          (cd "${TLD}/bin"; tar cf - ./LisaEm.app ) | (cd "$PREFIX"; tar xf -)
+          echo "* Installing ${SOFTWARE}.app" 1>&2
+          (cd "${TLD}/bin"; tar cf - ./${SOFTWARE}.app ) | (cd "$PREFIX"; tar xf -)
           x=$?
           if  [[ "$x" -ne 0 ]]; then
-              echo "Failed to copy ${TLD}/bin/LisaEm.app to ${PREFIX}" 1>&2
+              echo "Failed to copy ${TLD}/bin/${SOFTWARE}.app to ${PREFIX}" 1>&2
               exit $x
           fi
           echo "* Done Installing." 1>&2
@@ -863,7 +889,6 @@ if  [[ -f "$LISANAME" ]]; then
           exit 0
         fi
 
-        # :TODO: move this to tools build.sh + create fn for pkgbuild productbuild.
         if [[ -n "$WITHPKG" ]]; then
 
            cd "${TLD}/bin/${MACOSX_MAJOR_VER}/" || exit $?
@@ -876,17 +901,13 @@ if  [[ -f "$LISANAME" ]]; then
            TOOLLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
            mv ${TOOLLIST} "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
 
-           pkgbuild --root pkg --install-location / \
-                    --identifier net.sunder.lisaem-cli-tools --version "${VER}" \
-                    ../../pkg/lisaem-cli-tools-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg 1>&2 || exit $?
-
+           # create a tools only package
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-cli-tools-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            mkdir -pm755     ./pkg/Applications || exit $?
-           mv ../LisaEm.app ./pkg/Applications || exit $?
+           mv ../${SOFTWARE}.app ./pkg/Applications || exit $?
 
-           pkgbuild --root pkg --install-location / \
-                    --identifier net.sunder.lisaem --version "${VER}" \
-                    ../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg 1>&2  || exit $?
-
+           # create a LisaEm package
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            # put things back and clean up
            mv pkg/usr/local/bin/*  "${TLD}/bin/${MACOSX_MAJOR_VER}/"
            mv pkg/Applications/*   "${TLD}/bin"
@@ -894,13 +915,12 @@ if  [[ -f "$LISANAME" ]]; then
            rmdir ${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin  ${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local \
                  ${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr  ${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/Applications \
                  ${TLD}/bin/${MACOSX_MAJOR_VER}/pkg
-        fi
+        fi #end of macos package
 
         echo "Done." 1>&2
         exit 0
-    fi
-    
-    
+    fi #end of DARWIN/macos build/package/etc.
+     
     echo
     ####
     
@@ -908,58 +928,72 @@ if  [[ -f "$LISANAME" ]]; then
     
       ## Install ###################################################
       if [[ -n "$INSTALL" ]]; then
-    
+  
         if [[ -n "$CYGWIN" ]]; then
-              # PREFIX+PREFIXLIB will go to: "/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+              # PREFIX+PREFIXLIB will go to: "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
               # these are set in the bashbuild {OS}.sys file
-              echo "* Installing skins in $PREFIXLIB/LisaEm"
+              ACTION="Installing"
+
+              if [[ -n "$WITHPKG" ]]; then
+                 set_pkg_prefix
+                 ACTION="Packaging"
+              fi
+
+              echo "* ${ACTION} skins in $PREFIXLIB/${SOFTWARE}"
               mkdir -pm755 "$PREFIX"
-              (cd "${TLD}/resources"; tar cpf - skins) | (cd "$PREFIX"; tar xpf - )
-              echo "* Installing lisaem.exe binary in $PREFIX/lisaem"
-              cp "${TLD}/bin/lisaem.exe" "$PREFIX"
-              echo -n "  Done Installing."
+              (cd "${XTLD}/resources"; tar cpf - skins) | (cd "$PREFIX"; tar xpf - )
+              echo "* ${ACTION} lisaem.exe and tools binaries in $PREFIX"
+              mkdir "${PREFIX}/bin"
+              cp "${XTLD}/bin/"*.exe "${PREFIX}/bin"
+              mv "${PREFIX}/bin/lisaem.exe" "$PREFIX"
+              echo -n "  Done ${ACTION}."
 
-              if  [[ -n "$WITHPKG" ]]; then
-		  [[ -z "$MACHINE" ]] && export MACHINE="$( uname -m )"
-		  PKGNAME="${TLD}/pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-win10-${MACHINE}.zip"
-		  echo "Creating ZIP Windows Package: $PKGNAME" 1>&2
-		  cd "$PREFIX/../.." || exit 1
-                  zip -r -9 "${PKGNAME}" ./Sunder.NET/LisaEm || exit $?
-                  echo "Created zip package: ${PKGNAME}" 1>&2
-
-                  elapsed=$(get_elapsed_time)
-                  [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
-	      fi
-
-              elapsed=$(get_elapsed_time)
-              [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+              create_packages_for_os
 
               exit 0
-        else
-          # PREFIX="/usr/local/bin" PREFIXLIB="/usr/local/share/" - these are set in bashbuild/${OS}.sys file    
-          echo "* Installing resources in     $PREFIXLIB/lisaem" 1>&2
-          mkdir -pm755 $PREFIXLIB/lisaem $PREFIX
-          cp -r ../resources/skins "$PREFIXLIB/lisaem/"
-          echo "* Installing launcher in $PREFIXLIB/applications" 1>&2
-          mkdir -pm755 "$PREFIXLIB/icons/hicolor/128x128/apps" 2>/dev/null #incase it doesn't exist
-          cp ../resources/lisaem.png "$PREFIXLIB/icons/hicolor/128x128/apps"
-          cp ../resources/lisaem.desktop "$PREFIXLIB/applications"
-          echo "* Installing lisaem binary in $PREFIX/lisaem" 1>&2
-          cp ../bin/lisaem "$PREFIX"
-          echo -n "  Done Installing." 1>&2
-          elapsed=$(get_elapsed_time)
-          [[ -n "$elapsed" ]] && echo "$elapsed seconds" 1>&2 || echo 1>&2
-          exit 0
-        fi
-    
-      fi     # end of  INSTALL
+        else   # Install for linux/freebsd/sunos, etc.
+
+              ACTION="Installing"
+
+              if [[ -n "$WITHPKG" ]]; then
+                 export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIX"
+                 export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIXLIB"
+                 ACTION="Packaging"
+              fi
+
+              # PREFIX="/usr/local/bin" PREFIXLIB="/usr/local/share/" - these are set in bashbuild/${OS}.sys file
+              echo "* ${ACTION} resources in     $PREFIXLIB/lisaem" 1>&2
+              mkdir -pm755 $PREFIXLIB/lisaem $PREFIX
+              cp -r ../resources/skins "$PREFIXLIB/lisaem/"
+
+              # create dirs incase path doesn't exist - i.e. target is in pkg/build/tmp/${COMPANY}/${SOFTWARE}
+              mkdir -pm755 "$PREFIXLIB/icons/hicolor/128x128/apps" 2>/dev/null
+              mkdir -pm755 "$PREFIXLIB/applications"               2>/dev/null 
+
+              # copy icon + GNOME desktop file
+              cp ../resources/lisaem.png     "$PREFIXLIB/icons/hicolor/128x128/apps"
+              cp ../resources/lisaem.desktop "$PREFIXLIB/applications/"
+
+              # copy all our binaries, but skip hashes.txt, bin link, and the interim build.sh link
+              (cd ../bin; for f in $(ls -1 | egrep -v 'build.sh|bin|hashes.txt'); do cp "$f" "${PREFIX}"; done)
+
+              echo -n "  Done ${ACTION}." 1>&2
+              elapsed=$(get_elapsed_time) && [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+
+              create_packages_for_os
+
+              elapsed=$(get_elapsed_time) && [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
+              exit 0
+        fi # cygwin vs linux/freebsd/solaris install
+      fi #end of INSTALLa
+
       ##########################################################
     
-    else
+    else # debug builds should invoke GDB/lldb
       elapsed=$(get_elapsed_time)
       [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
     
-      if [[ -z "$CYGWIN" ]]; then
+      if [[ -z "$CYGWIN" ]]; then # debugger invocation not cygwin
         cd ../bin
         echo "run -p" >gdb-run
         if [[ -n "$(echo $GDB | grep valgrind)" ]]; then 
@@ -972,11 +1006,11 @@ if  [[ -f "$LISANAME" ]]; then
             $GDB ./lisaem      -x gdb-run
             exit $?
         fi
-      else
-	cp lisaem.exe "/cygdrive/c/Program Files/Sunder.NET/LisaEm" || exit 1
-	cd ../resources
-	tar cpf - skins | ( cd "/cygdrive/c/Program Files/Sunder.NET/LisaEm"; tar xpf - )
-	cd "/cygdrive/c/Program Files/Sunder.NET/LisaEm" || exit 1
+      else # debug under cygwin
+        cp lisaem.exe "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}" || exit 1
+        cd ../resources
+        tar cpf - skins | ( cd "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"; tar xpf - )
+        cd "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}" || exit 1
         echo "run -p" >gdb-run
         $GDB ./lisaem.exe -x gdb-run
         exit $?
@@ -989,6 +1023,7 @@ if  [[ -f "$LISANAME" ]]; then
           exit 0
       fi   
     fi
+
 fi
 
 if  egrep -i 'warn:|error:' $BUILDWARNINGS >/dev/null 2>/dev/null; then

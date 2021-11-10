@@ -49,10 +49,303 @@ export GUIAPP=""
 
 export HASHOPTS="-b --tag"
 
+
+if [[ -f /etc/os-release ]]; then
+   eval $(sed -e 's/^/export OSREL_/g' /etc/os-release  )
+fi
+
 # Only used on Windows
 function windres() {
 true 
 }
+
+function makedebpkgcontrol() {
+size=$(du -sk "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}" | cut -f1)
+
+CONTROL="$1/control"
+machine="$(echo $MACHINE | sed -e 's/x86_64/amd64/g' )" # DEBs prefer amd64 in architecture.
+
+cat >"$CONTROL" <<ENDDEBCONTROLEND || exit $?
+Package: ${SOFTWARE}
+Version: ${VER}${DEBSUFFIX}
+Architecture: ${machine}
+Maintainer: ${AUTHOR} <${AUTHEMAIL}>
+Depends: $DEBDEPENDS
+Installed-Size: $size
+Homepage: ${URL}
+Description: ${DESCRIPTION}
+ENDDEBCONTROLEND
+
+chmod 600 "$CONTROL" || exit $?
+}
+
+# create file system as intended under pkg/build/tmp/root before calling this.
+function LinuxDebianPackage() {
+  if [[ -z "$( which dpkg-deb 2>/dev/null )" ]]; then return 0; fi
+
+  SUFFIX=""
+  [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]] && export DEBSUFFIX="-${STABILITY}-${RELEASEDATE}"
+
+  pushd "${XTLD}/pkg" >/dev/null 2>/dev/null || exit $? 
+  mkdir -pm755 build/tmp
+  cd build/tmp || exit $?
+
+  # output package here
+  export DEBNAME="${XTLD}/pkg/${SOFTWARE}-${VER}${DEBSUFFIX}.deb"
+
+  echo "  + $DEBNAME" 1>&2
+
+  DEBSTAGE="${XTLD}/pkg/build/tmp/deb/${SOFTWARE}-${VER}${DEBSUFFIX}"
+
+  mkdir -pm755 "$DEBSTAGE/DEBIAN"
+
+  # copy artifacts to debian pkg structure
+  if [[ ! -d "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" ]]; then
+     echo "PREFIX ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/ is missing" 1>&2
+     exit 1
+  fi
+
+  if [[ ! -d "${DEBSTAGE}" ]]; then
+     echo "DEBSTAGE ${DEBSTAGE} is missing" 1>&2
+     exit 1
+  fi
+
+  #echo "cloning from ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/ $(du -sh ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/)" 1>&2
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${DEBSTAGE}" && tar xpf -)
+  #echo "to           $DEBSTAGE $(du -sh $DEBSTAGE)" 1>&2
+
+  if [[ -f /etc/os-release ]]; then
+     machine="$(echo $MACHINE | sed -e 's/x86_64/amd64/g' )" # DEBs prefer amd64 in architecture.
+     export DEBNAME="${SOFTWARE}-${VER}${DEBSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${machine}.deb"
+  fi
+
+  makedebpkgcontrol "$DEBSTAGE/DEBIAN"
+
+  # build the package
+  cd "${XTLD}/pkg/build/tmp/deb" || exit $?
+
+  dpkg-deb --build ${SOFTWARE}-${VER}${DEBSUFFIX} "${XTLD}/pkg/$DEBNAME" 2>&1 >"${XTLD}/pkg/${DEBNAME}.log" || exit $?
+
+  # create hashes
+  if [[ -f "$DEBNAME" ]]; then
+     cd "$XTLD/pkg"
+     [[ -n "$MD5SUM" ]]    && $MD5SUM  "$DEBNAME" >"${DEBNAME}.md5"
+     [[ -n "$SHA1SUM" ]]   && $SHA1SUM "$DEBNAME" >"${DEBNAME}.sha1"
+     [[ -n "$SHA256SUM" ]] && $SHA1SUM "$DEBNAME" >"${DEBNAME}.sha256"
+  fi
+
+  # cleanup
+  rm -rf "${XTLD}/pkg/tmp/deb"
+  popd >/dev/null 2>/dev/null
+}
+
+
+function makerpmspec() {
+
+specname="$1"
+tarname="$2"
+
+for i in $(echo $RPMDEPENDS | sed -e 's/,//g' ); do
+  BUILDREQUIRES="${BUILDREQUIRES}$(printf 'BuildRequires: %s\n' $i )"
+done
+
+cat >"$specname" <<ENDRPMSPEC
+%define name            ${SOFTWARE}
+%define release         ${RELEASEDATE}
+%define version         ${VERSION}
+%define buildroot       /var/tmp/%{name}-buildroot
+%define source          ${tarname}
+
+BuildRoot:              %{buildroot}
+Summary:                ${DESCRIPTION}
+License:                $LICENSESHORT
+Name:                   %{name}
+Version:                %{version}
+Release:                %{release}
+Source:                 %{source}
+
+$BUILDREQUIRES
+
+%description
+${DESCRIPTION}
+
+%pre
+if [[ "\$(uname -m)" != "$MACHINE" ]]; then
+   echo "This package was compiled for $MACHINE systems, your system is \$(uname -m)" 1>&2
+   exit 1
+fi
+
+%prep
+
+%setup -q build
+
+%install
+rm -rf \$RPM_BUILD_ROOT
+mkdir \$RPM_BUILD_ROOT
+cp -r * \$RPM_BUILD_ROOT
+
+%clean
+rm -rf \$RPM_BUILD_ROOT
+
+%files
+ENDRPMSPEC
+
+(pushd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}" 2>/dev/null >/dev/null
+ find . -type f -print  | cut -c2-
+ popd >/dev/null 2>/dev/null
+) >>"$specname"
+
+}
+
+
+function LinuxRPMPackage() {
+  [[ -z "$( which rpmdev-setuptree 2>/dev/null )" ]] && return 0
+
+  pushd . >/dev/null 2>/dev/null
+
+  [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]] && export RPMSUFFIX="-${STABILITY}-${RELEASEDATE}"
+
+  if [[ -f /etc/os-release ]]; then
+     export  RPMNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.rpm"
+     export SPECNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.spec"
+     export TARNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.tar"
+  fi
+
+  RPMPATH="$XTLD/pkg/build/$RPMNAME"
+  RPMORIGINAL="$XTLD/pkg/build/tmp/rpmbuild/RPMS/${MACHINE}/$RPMNAME"
+  echo "  + $RPMNAME" 1>&2
+
+  export OVERSION="$VERSION"
+  export VERSION="$(  echo $VERSION | sed -e 's/-/_/g' )"
+
+  SPECPATH="$XTLD/pkg/build/tmp/rpmbuild/SPECS/${SPECNAME}"
+  TARTARGET="${XTLD}/pkg/build/tmp/rpmbuild/SOURCES/${TARNAME}"
+
+  cd "${XTLD}/pkg/build/tmp"
+
+  mkdir -pm755 rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}"
+       # wants  LisaEm-1.2.7_PRE_RC4_UNSTABLE_2021.10.11
+       TARROOT="${SOFTWARE}-${VER}$( echo ${RPMSUFFIX}| sed -e's/-/_/g' )"
+       mv "${SOFTWARE}" "${TARROOT}"
+       tar cpJf "${TARTARGET}.xz" "${TARROOT}"
+       mv "${TARROOT}" "${SOFTWARE}"
+  )
+
+  makerpmspec "${SPECPATH}" "${TARNAME}.xz"
+
+  if [[ "$( id -u)" == "0" ]]; then
+     echo "Cannot run rpmbuild as user root, please run as a regular user, without sudo or su" 1>&2
+  else
+     cd "${XTLD}/pkg/build/tmp/rpmbuild"
+     ( rpmbuild --define "_topdir ${XTLD}/pkg/build/tmp/rpmbuild" -bb "SPECS/${SPECNAME}" --target $MACHINE 2>&1 ) >"${XTLD}/pkg/build/tmp/rpmbuild.txt"
+     mv "${XTLD}/pkg/build/tmp/rpmbuild/RPMS/${MACHINE}/"*.rpm "${XTLD}/pkg/${RPMNAME}"
+  fi
+
+  export VERSION="$OVERSION"
+  # cleanup
+  rm -rf "${XTLD}/pkg/tmp/rpmbuild"
+  popd >/dev/null 2>/dev/null
+}
+
+
+# Failed to load plugin: properties failed to load for lisaem: Additional properties are not allowed ('prepare', 'snap' were unexpected)
+function makeSnapCraftYAMLandTar() {
+
+targetlocal="$1"
+
+if [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]]; then
+   export SNAPSUFFIX="-${STABILITY}-${RELEASEDATE}"
+   sv="${VER}${SNAPSUFFIX}"
+   snapver="${sv:0:31}"
+   snapstability="devel"
+else
+   snapstability="stable"
+fi
+
+BASE="core$(echo $OSREL_VERSION_ID | cut -f1 -d'.')"
+[[ -z "$BASE" ]] && BASE="core20"
+
+cat <<ENDOFSNAPCRAFTYAML >snapcraft.yaml
+name: ${LCNAME} # you probably want to 'snapcraft register <name>'
+base: $BASE
+version: '${snapver}'
+summary: ${DESCRIPTION}
+description: ${DESCRIPTION}
+grade: ${snapstability}
+confinement: ${SNAPCONFINEMENT}
+compression: lzo
+plugs:
+  homedir:
+    interface: personal-files
+    write:
+    - \$HOME/
+apps:
+  ${LCNAME}:
+    command: ${SNAPCOMMAND}
+    plugs: [ ${SNAPPLUGS} ]
+parts:
+  ${LCNAME}:
+    stage-packages: [ ${SNAPDEPENDS} ]
+    plugin: dump
+    source-type: local
+    source: snap
+    organize:
+      local: /
+ENDOFSNAPCRAFTYAML
+
+# create the tar file and add the file list from our package to the snapcraft.yaml file
+(  cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"
+   tar cpf - . | (cd "$targetlocal" && tar xpf - ) 
+   # tar cpJf "${tarname}" . 1>&2                                 # 123456789.......
+   # find . -type f -print  | cut -c3- | while read line; do echo "      - ${line}"; done
+
+   if [[ -d "${XTLD}/pkg/templates/snap" ]]; then
+      (cd "${XTLD}/pkg/templates/snap"; tar cpf - . ) | ( cd "$SNAPHOME"; tar xpf - )
+   fi
+) # >>snapcraft.yaml
+
+}
+
+function LinuxSnapPackage() {
+  # if we don't have snapcraft installed, ignore this package method, others will still be built
+  [[ -z "$( which snapcraft 2>/dev/null )" ]] && return 0
+  [[ -z "$( which multipass 2>/dev/null )" ]] && return 0
+
+  [[ "$OSREL_ID" != "ubuntu" ]] && return 0 # only support snap building on ubuntu right now, might work on debian, and OS year must match core, i.e. 20.04=core20
+
+  echo "  + Snapcraft ${SOFTWARE}" 1>&2
+
+  mkdir -pm755 "${TLD}/pkg/build/tmp"
+  pushd "${TLD}/pkg/build/tmp" 2>/dev/null >/dev/null
+
+  # snaps need to be off /home/$USERNAME because multipass VM cannot mount
+  # except from a limited set of directories.
+  SNAPHOME="$HOME/snap-${COMPANY}-${SOFTWARE}/snap"
+  SNAPPARENT="$HOME/snap-${COMPANY}-${SOFTWARE}"
+
+  export TARGETLOCAL="${SNAPHOME}"
+
+  mkdir -pm755 "${SNAPHOME}/local"
+  cd           "${SNAPHOME}"
+
+  makeSnapCraftYAMLandTar "${TARGETLOCAL}/local"
+
+  cd "${SNAPPARENT}"
+  snapcraft clean >/dev/null 2>/dev/null
+  if snapcraft 2>&1 >snapcraft-build.log; then
+     mv "$HOME/snap-${COMPANY}-${SOFTWARE}/${LCNAME}_${VER}"*.snap "${XTLD}/pkg/" 2>/dev/null >/dev/null
+     snapcraft clean >/dev/null 2>/dev/null
+     rm -rf "$HOME/snap-${COMPANY}-${SOFTWARE}"
+  else
+     snapcraft --debug
+  fi
+
+  popd >/dev/null 2>/dev/null
+}
+
+
 
 ##############################################################################
 # getcpus
@@ -131,5 +424,3 @@ fi
 
 echo -n "" >/dev/null
 }
-
-

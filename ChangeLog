@@ -3,12 +3,45 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 TBA 1.2.7  - Release on 2021.XX.YY (TBA) (Major release for all platforms)
 
+TODO: fix clean build pkg RPM bug (libdc42 or tools tries to install but doesn't have root so it fails.)
+need to pass PREFIX to it when PKG is set.
+
+2021.11.07 - fixed wx3.1.2+ display issue for macos
+
+2021.10.30 - added package creation for OpenBSD 7 - end of Packagetober
+             but it doesn't quite work correctly yet, so disabled for now
+
+2021.10.24 - added FreeBSD 13 port for lisaem-1.2.7
+
+2021.10.23 - added classic Solaris package creation for OpenIndiana, i.e.:
+             pkg_add -i . SUNDERNETlisaem.1.2.7.OI_2021.04.x86-64.pkg
+           - added IPS Solaris package creation for OpenIndiana
+
+2021.10.22 - added FreeBSD package + port prototype (on FreeBSD 13) and
+             scripts/build-wx3.1.5-gtk updates
+           - added Solaris/OpenIndiana compile/build support and
+             scripts/build-wx3.1.5-gtk updates
+
+2021.10.21 - snapcraft seems to work at last
+
+2021.10.08 - added SnapCraft package creation (must install snapcraft tools)
+
+2021.10.06 - added RPM Package Creation support (must install rpmdevtools
+             package to allow rpm package building via ./build.sh pkg )
+2021.10.05 - added Debian Package creation
+
+2021.10.02 - added NSIS installer support for windows for Packagetober
+
+
 2021.09.10 - fixed crash on macos 11.x - wxDisplay constructor parent param
-           - added _MACOSVER define to help select wxDisplay parent params
+           - added _MACOSVER C define to help select wxDisplay parent params
+
            - non-production macos beta/RC releases will be renamed in the dmg 
-	           with the version info, releases will remain named LisaEm.app
-	         - Added --clean-preferences to macos x lisaem.sh to clear
-	           saved preferences incase LisaEm is misbehaving.
+             with the version info, releases will remain named LisaEm.app
+
+           - Added --clean-preferences to macos x lisaem.sh to clear
+             saved preferences incase LisaEm is misbehaving.
+
            - Added package option to windows build (implies install), makes a
              zip file which you'll extract in C:\Program Files - this is not
              a real installer yet, sorry.
@@ -865,9 +898,9 @@ to   08.27 - moved skin settings to their own class
              speed.
 
 2007.04.08 - added Unthrottled menu option for those who want to melt their
-	           host computer. :-)
+             host computer. :-)
 
-	         - added buffered raw keycodes to compensate for repeats.
+           - added buffered raw keycodes to compensate for repeats.
 
 2007.04.07 - bug with raw keycodes that prevents updates found and fixed.
 

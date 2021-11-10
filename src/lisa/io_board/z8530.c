@@ -237,7 +237,7 @@ static inline void on_read_irq_handle(int port);
  * W = (W & 0xaa)>>1 | (W & 0x55)<<1  = hgfedcba
 */
 
-inline uint8 reversebit(uint8 c)
+static inline uint8 reversebit(uint8 c)
 {
     c = (c & 0xf0)>>4 | (c & 0x0f)<<4;
     c = (c & 0xcc)>>2 | (c & 0x33)<<2;
@@ -245,7 +245,7 @@ inline uint8 reversebit(uint8 c)
     return c;
 }
 
-inline uint8 BITREVERSE(uint8 d)
+static inline uint8 BITREVERSE(uint8 d)
 {
 #ifdef  __POWERPC__
     return d;

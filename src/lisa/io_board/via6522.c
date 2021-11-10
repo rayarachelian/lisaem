@@ -639,7 +639,7 @@ void via2_orb(uint8 data)
     //  if ( PARITY_BIT   & via[2].via[DDRB]) {via[2].ProFile->Parity=(data &  PARITY_BIT) ? 0:1;}   //5 Parity error bit is input
         if ( DSK_DIAG_BIT & via[2].via[DDRB]) {DEBUG_LOG(0,"Write to DSK_DIAG on via2_orb!:%02x",data & DSK_DIAG_BIT);} // 6 Floppy Disk Diag is input
 
-        // this is wrong, reet is on VIa1!
+       // this is wrong, reset is on VIa1 - this is an input from the IWM WRQ pin 9, to PB7 - input only? there's a buffer at U1C LS367 pin 14->13
        // if ( CTRL_RES_BIT & via[2].via[DDRB]) {if ((data & CTRL_RES_BIT)==0)                         //7 Controller reset
        //                                           { DEBUG_LOG(0,"Sent Controller Reset to ProFile:%02x",data & CTRL_RES_BIT);
        //                                             ProfileReset(via[2].ProFile);
@@ -885,8 +885,8 @@ void via1_orb(uint8 data)
     if (data & 32 & via[1].via[DDRB]) {DEBUG_LOG(0,"lisa writing to Parity RESET: %02x ->%02x\n",data, data & 0x40);} // PRES/ Parity Reset
 
     if (data & 64 & via[1].via[DDRB]) {DEBUG_LOG(0,"lisa writing to cops handshake: %02x ->%02x\n",data, data & 0x40);} // cops handshake
-    // PB7=CRES/
 
+    // PB7=CRES/
     if (0x80 & via[1].via[DDRB])
         {
             DEBUG_LOG(0,"via1_orb ProFile !RESET :%02x %02x (0 means no reset, 80 means reset)\n",data,data & 0x80); //20051214 flipped

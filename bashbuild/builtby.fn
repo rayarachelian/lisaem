@@ -8,7 +8,7 @@ function create_builtby {
 
   pushd "${TLD}" >/dev/null
 
-  BUILTBY="\"Compiled on `date` by $LOGNAME@`uname -n`  (`uname -v `)  \\n options:$WITHBLITS $WITHDEBUG $WITHDEBUG $WITHTRACE $WITHUNICODE \\nusing:`$CC --version 2>/dev/null | head -1`\""
+  BUILTBY="\"Compiled on `date` by $LOGNAME@$(uname -n)  ($(uname -v ))  \\\\n options:$WITHBLITS $WITHDEBUG $WITHDEBUG $WITHTRACE $WITHUNICODE \\\\nusing:$($CC --version 2>/dev/null | head -1)\""
 
   echo     "#ifndef __BUILTBY_H__"                                  > ${file}
   echo     "#define __BUILTBY_H__"                                 >> ${file}

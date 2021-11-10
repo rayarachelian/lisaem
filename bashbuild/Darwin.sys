@@ -67,7 +67,7 @@ fi
 
 export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer -std=c99"
 export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer $NOUNKNOWNWARNING $NOCPP11EXT"
-export CXXFLAGS="$CXXFLAGS -d_MACOSMAJOR=$OSMAJOR -d_MACOSMIDDLE=$OSMIDDLE -d_MACOSVER=${OSMAJOR}${OSMIDDLE}"
+export CXXFLAGS="$CXXFLAGS -D_MACOSMAJOR=$OSMAJOR -D_MACOSMIDDLE=$OSMIDDLE -D_MACOSVER=${OSMAJOR}${OSMIDDLE}"
 
 export SYSLIBS=""
 # Since we don't want to require the end user have wxWidgets as a dylib preinstalled
@@ -120,6 +120,16 @@ export GUIAPP=""
 # Only used on Windows
 function windres() {
 true 
+}
+
+# i.e. macospkg #"net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+# must call this from the root directory
+function macospkg() {
+         REVERSECO="$1"
+         PKGOUT="$2"
+         pkgbuild --root pkg --install-location / \
+                    --identifier "$REVERSECO" --version "${VER}" \
+                    "$PKGOUT" 1>&2  || exit $?
 }
 
 ##############################################################################

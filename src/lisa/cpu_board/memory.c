@@ -945,7 +945,7 @@ void   lisa_wl_Ox2000_slot1(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return NULL;
@@ -955,7 +955,7 @@ uint8  *lisa_mptr_Ox4000_slot2(uint32 addr)
 uint8  lisa_rb_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address returning 0xff",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x returning 0xff",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xff;
@@ -964,7 +964,7 @@ uint8  lisa_rb_Ox4000_slot2(uint32 addr)
 uint16 lisa_rw_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffff;
@@ -973,7 +973,7 @@ uint16 lisa_rw_Ox4000_slot2(uint32 addr)
 uint32 lisa_rl_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffffffff;
@@ -981,7 +981,7 @@ uint32 lisa_rl_Ox4000_slot2(uint32 addr)
 
 void   lisa_wb_Ox4000_slot2(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  ALERT_LOG(0,"@%08x",addr);
     //ui_log_verbose("lisa_mptr_Ox2000_slot2l got called!");
@@ -993,7 +993,7 @@ void   lisa_wb_Ox4000_slot2(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox4000_slot2(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1004,7 +1004,7 @@ void   lisa_ww_Ox4000_slot2(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox4000_slot2(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1018,7 +1018,7 @@ void   lisa_wl_Ox4000_slot2(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  ALERT_LOG(0,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     //ui_log_verbose("****lisa_mptr_Ox6000_slot2h got called!****");
@@ -1028,7 +1028,7 @@ uint8  *lisa_mptr_Ox6000_slot2(uint32 addr)
 uint8  lisa_rb_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xff;
@@ -1037,7 +1037,7 @@ uint8  lisa_rb_Ox6000_slot2(uint32 addr)
 uint16 lisa_rw_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffff;
@@ -1046,7 +1046,7 @@ uint16 lisa_rw_Ox6000_slot2(uint32 addr)
 uint32 lisa_rl_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffffffff;
@@ -1054,7 +1054,7 @@ uint32 lisa_rl_Ox6000_slot2(uint32 addr)
 
 void   lisa_wb_Ox6000_slot2(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1065,7 +1065,7 @@ void   lisa_wb_Ox6000_slot2(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox6000_slot2(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1076,7 +1076,7 @@ void   lisa_ww_Ox6000_slot2(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox6000_slot2(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data);
-    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
