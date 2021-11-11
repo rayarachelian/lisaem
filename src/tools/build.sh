@@ -299,7 +299,7 @@ strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd "${XTLD}/bin/x/$MACOSX_MAJOR_VER"
+      cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
       [[ -n "$DARWIN" ]] && PREFIX=/usr/local/bin  # these shouldn't go into /Applications
       echo "Installing tools to $PREFIX/bin"
       mkdir -pm755 "$PREFIX/bin" 2>/dev/null
