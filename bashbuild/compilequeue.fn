@@ -180,13 +180,11 @@ function waitq()
            while IFS= read -r -u42 l; do
                  count=$(( count + 1))
                  if [[ $count -gt 3 ]] && [[ $count -lt 9 ]]; then 
-                    if        [[ "${l:0:2}" != '!!' ]]; then printf "%s" "${l}" 1>&2 
-                      else if [[ "${l:0:2}" != '++' ]]; then printf "%s" "${l}" 1>&2
-                      else printf "%s  " "${l:2}" 1>&2
-                      fi
+                    if   [[ "${l:0:2}" == '!!' ]] || [[ "${l:0:2}" == '++' ]]; then
+                         printf "%s\n" "${l:2}" 1>&2
+                    else
+                         printf "%s" "${l}" 1>&2 
                     fi
-                 else
-                    [[ $count -eq 9       ]] && printf "%s" "$l" 1>&2
                  fi
                  echo "$l" >>${BUILDWARNINGS}
            done 42<"$z"
