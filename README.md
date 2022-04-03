@@ -110,7 +110,7 @@ After wxWidgets is installed to `/usr/local/wxsomething`, add `/usr/local/wxsome
 
 ## Compiling LisaEm (for all platforms):
 
-You will need wxWidgets 3.0.4-3.1.3 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
+You will need wxWidgets 3.0.4-3.1.5 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
 
 You will want to install/compile wxWidgets **without** the shared library option, except perhaps on GTK systems, but if you do this, it will not be portable except to systems of the same kind and version.
 
