@@ -9,8 +9,8 @@ REM -- Change to the directory of the executing batch file
 CD %~dp0
  
 REM -- Configure our paths
-REM SET SITE=http://cygwin.mirrors.pair.com/
-SET SITE=http://mirror.clarkson.edu/cygwin/
+REM SET SITE=https://cygwin.mirrors.pair.com/
+SET SITE=https://mirror.clarkson.edu/cygwin/
 SET LOCALDIR=%CD%
 SET ROOTDIR=C:/cygwin
 e:

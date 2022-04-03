@@ -1,27 +1,44 @@
-Here's a list of some of the current known issues, there are likely many others.
+Here's a list of some of the current known issues, there are likely many others. Please report them on
+the LisaList2 forum, or github issues.
 
+* Windows - unicode chars in paths to Profile disks fail to work properly so the hard drive won't be found. Stick to all ASCII paths.
+  If this is not possible because your user name contains UTF8, etc. please store your disk images in something like C:\LisaDisks, etc.
+  (an ASCII only path) this is not an issue for macos, I suspect this is some wxwidgets string conversion issue that will take a significant
+  work around to switch between wxWidgets wxStrings to C strings when communicating with libdc42 open fn's.
+* TerminalWx code isn't complete - xmodem is missing, font picker/color picker is missing.
+* serial port A is broken on Lisa Office System (causes a lockup on access to the port) so it's disabled by default, there's a build script option to force enable it anyway.
+* UniPlus kernel v1.4 from pre-installed disk images works, new installs fail because sunix kernel v1.1 isn't yet supported.
+  + If you have a preinstalled UniPlus, you can now image it with BLU, convert the image with blu-to-dc42 and it will work in LisaEm, however, fresh installs will not work.
+* Xenix fails to fully boot though starts the kernel, it fails to fully come up to the login prompt.
+* MacWorks XL 3.0 mostly Works, but requires booting from floppy, later versions do not boot.
 * Various sound generation issues across several platforms, but works on 
-GTK if SDL is enabled, so turning on SDL for build wx scripts. 
+  GTK if SDL is enabled, so turning on SDL for build wx scripts, though sometimes 
+  I see alerts for not being able to open ALSA, you 
+  will need to also install the pulseaudio/ALSA proxy package. see:
+  https://docs.wxwidgets.org/trunk/classwx_sound.html
+    "Currently this class is implemented on Windows and Unix and can use either Open Sound System (OSS) or Simple DirectMedia Layer (SDL) under the latter. Notice that OSS is not provided any more by most, and maybe even all, Linux systems in 2017 and osspd (OSS Proxy Daemon) package typically needs to be installed to make it work."
+  not sure about newer sound managers on Linux yet.
 
-* Install both Xcode and command line tools on macos x.
-to properly build wxWidgets on macos x, it's highly recommended to install the
-right version of Xcode for your os as well as the right version of the Command
-line tools that match that Xcode. Builds with just command line tools don't
-install the macos SDKs which then fail when you try to compile LisaEm
-against wxWidgets.
-
-* If you get a  fatal error: 'tr1/type_traits' file not found  error, run this (Change the filename as needed)
-sudo patch /usr/local/wx3.1.2-cocoa-x86-macOS-10.9-clang-sdl/include/wx-3.1/wx/strvararg.h  scripts/wx-strvararg.patch
-
-Only has to be done once.
+* Mouse tracking fails to work under high load throttle- noticed on GTK.
+  On my system when using a debug compiled binary and throttle set to 100MHz,
+  Lisa Office System does not recognize mouse movement except for clicks.
+  Seems to be a wxWidgets related issues where mouse movements are treated
+  as lower priority without clicks and are not sent. Lowering the CPU throttle
+  to 48MHz fixes this, YMMV. The OnMouseMove method is no longer called by the
+  event handler. (The speed limit may vary on your host machine as well.)
+  The symptom appears to ignore mouse up events in LOS, and every click is
+  a drag.
 
 * UPX on macos 10.8, 10.9 generates executables that segfault, do not use.
-Added code to the bashbuild scripts to disable it on those, possibly affects
-other macos x versions, based on old memories, I remember it working on PPC32/64
-on macos 10.4, not sure about 10.5-10.7. This also affects command line tools
-such as lisafsh-tool.
+  Added code to the bashbuild scripts to disable it on those, possibly affects
+  other macos x versions, based on old memories, I remember it working on PPC32/64
+  on macos 10.4, not sure about 10.5-10.7. This also affects command line tools
+  such as lisafsh-tool.
 
-* blu-to-dc42
-This code does not work well enough to convert Widget or Profile dumped via BLU
-to be bootable, nor mountable in LisaEm, although lisafsh-tool can get a 
-directory of the resulting image, not yet sure what's wrong.
+* dc42-to-tar is mostly working, except for a few edge cases.
+
+* Monitor OS 0.12.3 takes a long time to power off the virtual Lisa after S(ysMgr / Off is invoked
+  roughly about 3 minutes after selecting the menu option to shut down.
+
+* Closing the TerminalWx window causes a segfault crash, tried to override the destructor to change
+  the behavior to minimize the window instead of destroying it, but not working correctly yet.

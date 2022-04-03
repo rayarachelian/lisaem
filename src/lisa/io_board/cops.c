@@ -135,6 +135,17 @@ static  uint16 copsqueuefull=0;
 
 
 
+static int mouse_seek_count=0;
+static int last_mouse_button_state=0;   // this is used to prevent repeated mouse up, mouse down events being sent.
+                                        // sort of like a switch debounce
+
+// keep track of the last 3 mouse positions when we've sent.
+// initialize these with 3 different values
+static uint16       ratx= 8192,        raty= 8192, 
+               last_ratx=16384,   last_raty=16384,
+              llast_ratx=32767,  llast_raty=32767;
+
+
 
 
 // Is Lisa listening to the mouse?
@@ -223,7 +234,6 @@ void bigm_delta(int16 x, int16 y)       // x,y are delta-x, delta-y, but there a
          }
 
          // reduce jitter caused by acceleration a bit further when getting close to the mouse pointer
-
 
 
          if (abs(dx)>mouse_x_halfing_tolerance) dx >>=1;
@@ -444,11 +454,11 @@ void set_keyboard_id(int32 id)
   if ( id>0xffff || id<-5) {cops_key_id=COPS_KEYID_US; return;}
   switch (id)
         {
-          case -1: cops_key_id=COPS_KEYID_US;     DEBUG_LOG(0,"US"); break;
-          case -2: cops_key_id=COPS_KEYID_UK;     DEBUG_LOG(0,"UK"); ;break;
-          case -3: cops_key_id=COPS_KEYID_GERMAN; DEBUG_LOG(0,"DE"); break;
-          case -4: cops_key_id=COPS_KEYID_FRENCH; DEBUG_LOG(0,"FR"); break;
-          default: cops_key_id=(id & 0xffff);     DEBUG_LOG(0,"Other");
+          case -1: cops_key_id=COPS_KEYID_US;     ALERT_LOG(0,"US"); break;
+          case -2: cops_key_id=COPS_KEYID_UK;     ALERT_LOG(0,"UK"); break;
+          case -3: cops_key_id=COPS_KEYID_GERMAN; ALERT_LOG(0,"DE"); break;
+          case -4: cops_key_id=COPS_KEYID_FRENCH; ALERT_LOG(0,"FR"); break;
+          default: cops_key_id=(id & 0xffff);     ALERT_LOG(0,"Other");
         }
 }
 
@@ -460,10 +470,13 @@ void cops_keyboard_id(void)
     uint8 x;
     DEBUG_LOG(0,"SRC: COPS: reporting keyboard ID:%04x len:%d",cops_key_id,copsqueuelen);
     if    (keyboard_keytronix) x=(cops_key_id>>8) & 0xff;        // keyboard id (allow user to change keyboards later)
-    else  x=(uint8)(cops_key_id & 0xff);                                // keyboard id (allow user to change keyboards later)
+    else  x=(uint8)(cops_key_id & 0xff);                         // keyboard id (allow user to change keyboards later)
 
-    SEND_RESETCOPS_AND_CODE(x);
-    DEBUG_LOG(0,"len:%d",copsqueuelen);
+
+    if ((reg68k_pc & 0x00ff0000)==0x00fe0000) {SEND_RESETCOPS_AND_CODE(x);
+        ALERT_LOG(0,"Sending keyboard id: %02x",x)
+        DEBUG_LOG(0,"len:%d",copsqueuelen);
+    }
 }
 
 
@@ -495,7 +508,7 @@ void plugmouse(void)                    // Used by initialization sequence - che
 
 
 
-void set_mouse_button(int i)  {  DEBUG_LOG(0,"mouse button event:%d",i); SEND_COPS_CODE( ( i?0x86:0x06) ); }
+void set_mouse_button(int i)  {  DEBUG_LOG(0,"mouse button event:%d %s",i, (i?"down":"up") ); SEND_COPS_CODE( ( i?0x86:0x06) ); }
 
 //#define OLD_COPS_BEHAVIOR
 
@@ -557,15 +570,9 @@ void normalize_lisa_clock(void)
 
 
      lisa_clock.hours_h=hours   /10; lisa_clock.hours_l=hours   %10;
-
      lisa_clock.mins_h =minutes /10; lisa_clock.mins_l =minutes %10;
-
      lisa_clock.secs_h =seconds /10; lisa_clock.secs_l =seconds %10;
-
      lisa_clock.tenths=tenths;
-
-
-    //   fflush(buglog);
 
 }
 
@@ -716,7 +723,7 @@ void via1_ora(uint8 data,uint8 regnum)
             if ( copsqueuelen+8>MAXCOPSQUEUE) {fprintf(buglog,"\n\n\n\n     COPS OVERFLOW! CAN'T SET DATE!\n\n\n"); }
             if ( copsqueuelen+7<MAXCOPSQUEUE)  // if the queue isn't full that is...
       			{
-              DEBUG_LOG(0,"getting clock.\n");
+              ALERT_LOG(0,"sending clock.\n");
 
 
 
@@ -966,7 +973,13 @@ void via1_ora(uint8 data,uint8 regnum)
         case 0x5d:
         case 0x5e:
         case 0x5f:   NMIKEY=(NMIKEY & 0x0f) | (data & 0x0f)<<4;
-                        DEBUG_LOG(0,"cops command - set nmi key high:%02x NMI key is now:%02x",data,NMIKEY);
+                        ALERT_LOG(0,"");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"cops command - set nmi key high:%02x NMI key is now:%02x",data,NMIKEY);
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"");
                         return;
 
 
@@ -986,7 +999,13 @@ void via1_ora(uint8 data,uint8 regnum)
         case 0x6d:
         case 0x6e:
         case 0x6f:  NMIKEY=(NMIKEY & 0xf0) | (data & 0x0f);
-                       DEBUG_LOG(0,"cops command - set nmi key low:%02x NMI key is now:%02x\n",data,NMIKEY);
+                        ALERT_LOG(0,"");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"cops command - set nmi key low:%02x NMI key is now:%02x\n",data,NMIKEY);
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"=====================================================================");
+                        ALERT_LOG(0,"");
         return;
 
 
@@ -1090,6 +1109,9 @@ uint8 via1_ira(uint8 regnum)
         mouse_pending_x=0;
         mouse_pending_y=0;
 
+        llast_ratx=last_ratx; llast_raty=last_raty;
+        last_ratx=ratx;        last_raty=raty;
+
         DEBUG_LOG(0,"Sending mouse 00, x,y to follow.")
         return 0x00; // this one is 1st, then dx, then dy to indicate mouse motion data. ie: 00,dx,dy
 
@@ -1112,27 +1134,33 @@ uint8 via1_ira(uint8 regnum)
 
 void add_mouse_event(int16 x, int16 y, int8 button)
 {
-
-    if ( mousequeuelen+1>MAXMOUSEQUEUE) mousequeuelen=0;  // we overflowed, just dump the old ones 20060609 17:15
+    if ( mousequeuelen+1>MAXMOUSEQUEUE) { ALERT_LOG(0,"overflowed mouse queue!"); mousequeuelen=0;}  // we overflowed, just dump the old ones 20060609 17:15
 
     if (!cops_mouse||contrast==0xff) return;
 
     if  (x<0||x>lisa_vid_size_x||y<0||y>lisa_vid_size_y) return;
 
-
     // if it's not a click, update the current one in the queue - if there is one.
     if ( !button && mousequeuelen && !mousequeue[mousequeuelen].button)
-       {mousequeue[mousequeuelen].x=x; mousequeue[mousequeuelen].y=y; return;}
+       { mousequeue[mousequeuelen].x=x; mousequeue[mousequeuelen].y=y; return;}
 
     // Otherwise add the event to the current one.
+    mousequeuelen++; 
+    mousequeue[mousequeuelen].x=x; 
+    mousequeue[mousequeuelen].y=y; 
+    mousequeue[mousequeuelen].button=button;
 
-    mousequeuelen++; mousequeue[mousequeuelen].x=x; mousequeue[mousequeuelen].y=y; mousequeue[mousequeuelen].button=button;
+//    if (button ==-1 ) ALERT_LOG(0,"button released added to queue");
+//    if (button == 1 ) ALERT_LOG(0,"button down added to queue");
+
+//
+//     mousequeuelen++; 
+//      mousequeue[mousequeuelen].x=x; 
+//      mousequeue[mousequeuelen].y=y; 
+//      mousequeue[mousequeuelen].button=button;
+//    }
 }
 
-
-static int mouse_seek_count=0;
-static int last_mouse_button_state=0;   // this is used to prevent repeated mouse up, mouse down events being sent.
-                                        // sort of like a switch debounce
 
 void seek_mouse_event(void)
 {
@@ -1146,22 +1174,11 @@ void seek_mouse_event(void)
 
   mouse_pending=0;
 
-  if (!cops_mouse||contrast==0xff || !mousequeuelen)
-        { DEBUG_LOG(0,"skipping seek_mouse_event because:%d,%d,%d\n",cops_mouse,contrast,mousequeuelen);
-          return;}
-
-
-
-  if (!is_lisa_mouse_on())
-        {   DEBUG_LOG(0,"skipping because lisa isn't listening to the mouse");
-            return;
-        }
-
-
+  if (!cops_mouse||contrast==0xff || !mousequeuelen) { DEBUG_LOG(0,"skipping seek_mouse_event because:%d,%d,%d\n",cops_mouse,contrast,mousequeuelen); return;}
+  if (!is_lisa_mouse_on())  { DEBUG_LOG(0,"skipping because lisa isn't listening to the mouse"); return; }
 
   abort_opcode=2;
   GET_RAT_XY(0);
-
   if ( abort_opcode==1)
   {
     DEBUG_LOG(0,"Got abort opcode while reading the mouse - this should never happen");
@@ -1169,8 +1186,6 @@ void seek_mouse_event(void)
     debug_on("abort_opcode_reading_mouse");
     #endif
     DEBUG_LOG(0,"Got abort opcode while reading the mouse");
-    DEBUG_LOG(0,"Got abort opcode while reading the mouse");
-    DEBUG_LOG(0,"abort_opcode while reading mouse");
     //exit(36);
   }
 
@@ -1178,24 +1193,16 @@ void seek_mouse_event(void)
   dy=mousequeue[1].y-(int16)(raty);
   DEBUG_LOG(0,"ratx,y: %d,%d mousequeue:%d,%d dx,dy",ratx,raty,mousequeue[1].x,mousequeue[1].y,dx,dy);
 
-
   abort_opcode=xabort_opcode;
   if  (ratx>lisa_vid_size_x||raty>lisa_vid_size_y) {DEBUG_LOG(0,"ratx,raty out of range:%d,%d",ratx,raty); return;}
-
-
-  // might want to paremetrise these.
-  // anti-acceleration jitter
-  //if      ((abs(dx)+abs(dy))<64 && !mouse_seek_count) mouse_seek_count=1;
-  //else if ((abs(dx)+abs(dy))<32 && !mouse_seek_count) mouse_seek_count=2;
-  //else if ((abs(dx)+abs(dy))<16 && !mouse_seek_count) mouse_seek_count=4;
-  //else if ((abs(dx)+abs(dy))<8  && !mouse_seek_count) mouse_seek_count=16;
-  //else if ((abs(dx)+abs(dy))<4  && !mouse_seek_count) mouse_seek_count=32;
-  //else if ((abs(dx)+abs(dy))<2  && !mouse_seek_count) mouse_seek_count=64;
-
 
   for (i=0;  anti_jitter_sample_dec1[i] &&  ((abs(dx)+abs(dy))<anti_jitter_sample_dec1[i] && !mouse_seek_count);   i++ )
        mouse_seek_count=anti_jitter_sample_dec2[i];
 
+  // 2020.09.14 I suspect this would help us here:
+  // if our motion attempts have failed and mouse button is set, release it or click it already.
+  // this means that acceleration is preventing us from moving close enough to the target pixel, so just give up.
+  if ((ratx==last_ratx) && (last_ratx==llast_ratx)  && (raty==last_raty) && (last_raty==llast_raty) && (!!mousequeue[1].button)) {dx=0; dy=0;}
 
   // do we need to move some more?  If so move, otherwise see if there has been a click, and send that.
   if  ( (dx|dy) )
@@ -1216,12 +1223,12 @@ void seek_mouse_event(void)
 
   switch ( mousequeue[1].button)
   { case -1 : if (last_mouse_button_state!=0) {
-                  set_mouse_button(0); //DEBUG_LOG(0,"mouse button set to 0 (up)");   // mouse is now up
+                  set_mouse_button(0); DEBUG_LOG(0,"mouse button set to 0 (up)");   // mouse is now up
                   last_mouse_button_state=0;
               }
               break;
     case +1 : if (last_mouse_button_state!=1) {
-                  set_mouse_button(1); //DEBUG_LOG(0,"mouse button set 1 (down)");   // mouse is now down
+                  set_mouse_button(1); DEBUG_LOG(0,"mouse button set 1 (down)");   // mouse is now down
                   last_mouse_button_state=1;
               }
 
@@ -1231,17 +1238,13 @@ void seek_mouse_event(void)
 
   // shift the mouse queue over
   if (mousequeuelen>1) {
-        for ( i=0;i<mousequeuelen;i++)
-         {  mousequeue[i].x      = mousequeue[i+1].x;
+        for ( i=0;i<mousequeuelen;i++) {
+            mousequeue[i].x      = mousequeue[i+1].x;
             mousequeue[i].y      = mousequeue[i+1].y;
-            mousequeue[i].button = mousequeue[i+1].button;}
+            mousequeue[i].button = mousequeue[i+1].button;  }
 
-     mousequeuelen--; }  //2006.07.12 moved this inside of the if statement.
-
-     //** the above worked, however, need to stop the jitter when it's close **
+        mousequeuelen--; }  //2006.07.12 moved this inside of the if statement.
 }
-
-
 
 
 void set_loram_clk(void)
@@ -1253,12 +1256,6 @@ void set_loram_clk(void)
    lisa_ram_safe_setbyte(1,0x1bd, (((lisa_clock.hours_l)&0x0f)<<4) | (lisa_clock.mins_h  &0x0f));
    lisa_ram_safe_setbyte(1,0x1be, (((lisa_clock.mins_l)&0x0f)<<4 ) | (lisa_clock.secs_h  &0x0f));
    lisa_ram_safe_setbyte(1,0x1bf, (((lisa_clock.secs_l)&0x0f)<<4 ) | (lisa_clock.tenths  &0x0f));
-
-
-
-
 }
-
-
 
 // "Devastation is on the way" - In memory of Dimebag Darrell 2004.12.08

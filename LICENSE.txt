@@ -1,0 +1,55 @@
+Apple Lisa Emulator (and supporting software, documentation, etc.)
+Copyright (C) 2021 by Ray A. Arachelian, All Rights Reserved.
+see: http://lisaem.sunder.net for updates and other information.
+
+All code written by me is distributed under the GNU GPL V2. Any 
+code not written by me included in this distribution subject to
+their respective licenses, I disclaim any rights to them, and are
+included as libraries used only.
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+version 3 as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111, USA
+
+---
+
+This program contains software from:
+
+
+Motorola(TM) 68000 CPU core emulation comes from:
+Generator - A Sega Genesis / Mega Drive Emulator
+http://squish.net/generator
+Copyright (C) 1997-2001 James Ponder
+Heavily modified for the Lisa Emulator Project.  
+Licensed under GPL V2
+
+
+LZHUF.C Routines for DART Compression as published on usenet:
+(c)1989 by Haruyasu Yoshizaki, Haruhiko Okumura, and Kenji Rikitake
+All rights reserved. Permission granted for non-commercial use.
+
+
+HQ3X Upscaler:
+Copyright (C) 2003 Maxim Stepin ( maxst@hiend3d.com )
+Copyright (C) 2010 Cameron Zemek ( grom@zeminvaders.net)
+Edits for LisaEm use, Copyright (C) 2018 Ray Arachelian  
+
+
+libTerminalWx Terminal Window Widget:
+https://github.com/jeremysalwen/TerminalWx.git
+
+By Jeremy Salwen.
+TerminalWx is taken (with modifications) from the Chameleon IDE (Mark
+Erikson), which itself took (with modifications) from taTelnet (Derry
+Bryson), which itself took (with modifications) from GTerm (Timothy
+Miller).  So this code has a bit of history ;).  All credit to those
+before me, the amount I've contributed is relatively nothing.

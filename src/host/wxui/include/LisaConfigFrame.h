@@ -57,7 +57,7 @@ public:
     wxButton   *b_rompath;         // button for picking it
 
     wxButton   *b_apply;           // save/apply button
-
+    wxPoint    applypoint;
 
     wxTextCtrl *serialtxt;
     wxTextCtrl *m_dprompath;       // Dual Parallel Expansion Slot ROM
@@ -65,12 +65,16 @@ public:
 
     wxRadioBox *kbbox;             // keyboard ID
 
-  //wxRadioBox *ramsize;           // memory size for Lisa, forced to 1024K due to bugs
-
     wxRadioBox *iorombox;          // I/O ROM version
 
+    wxRadioBox *cpurambox;         
+
     wxCheckBox *cheats;            // startup BOOT ROM cheats
+    wxCheckBox *hle_cheats;        // ProFile acceleration
+    wxCheckBox *console_term;      // Display TerminalWx for LPW + UniPlus (and eventually Xenix)
+  //wxCheckBox *macwx4mb;
     wxCheckBox *soundeffects;
+    wxCheckBox *doublesided;
     wxCheckBox *skinson;
     wxRadioBox *pportbox;          // Motherboard Parallel Port Connection type
     wxTextCtrl *m_propath;         // ProFile file path attached to parallel Port.
@@ -82,15 +86,23 @@ public:
     wxTextCtrl *m_text_propathh[4]; // profile paths
     wxTextCtrl *m_text_propathl[4];
 
-    wxRadioBox *serialabox;
-    wxRadioBox *serialbbox;
+//    wxRadioBox *serialabox;
+//    wxRadioBox *serialbbox;
+    wxChoice   *serialabox;
+    wxChoice   *serialbbox;
+
     wxTextCtrl *serialaparam;
     wxTextCtrl *serialbparam;
+    wxCheckBox *serialaxon;
+    wxCheckBox *serialbxon;
+    wxCheckBox *serialalimit;
+    wxCheckBox *serialblimit;
 
     wxString pportopts[3];        // common to all parallel ports
     wxString wpportopts[3];       // Widget on Lisa 2/10
 
-    wxString serportopts[6];
+    wxString nothingonly[2];
+    wxString serportopts[12];
     int      serialopts;
 
     // ImageWriter settings

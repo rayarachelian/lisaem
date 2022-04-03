@@ -89,6 +89,7 @@ CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h sr
 #echo parsing options
 for i in $@
 do
+ i=`echo "$i" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
 
  case "$i" in
   estimate)   cd ${XTLD}/src  # estimate compile count, we only have one file, but have to build library so return 2 units
@@ -169,10 +170,14 @@ do
  -arch=*)                      export ARCH="$(echo ${i} | sed -e 's/=/ /g') $ARCH"
                                export SARCH="$i $SARCH"                ;;
 
- --without-debug)              WITHDEBUG=""
+ --no-debug)                   WITHDEBUG=""
                                WARNINGS=""                               ;;
+ --profile)
+                               export WITHDEBUG="$WITHDEBUG -p"
+                               export LIBGENOPTS="$LIBGENOPTS --with-profile"
+                               export WITHPROFILE="yes"                                 ;;
 
- --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
+ --debug)                      WITHDEBUG="$WITHDEBUG -g"
                                WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
 
  --no-banner)                  NOBANNER="1";                             ;;
@@ -236,8 +241,8 @@ fi
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -254,13 +259,13 @@ fi
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
 echo "LASTBLITS=\"$WITHBLITS\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 
 [[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1 COMPILEPHASE="libdc42"
 
 ###########################################################################
-echo Building libdc42...
+echo "* Building libdc42..."
 echo
 
 # :TODO: silence warnings via rewriting code that emits them
@@ -275,7 +280,7 @@ if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
 
-   echo "Making libdc42.a library..." 1>&2
+   echo "  Making libdc42.a library..." 1>&2
    makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi
 
@@ -284,13 +289,13 @@ cd ..
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd ../lib/
+      cd ${XTLD}/lib/ || (echo "from $(pwd)" 1>&2; exit 1;)
       echo Installing libGenerator $VERSION
       mkdir -pm755 "$PREFIX/lib"
       cp libdc42-$VERSION.a "$PREFIX/lib/"
       [ -n "$DARWIN" ] && cp libdc42.${VERSION}.dylib "$PREFIX/lib/"
       cd "$PREFIX/lib"
-      ln -s libdc42-$VERSION.a libdc42.a
+      ln -sf libdc42-$VERSION.a libdc42.a
 fi
 echo
 [[ -z "$NOBANNER" ]] && echo "libdc42 build done"

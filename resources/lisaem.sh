@@ -15,7 +15,7 @@
 #---------------------------------------------------------------------------
 
 MACHINE=$( uname -m | sed -e 's/Power Macintosh/ppc/g')
-# x86_64
+# x86_64 arm64 ppc
 
 ME="$0"
 #MYDIR="$( dirname ${0})"  # <- this fails when dirname contains spaces
@@ -36,6 +36,13 @@ OSMIDDLE=$( printf "%02d" $( echo $OSVER | cut -d'.' -f2 ))
 WANT="lisaem-$MACHINE-$OSMAJOR.$OSMIDDLE-wx99999999"
 EXEC=""
 
+# fallback to x86_64 if we're on M1 but don't have any ARM binaries, but Rosetta2 is installed.
+if [[ "$MACHINE" == "arm64" ]]; then
+   if [[ -n "$(pkgutil --pkgs 2>/dev/null | grep Rosetta )" ]]; then
+      [[ -z "$( ls -1 lisaem-arm64* 2> /dev/null)" && MACHINE="arm64" ]] && export MACHINE="x86_64"
+   fi
+fi
+
 for lisaem in $( ls -1 lisaem-${MACHINE}-* 2>/dev/null ); do
     [[ "$WANT" == "$lisaem" ]] && export EXEC="$lisaem" # Found exact match for this macos?
     [[ "$lisaem" < "$WANT" ]] && [[ "$lisaem" > "$EXEC" ]] && export EXEC="$lisaem" # find latest executable
@@ -46,5 +53,43 @@ if  [[ -z "$EXEC" ]]; then
     display dialog "I can't find a proper LisaEm executable for your machine ${WANT} in $(pwd) 0=$0" with title "Sorry"
 EndOfScript
 else
+
+
+    if [[ "$1" == "--diet" ]]; then
+       export DELETED="Keeping $EXEC $( printf '\r\n' )"
+       for lisaem in $( ls -1 lisaem-*-* 2>/dev/null ); do
+	  [[ "$EXEC" != "$lisaem" ]] && export DELETED="${DELETED}Removed $lisaem $(printf '\r\n')" && rm "$lisaem"
+       done
+       osascript <<-EndDiet
+       display dialog "$DELETED in ${pwd} 0=$0" with title "Diet"
+EndDiet
+      exit 0
+    fi 
+
+
+    if [[ "$1" == "--list" ]]; then
+       export LIST="Will Use: $EXEC $( printf '\r\n\r\n' )"
+       for lisaem in $( ls -1 lisaem-*-* 2>/dev/null ); do
+	  [[ "$EXEC" != "$lisaem" ]] && export LIST="${LIST}          $lisaem $(printf '\r\n')"
+       done
+       osascript <<-EndDiet
+       display dialog "$LIST in ${pwd} 0=$0" with title "List of LisaEm Binaries Available"
+EndDiet
+      exit 0
+    fi 
+
+
+    if [[ "$1" == "--clean-preferences" ]]; then
+       rm -rf $HOME/Library/Saved\ Application\ State/net.sunder.lisaem.savedState
+       rm -f $HOME/Library/Preferences/lisaem*
+       rm -f $HOME/Library/Preferences/net.sunder.lisaem.plist
+       osascript <<-EndClearPrefs
+       display dialog "Preferences for LisaEm were cleaned" with title "Cleaned Preferences"
+EndClearPrefs
+      exit 0
+    fi
+
+
     exec ./${EXEC} $@
+
 fi

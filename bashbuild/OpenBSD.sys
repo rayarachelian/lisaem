@@ -1,0 +1,240 @@
+[[ -z "$CXX"    ]] && export CXX="c++"
+[[ -z "$CC"     ]] && export CC="cc" 
+[[ -z "$AR"     ]] && export AR="ar"
+[[ -z "$LD"     ]] && export LD="ld"
+[[ -z "$AROPTS" ]] && export AROPTS="cru"
+
+export  GCCVER="$($CC --version 2>/dev/null | grep gcc   | head -1 | sed 's/^.* //g' 2>/dev/null)"
+export CLANGVER="$($CC --version 2>/dev/null | grep clang | head -1 | sed 's/^.* //g' 2>/dev/null)"
+
+export GCCCOLORIZED=""
+[[ -n "${CLANGVER}"     ]]  && GCCCOLORIZED="-Xclang -fcolor-diagnostics"
+[[ "${GCCVER}" > "4.8"  ]]  && GCCCOLORIZED="-fdiagnostics-color=always"
+
+export OPENBSD="OpenBSD"
+
+export HASHOPTS="-b --tag"
+export PREFIX="/usr/local/bin"
+export PREFIXLIB="/usr/local/share/"
+
+export CFLAGS="$CFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-write-strings -O2 -ffast-math -fomit-frame-pointer"
+export SYSLIBS=""
+export GCCSTATIC=""
+
+export NOWARNFORMATTRUNC=""
+# is this needed for OpenBSD?
+# fix to alow modern XCode/stdc++ clang compilation, see: https://stackoverflow.com/questions/12920891/std-linker-error-with-apple-llvm-4-1
+# and https://apple.stackexchange.com/questions/350627/how-can-i-specify-the-c-version-to-use-with-xcode
+# wxWidgets may also need patching, see: https://stackoverflow.com/a/37632111
+
+if  [[ "$CLANGVER" ]]; then
+    export SYSLIBS="-lstdc++"
+   #export SYSLIBS="-lc++"
+fi
+
+export AROPTS="cru"
+
+export CLICMD=""
+export GUIAPP=""
+
+if [[ -f /etc/os-release ]]; then
+   eval $(sed -e 's/^/export OSREL_/g' /etc/os-release  )
+fi
+
+
+# Only used on Windows
+function windres() {
+true 
+}
+
+function OpenBSDPackage() {
+
+  pushd . >/dev/null 2>/dev/null
+
+  SUFFIX=""
+  [[ "${STABILITY}" != "RELEASE" ]] && [[ "${STABILITY}" != "PRODUCTION" ]] && export SUFFIX="-${STABILITY}-${RELEASEDATE}"
+
+  export STAGEDIR="${XTLD}/pkg/build/tmp/openbsd/"
+  export DESC="${XTLD}/pkg/build/tmp/openbsd/+DESC"
+  export CONTENTS="${XTLD}/pkg/build/tmp/openbsd/+CONTENTS"
+
+  rm -rf       "${STAGEDIR}"
+  mkdir -pm755 "${STAGEDIR}"
+  cd           "${STAGEDIR}"
+
+cat >"${DESC}" <<ENDOBSDDESCEND
+${SOFTWARE} ${VER}${SUFFIX}
+
+comment: ${DESCRIPTION}
+
+maintainer: ${AUTHOR} <${AUTHEMAIL}>
+WWW: ${URL}
+ENDOBSDDESCEND
+
+
+deps="$(for i in $OPENBSDDEPENDS; do echo @depend $i; done )"
+
+#deps=""
+#
+#for i in $OPENBSDDEPENDS; do
+#  deps="@depend $( printf ${i}\\n )"
+#done
+
+wantlib="$(for i in $OPENBSDWANTLIB; do echo @wantlib $i; done )"
+#wantlib=""
+#for i in $OPENBSDWANTLIB; do
+#  wantlib="$wantlib $( printf \"${i}\\n\" )"
+#done
+
+# have to do the depends and wantlibs here as well as pkgpath comment.
+# have to do the prefix, prefixlib, pkgprefix pkgprefixlibs
+
+cat >"${CONTENTS}" <<ENDOBSDCONTENTSEND
+@comment $OpenBSD: PLIST-main,v $
+@name ${LCNAME}-${VER}
+@comment pkgpath=${OPENBSDORIGIN} ftp=no
+@arch $(uname -m)
++DESC
+@sha$( cksum  -b -a sha256 "+DESC" | cut -d= -f2- )
+$( stat -r "+DESC" | awk '{print "@size "$8}')
+${deps}
+${wantlib}
+@cwd /usr/local
+ENDOBSDCONTENTSEND
+
+  # copy from install dir
+  if [[ -n "$( echo $PREFIX | grep '\/usr\/local' )" ]]; then
+     (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/usr/local" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+  else
+     (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+  fi
+
+  # add file info to +CONTENTS, mark binaries with @bin bin/filename...
+  (
+    # add everything but +DESC and +CONTENTS which we previously added.
+    find . -type f -print | sort | grep -v -- +DESC | grep -v -- +CONTENTS | cut -c3- | while read line; do
+
+      # tag binaries with @bin
+      if [[ "${line:0:13}" == "usr/local/bin" ]] || [[ "${line:0:7}" == "usr/bin" ]] || [[ "${line:0:3}" == "bin" ]]; then
+         echo -n "@bin "
+      fi
+      # tag man pages with @man
+      if [[ "${line:0:13}" == "usr/local/man" ]] || [[ "${line:0:7}" == "usr/man" ]] || [[ "${line:0:3}" == "man" ]]; then
+         echo -n "@man "
+      fi
+      if [[ -n "$(  echo $line | grep rc.d )" ]]; then
+         echo -n "@rcscript "
+      fi
+      if [[ -n "$(  echo $line | grep lib )" ]]; then
+         echo -n "@lib "
+      fi
+
+      #                      remove /usr/local  remove /usr     remove ^/ (leading / )
+      echo "$line" | sed -e 's/^.*local//g' -e 's/^.*usr//g' -e 's/^\///'
+
+      echo -n '@sha '; cksum  -b -a sha256 "$line" | awk '{print $4}'
+      stat -r "$line" | awk '{print "@size",$8}'
+      stat -r "$line" | awk '{print "@ts",$10}'
+
+    done
+
+    echo '@tag update-desktop-database'
+    echo '@tag gtk-update-icon-cache %D/share/icons/hicolor'
+    echo '@tag update-mime-database'
+  ) >>"${CONTENTS}"
+
+  # copy/override any other +files
+  cp "${XTLD}/pkg/templates/openbsd-package/"+* "${STAGEDIR}/" 2>/dev/null
+
+  cd "${XTLD}/pkg/build/tmp/openbsd"
+  pkg_create -f +CONTENTS 2>&1 | tee "${XTLD}/pkg/openbsd-pkg_create.log"
+  #echo "  + Using sudo to set perms and tarring, cleaning" 1>&2
+  #sudo bash -c "chown -R root:wheel .; chown root:bin +*; tar czf ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz *; cd ..; rm -rf openbsd"
+  echo "  + Created ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz - rename to ${LCNAME}-${VERSION}.tgz and then run pkg_sign" 1>&2
+   
+  popd . >/dev/null 2>/dev/null
+}
+
+##############################################################################
+# getcpus
+#
+# Gets the number of CPUs available on the machine so we can issue multiple
+# compiles simultaneously
+#
+##############################################################################
+
+function getcpus()
+{
+  if [[ -z "$NUMCPUS" ]]; then
+     export NUMCPUS="$(  sysctl hw.model hw.machine hw.ncpu | grep hw.ncpu: | cut -d: -f2 | sed -e's/ //g' )"
+  fi
+  [[ "$NUMCPUS" -lt 2 ]] && NUMCPUS=2
+}
+
+
+##############################################################################
+# makelibs
+#
+# Creates both static and shared libraries.
+#
+# Parameters $1 target directory
+#	     $2 library name
+#            $3 version tripplet.  i.e. 0.3.6
+#            $4 mode "static", "shared", or "both"
+#            $5 is a single string containing objects to merge.
+#               i.e. "a.o b.o c.o ..."
+#
+# i.e.
+#            makelibs  . libGenerator 0.3.6 both "lib68k.o cpu68k-?.o"
+#
+##############################################################################
+function makelibs() {
+
+dir="$1"
+libname="$2"
+ver="$3"
+mode="$4"
+objs="$5"
+
+aname="${libname}.${ver}.a"
+laname="${libname}.a"
+daname="${dir}/${aname}"
+ldaname="${dir}/${laname}"
+
+soname="${dir}/${libname}.${ver}.so"
+lsoname="${dir}/${libname}.so"
+ldsoname="${dir}/${libname}.so"
+dsoname="${soname}"
+
+[[ "$4" == "both" ]] && mode="static"
+
+
+if [[ "$mode" == "static" ]]
+then
+     echo "  Creating  $libname.a" 1>&2
+     $AR "$AROPTS" "${daname}" ${objs} || exit 1
+     ranlib ${daname}         || exit 1
+     /bin/rm -f       ${ldaname}
+     ln -sf ${daname} ${ldaname}
+fi
+
+
+[[ "$4" == "both" ]] && mode="shared"
+
+if [[ "$mode" == "shared" ]]
+then
+             # :TODO: test this
+             echo "  Creating  $libname.so" 1>&2
+             $CC $ARCH -shared- -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup  \
+                 -install_name /usr/local/lib/${libname}.so                                 \
+                 -compatibility_version ${ver} -current_version ${ver}                      \
+                 -o ${libname}.so ${objs}                                      || exit 1
+
+             /bin/rm -f          ${soname}
+             ln -sf ${lsoname}   ${soname}                                 
+
+fi
+
+echo -n "" >/dev/null
+}

@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -118,10 +118,10 @@ int8 IRQRingBufferAdd(uint8 irql, uint32 address)
 
 
 
-    fliflo_dump(&IRQq,"irq pre-add");
+    fliflo_dump(buglog,&IRQq,"irq pre-add");
     fliflo_buff_add(&IRQq,irql);
     DEBUG_LOG(0,"irq.c:: added IRQ:%d to fliflo which now has %d items queued\n",irql,fliflo_buff_size(&IRQq));
-    fliflo_dump(&IRQq,"irq post-add");
+    fliflo_dump(buglog, &IRQq,"irq post-add");
     return 0;
 
 }
@@ -432,12 +432,11 @@ void flag_via_t2_irq(int i)
        V->via[IFR] |= (VIA_IRQ_BIT_T2 | VIA_IRQ_BIT_SET_CLR_ANY); //  Set the IRQ flag for the VIA
 
        DEBUG_LOG(0,"T2 Timer VIA#%d IRQ:%d queued",V->vianum,V->irqnum);
-       reg68k_external_autovector(V->irqnum);   // fire interrupt
+       //reg68k_external_autovector(V->irqnum);   // fire interrupt  //2021.03.21 moved to irq loop
 
    } /////////////////////////////////// end of timer 2 ///////////////////////////////////////////////////////
 
 }
-
 
 
 void flag_via_t1_irq(int i)
@@ -449,15 +448,17 @@ void flag_via_t1_irq(int i)
     if (!V) return;
     if (!V->active) return;
 
+    latch=(V->via[T1LH]<<8)|(V->via[T1LL]);
+    rate=(latch ? ((cpu68k_clocks-V->t1_set_cpuclk)/latch) : 0);
+
     V->t1_e=-1;  V->via[IFR] |= VIA_IRQ_BIT_T1;
     if (V->via[IER] &   VIA_IRQ_BIT_T1)
     {   V->via[IFR] |= (VIA_IRQ_BIT_T1 | VIA_IRQ_BIT_SET_CLR_ANY);  // any bit only set when IRQ is fired.
         DEBUG_LOG(0,"T1 Timer Via#%d IRQ:%d queued.",V->vianum,V->irqnum);
-        reg68k_external_autovector(V->irqnum);
+        //reg68k_external_autovector(V->irqnum);   // fire interrupt  //2021.03.21 moved to irq loop
+
     }
     V->t1_fired++;
-    latch=(V->via[T1LH]<<8)|(V->via[T1LL]);
-    rate=(latch ? ((cpu68k_clocks-V->t1_set_cpuclk)/latch) : 0);
     DEBUG_LOG(0,"VIA %d T1 Timer expired at clock:%016llx was initialized at clock %016llx, ran for:%016llx clock cycles latch was:%04x rate:%ld",
             V->vianum,
             cpu68k_clocks,
@@ -467,10 +468,7 @@ void flag_via_t1_irq(int i)
             rate);
 
     V->t1_fired_cpuclk=cpu68k_clocks;
-
    // Will the timer reload?  Does PB7 need to be set?
-
-
    switch (V->via[ACR]>>6)
     {
         case   0:                   break;     // 00 Timed IRQ each time T1 loaded, one shot PB7 disabled
@@ -567,30 +565,38 @@ void get_next_timer_event(void)
           }
           #endif
 
-          ////////////////////// timer 1 //////////////////////////////////////////////////////////////
-
-          if (via[i].t1_e>cpu68k_clocks && is_vector_available(via[i].irqnum))
-                {
-                     DEBUG_LOG(0,"via#%d t1_e:       :%16llx \t(diff:%016llx)",i,via[i].t1_e,via[i].t1_e-cpu68k_clocks);
-                     if (cpu68k_clocks_stop>via[i].t1_e) // about to fire in this frame?
-                     {cpu68k_clocks_stop=via[i].t1_e; next_expired_timer=i;}    // yes, mark it as such.
-                }
-          else {if (via[i].t1_e>-1) {flag_via_t1_irq(i); /*cpu68k_clocks_stop=cpu68k_clocks+175; next_expired_timer=i;}*/}}      // oops! it expired, but we missed it!
-
           ////////////////////// timer 2/////////////////////////////////////////////////////////////
-
-          if (via[i].t2_e>cpu68k_clocks && is_vector_available(via[i].irqnum))
+          if ( via[i].t2_e != (XTIMER) 0xffffffffffffffff ) {
+             if (via[i].t2_e>cpu68k_clocks && is_vector_available(via[i].irqnum))
                  {
                     DEBUG_LOG(0,"via#%d t2_e:       :%016llx \t(diff:%016llx)",i,via[i].t2_e,via[i].t2_e-cpu68k_clocks);
                     if (cpu68k_clocks_stop>via[i].t2_e)  // same as above, only for timer 2
                      {
                       cpu68k_clocks_stop=via[i].t2_e; next_expired_timer=i|0x80;
-                      //flag_via_t2_irq(i);  //2005.06.08 9pm
+                      //flag_via_t2_irq(i);  //2005.06.08 9pm - hasn't happened yet, don't flag it.
                      }
                  }
-          // was missing 2004.12.07
-          else {if (via[i].t2_e>-1) {flag_via_t2_irq(i); /*cpu68k_clocks_stop=cpu68k_clocks+175; next_expired_timer=i;}*/}}      // oops! it expired, but we missed it!
+                 // was missing 2004.12.07
+              else 
+                 { 
+                     if (via[i].t2_e>-1) {flag_via_t2_irq(i);} 
+                }      // oops! it expired, but we missed it!
+           }
 
+
+          ////////////////////// timer 1 //////////////////////////////////////////////////////////////
+          if ( ( via[i].via[T1LH] | via[i].via[T1LL] ) && ( via[i].t1_e != (XTIMER) 0xffffffffffffffff ) )  // 2020.11.06
+          {
+              if ( via[i].t1_e>cpu68k_clocks && is_vector_available(via[i].irqnum) )
+                 {
+                         DEBUG_LOG(0,"via#%d t1_e:       :%16llx \t(diff:%016llx)",i,via[i].t1_e,via[i].t1_e-cpu68k_clocks);
+                         if (cpu68k_clocks_stop>via[i].t1_e) // about to fire in this frame?
+                            {cpu68k_clocks_stop=via[i].t1_e; next_expired_timer=i;}    // yes, mark it as such.
+                 }
+              else  flag_via_t1_irq(i); // cpu68k_clocks_stop=cpu68k_clocks+175; next_expired_timer=i;} }      // oops! it expired, but we missed it!
+          }
+
+         if (!!(via[i].via[IER]&via[i].via[IFR])) reg68k_external_autovector(via[i].irqnum);   // 2021.03.21 fire interrupt if IFR set to enabled bits
        }
 
     // non-VIA timers - if they're due in this cycle, then see if they're smaller than the current min
@@ -640,8 +646,18 @@ extern void LisaScreenRefresh(void);
 
 //static int screenrefreshcount=0;
 
+// 2021.02.23 UniPlus gets stuck in a loop like so, checking and resetting the VTIR timing
+//1/0001bd18 (0 0/0/0) : 13fc 0001 00fc e01a        : ........ :  318 : MOVE.B     #$01,$00fce01a  SRC:clk:00000000105f56d5 +20 clks
+//1/0001bd20 (0 0/0/0) : 0839 0002 00fc f801        : .9...... :  106 : BTST.B     #$02,$00fcf801  SRC:clk:00000000105f56e9 +20 clks
+//1/0001bd28 (0 0/0/0) : 66ee                       : f.       : 1053 : BNE.B      $0001bd18  SRC:clk:00000000105f56fd +8 clks
+// so added a limit on how often you can reset the VTIR
+static XTIMER lastvideotimimgreset=0;
 void reset_video_timing(void)
 {
+     // if you keep mashing on enable VTIR in a loop, this will only reset the circuitry once
+     if ( (cpu68k_clocks-lastvideotimimgreset)<60) {lastvideotimimgreset=cpu68k_clocks; return;}
+     lastvideotimimgreset=cpu68k_clocks;
+
      get_next_timer_event();
      video_scan=cpu68k_clocks;             // keep track of where we are
      virq_start=cpu68k_clocks+FULL_FRAME_CYCLES;

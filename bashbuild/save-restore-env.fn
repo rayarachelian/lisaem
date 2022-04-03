@@ -51,10 +51,21 @@ function save_environment() {
 
 
 function restore_environment() {
-   [[ "$XTLD" != "$( /bin/pwd )" ]] && export XTLD="$( /bin/pwd )"
-   #echo "Loading env from ${XTLD}/.env-saved" 1>&2
-   source "${XTLD}/.env-saved" || exit 100
-   #echo "Loaded env from ${XTLD}/.env-saved" 1>&2
+   #echo "In restore_environment:" 1>&2
+   #echo "XTLD: $XTLD"  1>&2
+   #echo "TLD:  $TLD" 1>&2
+   #echo "PWD:  $( pwd )" 1>&2
+   #echo 1>&2
+
+   [[ "$XTLD" != "$( /bin/pwd )" ]] && [[ -f .env-saved ]] && export XTLD="$( /bin/pwd )" #&& echo "set XTLD to current dir" 1>&2
+
+   if [[ -f "${XTLD}/.env-saved" ]]; then
+      source "${XTLD}/.env-saved" || exit 100
+      #echo "Loaded env from ${XTLD}/.env-saved" 1>&2
+   else
+      source "${TLD}/.env-saved" || exit 100
+      #echo "Loaded env from ${TLD}/.env-saved because XTLD did not have it." 1>&2
+   fi
 }
 
 

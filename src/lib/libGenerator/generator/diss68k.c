@@ -54,6 +54,7 @@ int diss68k_gettext(t_ipc * ipc, char *text)
 
     *text = '\0';
 
+    if (ipc->opcode==0x4e7a) { sprintf(text,"MOVEC VBR,D0 [UNI+ 68010 TESt - ILLEGAL on 68000]"); return 0; }
 //    DEBUG_LOG(1,"getting iib for opcode:%04x",ipc->opcode);
     iib = cpu68k_iibtable[ipc->opcode];
 //    printiib(iib);
@@ -323,7 +324,12 @@ int diss68k_getdumpline(uint32 addr68k, char *dumpline)
 
     p = dumpline;
     abort_opcode=2;
-    p += sprintf(p,       ": %04x ",          (fetchbyte(addr68k) << 8) + fetchbyte(addr68k+1));
+
+    if ((ipc.opcode & 0xf000)==0xa000) { // A-Line Lisa traps are 4 bytes wide
+       p += sprintf(p,       ": %08x ",          (fetchbyte(addr68k) << 24) + (fetchbyte(addr68k+1)<<16) + (fetchbyte(addr68k+2)<<8) + fetchbyte(addr68k+3) );
+    }
+    else
+       p += sprintf(p,       ": %04x ",          (fetchbyte(addr68k) << 8) + fetchbyte(addr68k+1));
     if (abort_opcode==1) {RESUME_DEBUG_MESSAGES(); DEBUG_LOG(0,"got_abort_opcode!"); return 0;} else abort_opcode=0;
 
     for (i = 1; i < words; i++) {

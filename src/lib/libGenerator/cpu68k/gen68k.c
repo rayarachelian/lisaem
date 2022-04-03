@@ -37,6 +37,8 @@
  * --------------------------------------------------*/
 #define BCD_NV_SAME 1
 
+#define PRESERVE_HIGH_BYTE 1
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1138,9 +1140,6 @@ void generate(FILE *o, int topnibble)
                             OUT("  SR = (SR & ~0xFF) | srcdata;\n");
                             break;
                         case sz_word:
-                            //OUT("  if (!SFLAG)\n");
-                            //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                            //(iib->wordlen)*2);
 
                             OUT("  if (!SFLAG)\n");
                             fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
@@ -1187,7 +1186,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  while (datamask) {\n");
                                 OUT("    dstaddr-= 2;\n");
                                 OUT("    storeword(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
-                                OUT("    DEBUG_LOG(5,\"reg D%d.W written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
+                                OUT("    DEBUG_LOG(5,\"reg D%d.W written to %08x <-%04x  SRC:\",7-movem_bit[datamask],dstaddr,DATAREG((7-movem_bit[datamask])));\n")
                                 ABORT_CHECK(o);
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
@@ -1202,10 +1201,9 @@ void generate(FILE *o, int topnibble)
                                 OUT("  }\n");
                                 OUT("  while (datamask) {\n");
                                 OUT("    dstaddr-= 4;\n");
-                                OUT("    storelong(dstaddr, ");
-                                OUT("DATAREG((7-movem_bit[datamask])));\n");
+                                OUT("    storelong(dstaddr, DATAREG((7-movem_bit[datamask])));\n");
                                 ABORT_CHECK(o);
-                                OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x  SRC:\",7-movem_bit[datamask],dstaddr);\n")
+                                OUT("    DEBUG_LOG(5,\"reg D%d.L written to %08x<-%08x  SRC:\",7-movem_bit[datamask],dstaddr,DATAREG((7-movem_bit[datamask])));\n")
                                 OUT("    datamask&= ~(1<<movem_bit[datamask]);\n");
                                 OUT("  }\n");
                                 break;
@@ -1230,7 +1228,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  }\n");
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storeword(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
-                                OUT("    DEBUG_LOG(5,\"reg A%d.W written to (%08x)<-%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
+                                OUT("    DEBUG_LOG(5,\"reg A%d.W written to (%08x)<-%04x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                                 ABORT_CHECK(o);
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 2;\n");
@@ -1247,7 +1245,7 @@ void generate(FILE *o, int topnibble)
                                 OUT("  while (addrmask) {\n");
                                 OUT("    storelong(dstaddr, ADDRREG(movem_bit[addrmask]));\n");
                                 ABORT_CHECK(o);
-                                OUT("    DEBUG_LOG(5,\"reg A%d.L written to (%08x)<-%08x  SRC:\",7-movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
+                                OUT("    DEBUG_LOG(5,\"reg A%d.L written to (%08x)<-%08x  SRC:\",movem_bit[addrmask],dstaddr,ADDRREG(movem_bit[addrmask]));\n")
                                 OUT("    addrmask&= ~(1<<movem_bit[addrmask]);\n");
                                 OUT("    dstaddr+= 4;\n");
                                 OUT("  }\n");
@@ -1330,10 +1328,6 @@ void generate(FILE *o, int topnibble)
                     C_ABRT_CHK(o);
 
                     OUT("\n");
-                    //OUT("  if (!SFLAG)\n");
-                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                    //(iib->wordlen)*2);
-                    //OUT("\n");
                     OUT("  if (!SFLAG)\n");
                     fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
@@ -1347,10 +1341,6 @@ void generate(FILE *o, int topnibble)
                     generate_ea(o, iib, tp_src, 1);
                     OUT("  uint32 outdata;\n");
                     OUT("\n");
-                    //OUT("  if (!SFLAG)\n");
-                    //fprintf(o, "    reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);\n",
-                    //(iib->wordlen)*2);
-                    //OUT("\n");
                     OUT("  if (!SFLAG)\n");
                     fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                         (iib->wordlen)*2);
@@ -1875,6 +1865,10 @@ void generate(FILE *o, int topnibble)
                     C_ABRT_CHK(o);
                     OUT("\n");
 
+                    fprintf(o,"   #ifdef DEBUG\n");
+                    fprintf(o,"   trap_opcode(srcdata);\n");
+                    fprintf(o,"   #endif\n");
+
                     fprintf(o, "  reg68k_internal_vector(V_TRAP+srcdata, PC+%d,0);\n",
                         (iib->wordlen)*2);
                     pcinc = 0;
@@ -1931,13 +1925,13 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)+= (sint16)srcdata;\n");
                     break;
 
-                case i_UNLK:
+                case i_UNLK:  //       An -->; SP; (SP) -->; An; SP + 4 -->; SP 
                     GENDBG("");
                     generate_ea(o, iib, tp_src, 1);
                     generate_eaval(o, iib, tp_src);
                     OUT("\n");
-                    OUT("uint32 tmp=ADDRREG(srcreg);\n");
-                    OUT("l1=fetchlong(srcdata);");
+                 // OUT("  ADDRREG(srcreg) = fetchlong(srcdata);\n");
+                    OUT("  l1=fetchlong(srcdata);");
                     ABORT_CHECK(o);
                     OUT("  ADDRREG(srcreg) =l1;\n");
                     OUT("  ADDRREG(7) = srcdata+4;\n");
@@ -2011,6 +2005,9 @@ void generate(FILE *o, int topnibble)
 
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"RTS: ->0x%X\\n\", PC);", o);
+                        #ifdef DEBUG
+                        fputs("  if (!(PC)) {extern void dumpallscreenshot(void); dumpallscreenshot();}", o);
+                        #endif
                     pcinc = 0;
                     break;
 
@@ -2046,12 +2043,15 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)-= 4;\n");
                     fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
                     ABORT_CHECK(o);
+                    #ifdef PRESERVE_HIGH_BYTE
                   //OUT("  fetchword(srcaddr);"); //20060113
                   //ABORT_CHECK(o);
-//                    if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
-//                         {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
-//                    else 
-                           OUT("  PC = srcaddr;\n");
+                    if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+                         {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+                    else  OUT("  PC = srcaddr;\n");
+                    #else
+                          OUT("  PC = srcaddr;\n");
+                    #endif
 
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"JSR: ->0x%X\\n\", PC);", o);
@@ -2069,17 +2069,19 @@ void generate(FILE *o, int topnibble)
                   //OUT("  fetchword(srcaddr);\n"); //20060113
                   //ABORT_CHECK(o);  // suspect there's an issue here **** 20180316 ****
 //         fputs("  fprintf(stderr,\"JMP: %08x->0x%08x\\n\", PC, srcaddr);\n", o);  //2020.07.24
-
-                  //if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
-                  //     {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
-                  //else 
+                  #ifdef PRESERVE_HIGH_BYTE
+                  if (iib->stype == dt_Pidx || iib->stype == dt_Pdis )
+                       {OUT("  PC = (PC & 0xff000000) | (srcaddr & 0x00ffffff) ;\n");}
+                  else  OUT("  PC = srcaddr;\n");
+                  #else
                          {OUT("  PC = srcaddr;\n");}
+                  #endif
 
-                    if (DEBUG_BRANCH)
-                        fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", o);
+                  if (DEBUG_BRANCH)
+                      fputs("  printf(\"JMP: ->0x%X\\n\", PC);\n", o);
                     
-                    pcinc = 0;
-                    break;
+                  pcinc = 0;
+                  break;
 
                 case i_Scc:
                     GENDBG("");
@@ -2153,13 +2155,27 @@ void generate(FILE *o, int topnibble)
                     OUT("  uint32 srcdata = ipc->src;\n");
                     generate_cc(o, iib);
                     OUT("\n");
+                    OUT("  uint32 oldpc=PC;\n");
+                    #ifdef DEBUG
+                    OUT("static uint32 sent;\n");
+                    #endif
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"Bcc: 0x%X\\n\", PC);\n", o);
-                    OUT("  if (cc)\n");
-                  //OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
+                    OUT("  if (cc) {\n");
+
+                    #ifdef PRESERVE_HIGH_BYTE
+                    OUT("    {  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff); cpu68k_clocks+=(10-8);}\n");
+                    #else
                     OUT("    {  PC = srcdata; cpu68k_clocks+=(10-8);}\n");
-                    OUT("  else\n");
-                    if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                   }\n", (iib->wordlen)*2);
+                    #endif
+
+                    OUT("        if (oldpc==PC) {\n");
+                    #ifdef DEBUG
+              fprintf(o,"            if (sent!=PC) {sent=PC; fprintf(stderr,\"infinite loop detected at %%08x opcode length: %d bytes\\n\",PC);}\n", (iib->wordlen)*2 );
+                    #endif
+                    OUT("            cpu68k_clocks+=10000; }\n");    // move clocks forward to speed up next timer IRQ
+                    OUT("  } else\n");
+                    if (iib->size == sz_word)   fprintf(o, "    {PC+= %d;                       }\n", (iib->wordlen)*2);
                     else                        fprintf(o, "    {PC+= %d; cpu68k_clocks+=(12-8);}\n", (iib->wordlen)*2);
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"Bcc: ->0x%X\\n\", PC);\n", o);
@@ -2176,9 +2192,11 @@ void generate(FILE *o, int topnibble)
                     OUT("  ADDRREG(7)-= 4;\n");
                     fprintf(o, "  storelong(ADDRREG(7), PC+%d);\n", (iib->wordlen)*2);
                     ABORT_CHECK(o);
-                  //OUT("  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff);\n");
+                    #ifdef PRESERVE_HIGH_BYTE
+                    OUT("  PC = (PC & 0xff000000) | (srcdata & 0x00ffffff);\n");
+                    #else
                     OUT("  PC = srcdata;\n");
-
+                    #endif
                     if (DEBUG_BRANCH)
                         fputs("  printf(\"BSR: ->0x%X\\n\", PC);\n", o);
                     pcinc = 0;
@@ -2342,6 +2360,10 @@ void generate(FILE *o, int topnibble)
                     GENDBG("");
                     OUT("\n");
                     //fprintf(o, "  PC+=2;\n  reg68k_internal_vector(V_LINE10, PC,0);\n");        //20060116-RA
+
+                    fprintf(o,"#ifdef DEBUG\n");
+                    fprintf(o,"a_line();\n");
+                    fprintf(o,"#endif\n");
                     fprintf(o, "reg68k_internal_vector(V_LINE10, PC,0);\n");
 
                     pcinc = 0;
@@ -2356,8 +2378,10 @@ void generate(FILE *o, int topnibble)
 
                 case i_ILLG:
                     GENDBG("");
+                    OUT("  if (ipc->opcode==0x4e7a) PC+=4; else PC+=2;\n"); // http://bitsavers.org/pdf/apple/lisa/unisoft/Unisoft_Lisa_Kernel_Aug1983.pdf p3 movec vbr,d0
                     OUT("  printf(\"Illegal instruction @ %x\\n\", PC);\n");
                     fprintf(o, "  reg68k_internal_vector(4, PC,0);\n");  // RA2002.08.02
+                    pcinc = 0;
                     break;
 
             } /* switch */

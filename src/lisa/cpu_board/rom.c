@@ -149,9 +149,8 @@ void fixromchk(void)
     /* C ROM */ if (lisarom[0x3ffc]==0x02 && lisarom[0x3ffd]==0x11) ALERT_LOG(0,"C ROM 0x275:%02x",lisarom[0x0275]);
     
     
-    
     // don't touch any ROM except H
-    if (lisarom[0x3ffc] != 0x02 || lisarom[0x3ffd] != 'H')  return;
+    if (lisarom[0x3ffc] != 0x02 || lisarom[0x3ffd] != 'H') {ALERT_LOG(0,"ROM is not H-ROM, will not patch"); return;}
 
     if (cheat_ram_test)
     {
@@ -171,7 +170,35 @@ void fixromchk(void)
        /* Instead of jumping to BEGIN go to SETMMU. */
        lisarom[0x0006] = 0x02;
        lisarom[0x0007] = 0xc6;
+
+
+       // 0AD4| 203C 0013 12D0
+       lisarom[0x0ad7]=8; // 5 second delay -> 2s delay during boot process. this is used as a long beep, during booting, service mode display testing
     }
+
+
+    ALERT_LOG(0,"HLE is: %d",hle)
+    if (hle) {  
+               // patch the ROM entry at 090, and also the actual call inside the ROM, which can
+               // move around depending on the ROM version, because when booting from the ROM
+               // the ROM will call the actual address of PROREAD rather than go through the
+               // jump table entry at fe0090
+
+               lisarom[0x90]=0xf3; lisarom[0x91]=0x3d;
+
+               rom_profile_read_entry=(lisarom[0x92]<<8)+(lisarom[0x93])+0x92;
+
+               lisarom[rom_profile_read_entry+0]=0xf3;
+               lisarom[rom_profile_read_entry+1]=0x3d;
+               
+               rom_profile_read_entry|=0x00fe0000;
+
+               ALERT_LOG(0,"#  # #    ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #    #       Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#### #    ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #    #       Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+               ALERT_LOG(0,"#  # #### ####    Applied ROM HLE  to ProFile Read fe0090 and %08x",rom_profile_read_entry);
+             }
 
     /* Simulate all but the final add of the ROM checksum routine */
     uint16 d0;
@@ -179,7 +206,7 @@ void fixromchk(void)
 
     d0=0;                                    // CLR.L D0
     a0=0;                                    // LEA BASE,A0
-    a1=0x3ffe;                                // LEA LAST,A1
+    a1=0x3ffe;                               // LEA LAST,A1
 
     d0=chksum_a_rom_range(lisarom,a0,a1);
 
@@ -414,48 +441,71 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     uint8 *ROMLO, *ROMHI;
     FILE  *low,   *high, *out;
     size_t c;
-
+    int lohiflag=0;
     if (!filename || !ROMMX) return -3;
     strncpy(infilename,filename,FILENAME_MAX-1);         // copy the original file name
-
-    s=strstr(infilename,".lo");  if (s) *s=0;  // strip off any possible .lo
-    s=strstr(infilename,".hi");  if (s) *s=0;  // strip off any possible .hi
 
     ROMLO=(uint8 *) calloc(1,8194); if (!ROMLO) {return -2;}
     ROMHI=(uint8 *) calloc(1,8194); if (!ROMHI) {free(ROMLO); return -2;}
 
-    snprintf(myfilename,FILENAME_MAX-1,"%s.lo",infilename);
-    low=fopen(myfilename,"rb");
-    if (!low) {free(ROMHI); free(ROMLO); return -1;}
-    DEBUG_LOG(0,"Opened %s\n",myfilename);
+    // :TODO: is if strcasestr exists on all our supported platforms
+    s=strstr(infilename,".lo"); if (!s) s=strstr(infilename,".LO"); if (!s) s=strstr(infilename,".Lo");
+    if (s) *s=0; // strip off any possible .lo
 
+    s=strstr(infilename,".hi"); if (!s) s=strstr(infilename,".HI"); if (!s) s=strstr(infilename,".Hi");
+    if (s) *s=0; // strip off any possible .hi
 
-    snprintf(myfilename,FILENAME_MAX-1,"%s.hi",infilename);
-    high=fopen(myfilename,"rb");
-    if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
-    DEBUG_LOG(0,"Opened %s\n",myfilename);
+    // You try to pick the lesser of, But evil doesn't come in twos, Whoooo!
+    // note we do assignements inside the if here, because we're super cool like that
+    //                         0123456
+    if ( (s=strstr(infilename,"341-175-")) || (s=strstr(infilename,"341-176-")) ) {
 
+        s[6]='5';
+        low=fopen(infilename,"rb");
+        if (!low) {free(ROMHI); free(ROMLO); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",infilename);
+
+        s[6]='6';
+        high=fopen(infilename,"rb");
+        if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",infilename);
+
+        // strip off .bin, we'll add .ROM later
+        s=strstr(infilename,".bin"); if (!s) s=strstr(infilename,".BIN"); if (!s) s=strstr(infilename,".Bin");
+        if (s) *s=0;
+    }
+    else
+    {
+        snprintf(myfilename,FILENAME_MAX-1,"%s.lo",infilename);
+        low=fopen(myfilename,"rb");
+        if (!low) {free(ROMHI); free(ROMLO); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",myfilename);
+    
+        snprintf(myfilename,FILENAME_MAX-1,"%s.hi",infilename);
+        high=fopen(myfilename,"rb");
+        if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",myfilename);
+    }
+
+    // [control|absorb|destroy] yourself [you're better alone|see who gives a fuck|if there was a day I could live|if there was a single breath I could breathe]... LoG!
     c=fread(ROMLO,8192,1,low);   if (c!=1) {ALERT_LOG(0,"Error reading  LOW bytes from %s",myfilename);}
     c=fread(ROMHI,8192,1,high);  if (c!=1) {ALERT_LOG(0,"Error reading HIGH bytes from %s",myfilename);}
+    // for the truth shall set you free
+    fclose(low); fclose(high); // and bury you with honesty
 
-    fclose(low);
-    fclose(high);
-
-    // stitch the ROMs
+    // stitch the lo/hi | even/odd ROMs
     for (i=0,j=0; i<16384; i+=2, j++)
-        {
-          ROMMX[i+1]=ROMLO[j];
-          ROMMX[i  ]=ROMHI[j];
-        }
+        { ROMMX[i+1]=ROMLO[j]; ROMMX[i  ]=ROMHI[j]; }
 
-    free(ROMHI);
-    free(ROMLO);
+    // lay this to rest
+    free(ROMHI); free(ROMLO);
 
-
+    // collosal hate arrises
     snprintf(myfilename,1024,"%s.ROM",infilename);
     out=fopen(myfilename,"wb");
     if (out) {  fwrite(ROMMX,16384,1,out); fflush(out);  fclose(out); rename_rompath(myfilename);}
 
+    // for (a=good; time<9999; see++) {youtu_be("KgaEI08JsiE"); ALERT_LOG(0,"Randy, you're scaring the kids.  Go scream in the closet! lel!");
     DEBUG_LOG(0,"Saved merged rom file as %s\n",myfilename);
 
 
@@ -470,8 +520,10 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
 
 
 /**************************************************************************************\
-* This function loads in a straight/raw 16k rom dump.                                      *
+* This function loads in a straight/raw 16k rom dump.                                  *
 \**************************************************************************************/
+
+extern void enable_4MB_macworks(void);
 
 int16 read_rom(char *filename, uint8 *ROMMX)
 {
@@ -492,10 +544,14 @@ int16 read_rom(char *filename, uint8 *ROMMX)
 
     ALERT_LOG(0,"Lisa ROM CHKSUM is %02x%02x version:%02x.%c (%02x)",ROMMX[0x3ffe],ROMMX[0x3fff],ROMMX[0x3ffc],ROMMX[0x3ffd],ROMMX[0x3ffd]);
 #ifdef DEBUG
-    if (lisarom[0x3ffd]<'F') debug_on("C-ROM");
+//    if (lisarom[0x3ffc]==2 && lisarom[0x3ffd]<'F') debug_on("C-ROM");
 #endif    
-    return 0;
 
+    if (lisarom[0x3ffc]==3 && lisarom[0x3ffd]>='A') { // 3A ROM
+       if (macworks4mb) enable_4MB_macworks();
+    }
+
+    return 0;
 }
 
 extern int romless_dualparallel(void);
@@ -550,7 +606,6 @@ int read_parallel_card_rom(char *filename)
        newchks=(~newchks)+1;
        dualparallelrom[words]=(newchks>>8); dualparallelrom[words+1]=(newchks & 0xff);
     }
-
 
     if (!ret) return romless_dualparallel();
 

@@ -108,6 +108,22 @@ void   lisa_wl_xlvidram(uint32 addr, uint32 data);
 uint8 lisa_rb_ext_2par_via(viatype *V,uint32 addr);
 void  lisa_wb_ext_2par_via(viatype *V,uint32 addr, uint8 xvalue);
 
+int get_vianum_from_addr(long addr) {
+
+  switch(addr & 0x00fffe00) {
+           case 0x00FCDD00: return 1;  // printf("cops: ");
+           case 0x00fcd800: return 2;  // printf("motherboard: ");
+           case 0x00fcd900: return 2;  // printf("motherboard: ");
+           case 0x00fc2800: return 3;  // printf("slot 1 high: ");
+           case 0x00fc2000: return 4;  // printf("slot 1 low : ");
+           case 0x00fc6800: return 5;  // printf("slot 2 high: ");
+           case 0x00fc6000: return 6;  // printf("slot 2 low : ");
+           case 0x00fca800: return 7;  // printf("slot 3 high: ");
+           case 0x00fca000: return 8;  // printf("slot 3 low : ");
+           default: return 0;
+  }
+}
+
 
 char slrnm[1024];
 char *slrname(uint16 slr)
@@ -385,9 +401,11 @@ void  *dmem68k_memptr(char *file, char *function, int line,uint32 addr)
 
 
     ret=(void *)mem68k_memptr[mmu_trans[((addr) & MMUEPAGEFL)>>9].readfn](addr);
-    MEMDEBUG_LOG(1,"fn returned pointer to %08x\n",(uint32)(ret));
+    MEMDEBUG_LOG(1,"fn returned pointer to %p\n",(void*)(ret));
     return ret;
 }
+
+uint32 get_physaddr(uint32 addr) { CHK_RAM_LIMITS(addr); return physaddr; }
 
 
 uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
@@ -399,12 +417,11 @@ uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"%s:%s:%d: READ BYTE @ %d/%08x:: %s",file,function,line, context,addr, chk_mtmmu(a,0));
     #endif
-    if (mmu_trans[((addr) & MMUEPAGEFL)>>9].readfn<2)
-    {EXITR(306,0,"MMU_T[%04x].rfn is %d!", ((addr) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(306,0,"MMU_T[%04x].rfn is %d!", ((addr) & MMUEPAGEFL)>>9,rfn);}
 
-
-    ret=mem68k_fetch_byte[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ BYTE %02x '%s' from @%d/%08x (@%08x)",ret,ascbyte(ret),context,a,addr);
+    ret=mem68k_fetch_byte[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ BYTE %02x '%s' from @%d/%08x (phys @%08x) using %s",ret,ascbyte(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) MEMDEBUG_LOG(100,":::::Got abort_opcode=1 for READ BYTE %02x '%s' from @%d/%08x (@%08x)",ret,ascbyte(ret),context,a,addr);
@@ -412,7 +429,6 @@ uint8  dmem68k_fetch_byte(char *file, char *function, int line,uint32 addr)
     #endif
 
 #ifdef CPU_CORE_TESTER
-//    void record_access(uint32 address, int size, int write, uint32 prewriteval, uint32 value)
     record_access(addr, 1, 0,  (uint32)ret);
 #endif
 
@@ -427,13 +443,10 @@ uint16 dmem68k_fetch_word(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: READ WORD @ %d/%08x:: %s",file,function,line, context,a, chk_mtmmu(a,0));
     #endif
-
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].readfn<2)
-    {EXITR(307,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
-
-
-    ret=mem68k_fetch_word[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ WORD %04x '%s' from @%d/%08x (@%08x)",ret,ascword(ret),context,a,addr);
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(307,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,rfn);}
+    ret=mem68k_fetch_word[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ WORD %04x '%s' from @%d/%08x (phys @%08x) using %s",ret,ascword(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! READ WORD %04x '%s' from @%d/%08x (@%08x)",ret,ascword(ret),context,a,addr);
@@ -456,12 +469,11 @@ uint32 dmem68k_fetch_long(char *file, char *function, int line,uint32 addr)
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: REAd LONG @ %d/%08x:: %s",file,function,line, context,a, chk_mtmmu(a,0));
     #endif
+    int rfn=mmu_trans[((a) & MMUEPAGEFL)>>9].readfn;
+    if (rfn<2) {EXITR(308,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,rfn);}
 
-    if ((mmu_trans[((a) & MMUEPAGEFL)>>9].readfn)<2)
-    {EXITR(308,0,"MMU_T[%04x].rfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].readfn);}
-
-    ret=mem68k_fetch_long[mmu_trans[((a) & MMUEPAGEFL)>>9].readfn](a);
-    MEMDEBUG_LOG(100,":::::READ LONG %08x '%s' from @%d/%08x (@%08x)",ret,asclong(ret),context,a,addr);
+    ret=mem68k_fetch_long[rfn](a);
+    MEMDEBUG_LOG(100,":::::READ LONG %08x '%s' from @%d/%08x (phys @%08x) using %s",ret,asclong(ret),context,a,get_physaddr(addr),memspaces[rfn]);
 
     #ifdef DEBUG
     if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! READ LONG %08x '%s' from @%d/%08x (@%08x)",ret,asclong(ret),context,a,addr);
@@ -484,15 +496,14 @@ void   dmem68k_store_byte(char *file, char *function, int line,uint32 addr, uint
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: WRITE BYTE %02x to @ %d/%08x:: %s",file,function,line, d,context,a, chk_mtmmu(a,1));
     #endif
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-    {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
-
-    MEMDEBUG_LOG(100,":::::WRITE BYTE %02x '%s' to @%d/%08x",d,ascbyte(d),context,a);
-    mem68k_store_byte[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    MEMDEBUG_LOG(0,":::::WRITE BYTE %02x '%s' to @%d/%08x using %s",d,ascbyte(d),context,a,memspaces[wfn]);
+    mem68k_store_byte[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! :::::WRITE BYTE %02x '%s' to @%d/%08x",d,ascbyte(d),context,a);
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! :::::WRITE BYTE %02x '%s' to @%d/%08x (phys @%08x) using %s",d,ascbyte(d),context,a,get_physaddr(addr),memspaces[wfn]);
     #endif
 #ifdef CPU_CORE_TESTER
 //    void record_access(uint32 address, int size, int write, uint32 prewriteval, uint32 value)
@@ -509,14 +520,14 @@ void   dmem68k_store_word(char *file, char *function, int line,uint32 addr, uint
     #ifdef DEBUGMEMCHKMMU
     MEMDEBUG_LOG(100,"\n%s:%s:%d: WRITE WORD %04x to @ %d/%08x:: %s",file,function,line, d,context,a, chk_mtmmu(a,1));
     #endif
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-        {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    MEMDEBUG_LOG(100,":::::WRITE WORD %04x '%s' to @%d/%08x",d,ascword(d),context,a);
-    mem68k_store_word[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    MEMDEBUG_LOG(100,":::::WRITE WORD %04x '%s' to @%d/%08x using %s",d,ascword(d),context,a,memspaces[wfn]);
+    mem68k_store_word[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE WORD %04x '%s' to @%d/%08x",d,ascword(d),context,a);
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE WORD %04x '%s' to @%d/%08x (phys @%08x)using %s",d,ascword(d),context,a,get_physaddr(addr),memspaces[wfn]);
     #endif
 
 #ifdef CPU_CORE_TESTER
@@ -532,16 +543,16 @@ void   dmem68k_store_long(char *file, char *function, int line,uint32 addr, uint
     HIGH_BYTE_FILTER();
     uint32 a=addr;
 
-    if (mmu_trans[((a) & MMUEPAGEFL)>>9].writefn<2)
-        {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,mmu_trans[((a) & MMUEPAGEFL)>>9].writefn);}
+    int wfn=mmu_trans[((a) & MMUEPAGEFL)>>9].writefn;
+    if (wfn<2) {EXIT(309,0,"MMU_T[%04x].wfn is %d!", ((a) & MMUEPAGEFL)>>9,wfn);}
 
-    MEMDEBUG_LOG(100,":::::WRITE LONG %08x '%s' to @%d/%08x %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):"")  );
+    MEMDEBUG_LOG(100,":::::WRITE LONG %08x '%s' to @%d/%08x %s (phys @%08x) using %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):""), get_physaddr(addr), 
+                     memspaces[wfn]  );
 
-
-    mem68k_store_long[mmu_trans[((a) & MMUEPAGEFL)>>9].writefn](a,d);
+    mem68k_store_long[wfn](a,d);
 
     #ifdef DEBUG
-    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE LONG %08x '%s' to @%d/%08x %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):"")  );
+    if ( abort_opcode==1) DEBUG_LOG(100,":::::GOT ABORT_OPCODE! WRITE LONG %08x '%s' to @%d/%08x %s using %s",d,asclong(d),context,a,   ( (a<0x80) ? getvector(a/4):""),memspaces[wfn]  );
     #endif
 
 #ifdef CPU_CORE_TESTER
@@ -705,11 +716,9 @@ int getsnbit(void)
 
 int peeksnbit(void) {return (  ((serialnum240[serialnumshiftcount>>3]) & (1<<((serialnumshiftcount&7)^7))) ? 32768:0);}
 
-
-
 uint8  *lisa_mptr_OxERROR(uint32 addr)
 {
-    EXITR(321,NULL,"Something's wrong with the MMU - bad mapping at %8x****\n", addr);
+    EXITR(321,((uint8 *)(NULL)),"Something's wrong with the MMU - bad mapping at %8x****\n", addr);
 }
 
 uint8  lisa_rb_OxERROR(uint32 addr)
@@ -788,7 +797,7 @@ void   lisa_wl_OxUnused(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Ox0000_slot1(uint32 addr)
 {
     //ui_log_verbose("***** lisa_mptr_Ox0000_slot1l got called! ******");
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
 
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
 
@@ -797,7 +806,8 @@ uint8  *lisa_mptr_Ox0000_slot1(uint32 addr)
 
 uint8  lisa_rb_Ox0000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access to %08x from %08x returning 0",addr,reg68k_pc);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0;
@@ -805,7 +815,8 @@ uint8  lisa_rb_Ox0000_slot1(uint32 addr)
 
 uint16 lisa_rw_Ox0000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access to %08x from %08x",addr,reg68k_pc);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
 
@@ -814,7 +825,8 @@ uint16 lisa_rw_Ox0000_slot1(uint32 addr)
 
 uint32 lisa_rl_Ox0000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access to %08x from %08x",addr,reg68k_pc);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
 
@@ -823,6 +835,7 @@ uint32 lisa_rl_Ox0000_slot1(uint32 addr)
 
 void   lisa_wb_Ox0000_slot1(uint32 addr, uint8 data)
 {   UNUSED(data); UNUSED(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -833,6 +846,7 @@ void   lisa_wb_Ox0000_slot1(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox0000_slot1(uint32 addr, uint16 data)
 {   UNUSED(data); UNUSED(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -843,6 +857,7 @@ void   lisa_ww_Ox0000_slot1(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox0000_slot1(uint32 addr, uint32 data)
 {   UNUSED(data); UNUSED(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -855,6 +870,7 @@ void   lisa_wl_Ox0000_slot1(uint32 addr, uint32 data)
 
 uint8  *lisa_mptr_Ox2000_slot1(uint32 addr)
 {   
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     //ui_log_verbose("****lisa_mptr_Ox2000_slot1h got called!****");
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
@@ -865,7 +881,8 @@ uint8  *lisa_mptr_Ox2000_slot1(uint32 addr)
 
 uint8  lisa_rb_Ox2000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xff;
@@ -873,7 +890,8 @@ uint8  lisa_rb_Ox2000_slot1(uint32 addr)
 
 uint16 lisa_rw_Ox2000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffff;
@@ -881,7 +899,8 @@ uint16 lisa_rw_Ox2000_slot1(uint32 addr)
 
 uint32 lisa_rl_Ox2000_slot1(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffffffff;
@@ -889,6 +908,7 @@ uint32 lisa_rl_Ox2000_slot1(uint32 addr)
 
 void   lisa_wb_Ox2000_slot1(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -899,6 +919,7 @@ void   lisa_wb_Ox2000_slot1(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox2000_slot1(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -909,6 +930,7 @@ void   lisa_ww_Ox2000_slot1(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox2000_slot1(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot1h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -921,7 +943,7 @@ void   lisa_wl_Ox2000_slot1(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
-    //ui_log_verbose("****lisa_mptr_Ox4000_slot2l got called!****");
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return NULL;
@@ -931,6 +953,7 @@ uint8  *lisa_mptr_Ox4000_slot2(uint32 addr)
 uint8  lisa_rb_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x returning 0xff",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xff;
@@ -939,6 +962,7 @@ uint8  lisa_rb_Ox4000_slot2(uint32 addr)
 uint16 lisa_rw_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffff;
@@ -947,6 +971,7 @@ uint16 lisa_rw_Ox4000_slot2(uint32 addr)
 uint32 lisa_rl_Ox4000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffffffff;
@@ -954,6 +979,7 @@ uint32 lisa_rl_Ox4000_slot2(uint32 addr)
 
 void   lisa_wb_Ox4000_slot2(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  ALERT_LOG(0,"@%08x",addr);
     //ui_log_verbose("lisa_mptr_Ox2000_slot2l got called!");
@@ -965,6 +991,7 @@ void   lisa_wb_Ox4000_slot2(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox4000_slot2(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -975,6 +1002,7 @@ void   lisa_ww_Ox4000_slot2(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox4000_slot2(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -988,6 +1016,7 @@ void   lisa_wl_Ox4000_slot2(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  ALERT_LOG(0,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     //ui_log_verbose("****lisa_mptr_Ox6000_slot2h got called!****");
@@ -997,6 +1026,7 @@ uint8  *lisa_mptr_Ox6000_slot2(uint32 addr)
 uint8  lisa_rb_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xff;
@@ -1005,6 +1035,7 @@ uint8  lisa_rb_Ox6000_slot2(uint32 addr)
 uint16 lisa_rw_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffff;
@@ -1013,6 +1044,7 @@ uint16 lisa_rw_Ox6000_slot2(uint32 addr)
 uint32 lisa_rl_Ox6000_slot2(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     else ALERT_LOG(0,"Unused access @%08x",addr);
     return 0xffffffff;
@@ -1020,6 +1052,7 @@ uint32 lisa_rl_Ox6000_slot2(uint32 addr)
 
 void   lisa_wb_Ox6000_slot2(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1030,6 +1063,7 @@ void   lisa_wb_Ox6000_slot2(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox6000_slot2(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1040,6 +1074,7 @@ void   lisa_ww_Ox6000_slot2(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox6000_slot2(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"access from %08x to address %08x",reg68k_pc,addr);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot2h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1057,7 +1092,7 @@ uint8  *lisa_mptr_2x_parallel_l(uint32 addr)
     //0xFC8001 slot 3  // every VIA register is 8 bytes from the other - exactly the same as on the motherboard parallel port
 
     addr &=0x00003fff;
-
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
     if (addr<0x1fff)                {addr=addr>>1;  return &(dualparallelrom[addr & 0x0fff]);}
     return NULL;
 }
@@ -1070,7 +1105,9 @@ uint8  lisa_rb_2x_parallel_l(uint32 addr)
     uint32 oa=addr;
     #endif
 
-    int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+    int vianum=get_vianum_from_addr(addr);\
+    //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+//    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
 
     addr &=0x00000fff;
     addr=addr>>1;
@@ -1090,24 +1127,29 @@ uint8  lisa_rb_2x_parallel_l(uint32 addr)
 
 
 uint16 lisa_rw_2x_parallel_l(uint32 addr)
-{ return (uint16)(lisa_rb_2x_parallel_l(addr)<<8) + (uint16)(lisa_rb_2x_parallel_l(addr+1)); }
+{
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+    return (uint16)(lisa_rb_2x_parallel_l(addr)<<8) + (uint16)(lisa_rb_2x_parallel_l(addr+1)); }
 
 
 uint32 lisa_rl_2x_parallel_l(uint32 addr)
-{   return (uint32)(    (uint32)(lisa_rb_2x_parallel_l(addr+0)<<24) + (uint32)(lisa_rb_2x_parallel_l(addr+1)<<16) +
+{
+       ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
+       return (uint32)(    (uint32)(lisa_rb_2x_parallel_l(addr+0)<<24) + (uint32)(lisa_rb_2x_parallel_l(addr+1)<<16) +
                         (uint32)(lisa_rb_2x_parallel_l(addr+2)<<8 ) + (uint32)(lisa_rb_2x_parallel_l(addr+3)    )    );
 }
 
 
 void   lisa_wb_2x_parallel_l(uint32 addr, uint8 data)
-{    UNUSED(data);
+{   UNUSED(data);
     uint32 oa=addr;
-    int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+
+    int vianum=get_vianum_from_addr(addr);
+    //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
     addr &=0x00003fff;
+    ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
 
-    DEBUG_LOG(100,"Access to VIA #%d or %d",vianum,vianum+1);
-
-    if (addr<0x1fff)                 {DEBUG_LOG(100,"Attempt to write to Parallel Port ROM offset %08x",addr); return;}
+    if (addr<0x1fff)                 {ALERT_LOG(100,"Attempt to write to Parallel Port ROM offset %08x",addr); return;}
 
     ALERT_LOG(0,"Weird extport write value %08x to address %08x for VIA #%d slot %d",data,oa,vianum,vianum>>1);
 }
@@ -1134,8 +1176,10 @@ void   lisa_wl_2x_parallel_l(uint32 addr, uint32 data)
 
 uint8  *lisa_mptr_2x_parallel_h(uint32 addr)
 {
- int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+  //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+  int vianum=get_vianum_from_addr(addr);
 
+  ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
   addr &=0x00003fff;
   if (addr<0x1fff)                {addr=addr>>1;  return &(dualparallelrom[addr & 0x0fff]);}
   return NULL;
@@ -1144,14 +1188,20 @@ uint8  *lisa_mptr_2x_parallel_h(uint32 addr)
 
 uint8  lisa_rb_2x_parallel_h(uint32 addr)
 {
- int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+    //0xFC0001 slot 1
+    //0xFC4001 slot 2
+    //0xFC8001 slot 3  // every VIA register is 8 bytes from the other - exactly the same as on the motherboard parallel port
+
+  //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+  int vianum=get_vianum_from_addr(addr);
 
   uint32 oa=addr;
   addr &=0x00003fff;
+   ALERT_LOG(0,"access from %08x to address",reg68k_pc,addr);
 
   if (addr & 1)
   {
-        DEBUG_LOG(100,"Access to lower VIA #%d at %08x slot",vianum,oa,(vianum-1)>>1);
+        ALERT_LOG(100,"Access to lower VIA #%d at %08x slot",vianum,oa,(vianum-1)>>1);
         return lisa_rb_ext_2par_via(&via[vianum  ],addr);
   }
 
@@ -1161,11 +1211,21 @@ uint8  lisa_rb_2x_parallel_h(uint32 addr)
 
 
 uint16 lisa_rw_2x_parallel_h(uint32 addr)
-{   return (uint16)(lisa_rb_2x_parallel_h(addr)<<8) + (uint16)(lisa_rb_2x_parallel_h(addr+1)); }
+{   
+    //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+    int vianum=get_vianum_from_addr(addr);
+
+    ALERT_LOG(100,"Access to lower VIA #%d at %08x slot %d pc:%08x",vianum,addr,(vianum-1)>>1,reg68k_pc);
+    return (uint16)(lisa_rb_2x_parallel_h(addr)<<8) + (uint16)(lisa_rb_2x_parallel_h(addr+1)); }
 
 
 uint32 lisa_rl_2x_parallel_h(uint32 addr)
-{   return (uint32)(  (uint32)(lisa_rb_2x_parallel_h(addr+0)<<24) + (uint32)(lisa_rb_2x_parallel_h(addr+1)<<16) +
+{
+    //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+    int vianum=get_vianum_from_addr(addr);
+
+    ALERT_LOG(100,"Access to lower VIA #%d at %08x slot %d pc:%08x",vianum,addr,(vianum-1)>>1,reg68k_pc);
+    return (uint32)(  (uint32)(lisa_rb_2x_parallel_h(addr+0)<<24) + (uint32)(lisa_rb_2x_parallel_h(addr+1)<<16) +
                       (uint32)(lisa_rb_2x_parallel_h(addr+2)<<8 ) + (uint32)(lisa_rb_2x_parallel_h(addr+3)    )    );
 }
 
@@ -1173,16 +1233,18 @@ uint32 lisa_rl_2x_parallel_h(uint32 addr)
 void   lisa_wb_2x_parallel_h(uint32 addr, uint8 data)
 {
   uint32 oa=addr;
-  int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+  //int vianum=(  (((addr>>0xe)&3)<<1) | (((addr>>0xb)&1)^1)  )+ 3;
+  int vianum=get_vianum_from_addr(addr);
+
   addr &=0x00003fff;
 
-  DEBUG_LOG(100,"Access to VIA #%d or %d",vianum);
+  ALERT_LOG(100,"Access to lower VIA #%d at %08x slot %d pc:%08x",vianum,addr,(vianum-1)>>1,reg68k_pc);
 
   if (addr<0x1fff)                 {ALERT_LOG(0,"Attempt to write to Parallel Port ROM offset %08x",addr); return;}
 
   if (addr & 1)
   {
-     DEBUG_LOG(100,"Access to VIA #%d at %08x slot %d",vianum,oa,(vianum-1)>>1);
+     ALERT_LOG(100,"Access to VIA #%d at %08x slot %d",vianum,oa,(vianum-1)>>1);
      lisa_wb_ext_2par_via(&via[vianum  ],addr,data); return;
   }
 
@@ -1238,6 +1300,7 @@ void    lisa_wl_OxVoid(uint32 addr, uint32 data)             { UNUSED(addr); UNU
 uint8  *lisa_mptr_Ox8000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     //ui_log_verbose("****lisa_mptr_Ox8000_slot3l got called!****");
     return NULL;
@@ -1245,14 +1308,16 @@ uint8  *lisa_mptr_Ox8000_slot3(uint32 addr)
 
 uint8  lisa_rb_Ox8000_slot3(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x returning 0xff",addr,reg68k_pc);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return 0xff;
 }
 
 uint16 lisa_rw_Ox8000_slot3(uint32 addr)
 {
-    CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    CHECK_DIRTY_MMU(addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return 0xffff;
 }
@@ -1260,12 +1325,14 @@ uint16 lisa_rw_Ox8000_slot3(uint32 addr)
 uint32 lisa_rl_Ox8000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return 0xffffffff;
 }
 
 void   lisa_wb_Ox8000_slot3(uint32 addr, uint8 data)
 {  UNUSED(addr); UNUSED(data);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1275,6 +1342,7 @@ void   lisa_wb_Ox8000_slot3(uint32 addr, uint8 data)
 
 void   lisa_ww_Ox8000_slot3(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data); 
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1284,6 +1352,7 @@ void   lisa_ww_Ox8000_slot3(uint32 addr, uint16 data)
 
 void   lisa_wl_Ox8000_slot3(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data); 
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3l) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1296,6 +1365,7 @@ void   lisa_wl_Ox8000_slot3(uint32 addr, uint32 data)
 uint8  *lisa_mptr_Oxa000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     //ui_log_verbose("*****lisa_mptr_Oxa000_slot3h got called!*****");
     return NULL;
@@ -1304,6 +1374,7 @@ uint8  *lisa_mptr_Oxa000_slot3(uint32 addr)
 uint8  lisa_rb_Oxa000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return 0xff;
 }
@@ -1311,6 +1382,7 @@ uint8  lisa_rb_Oxa000_slot3(uint32 addr)
 uint16 lisa_rw_Oxa000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return 0xffff;
 }
@@ -1318,12 +1390,14 @@ uint16 lisa_rw_Oxa000_slot3(uint32 addr)
 uint32 lisa_rl_Oxa000_slot3(uint32 addr)
 {
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=1; lisa_buserror(addr);}
     return  0xffffffff;
 }
 
 void   lisa_wb_Oxa000_slot3(uint32 addr, uint8 data)
 {   UNUSED(addr); UNUSED(data); 
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1333,6 +1407,7 @@ void   lisa_wb_Oxa000_slot3(uint32 addr, uint8 data)
 
 void   lisa_ww_Oxa000_slot3(uint32 addr, uint16 data)
 {   UNUSED(addr); UNUSED(data); 
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1342,6 +1417,7 @@ void   lisa_ww_Oxa000_slot3(uint32 addr, uint16 data)
 
 void   lisa_wl_Oxa000_slot3(uint32 addr, uint32 data)
 {   UNUSED(addr); UNUSED(data); 
+    ALERT_LOG(0,"addr: %08x from pc:%08x",addr,reg68k_pc);
     #ifndef NO_BUS_ERR_ON_NULL_IO_WRITE
     CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);
     if (!slot3h) {bustimeout=1; CPU_READ_MODE=0; lisa_buserror(addr);}
@@ -1461,7 +1537,7 @@ void getflopramaddr(uint32 a)
 
  if (!debug_log_enabled) return;
 
- DEBUG_LOG(100," floppy_ram (fdir=%d wait=%d timer:%ld) %08x::(%02x) ",floppy_FDIR,floppy_6504_wait,fdir_timer,
+ DEBUG_LOG(100," floppy_ram (fdir=%d [via1 bit 4] wait=%d timer:%ld) %08x::(%02x) ",floppy_FDIR,floppy_6504_wait,fdir_timer,
         a,floppy_ram[(a & 0x7ff)>>1]);
  switch(a|1)
  {
@@ -2047,7 +2123,7 @@ void   lisa_wb_Oxe000_latches(uint32 addr, uint8 data)
 
                     if ( videoirq) {
                                     vertical=0;  serialnumshiftcount=0; serialnumshift=0;
-                                    ALERT_LOG(100,"virq:VTIRMASK: disabling vertical retrace IRQ's");
+                                    DEBUG_LOG(100,"virq:VTIRMASK: disabling vertical retrace IRQ's");
                                    }
                     else           {DEBUG_LOG(100,"virq clear is already cleared..."); }
                     videoirq=0; //20060610 - was 0
@@ -2055,15 +2131,12 @@ void   lisa_wb_Oxe000_latches(uint32 addr, uint8 data)
                     //DEBUG_LOG(100,"video IRQ turned OFF");
                     return;      // allow fall through
 
-
-
         case 0x01A:
                     DEBUG_LOG(100,"About to ENABLE VideoIRQ. videoirq=%d vertical=%d",videoirq,vertical);
                     if (!videoirq) {serialnumshiftcount=0; serialnumshift=0;}
-                    videoirq=1;     ALERT_LOG(100,"virq:VTIRMASK: enabling vertical retrace IRQ's");
+                    videoirq=1;     DEBUG_LOG(100,"virq:VTIRMASK: enabling vertical retrace IRQ's");
                     verticallatch=0;
                     reset_video_timing();
-
                     return;
         //fce018                        // was vertical=0 for fce018, disabling to satisfy lisa os 3.1
 
@@ -2135,6 +2208,31 @@ uint32 lisa_rl_Oxe800_videlatch(uint32 addr)
     else return 0;
 }
 
+void refresh_vidram_fns(void) {  // erase old vidram fn's and update the new one.
+    int i,j; uint32 a, videomax=0;
+
+    //if (maxlisaram==1024*1024) videolatchaddress-=0x80000;
+    videomax=videolatchaddress+32768;
+
+    //ALERT_LOG(100,"new videolatch address:%02x->@%08x:Refreshing mmu_t tables for vidram for %08x-%08x at pc=%d/%08x",data,addr,videolatchaddress,videomax-1,context,pc24);
+
+//    for (j=0; j<5; j++) 
+        for (i=0; i<32768; i++)
+        {   // clear existing vidram and turn it into just ram
+            if  (mmu_trans_all[context][i].writefn==vidram)  
+                 mmu_trans_all[context][i].writefn=ram;
+            // if it's RAM check to see if it can be vidram
+            if  (mmu_trans_all[context][i].writefn==ram) {
+                    a=( (i<<9)+mmu_trans_all[context][i].address) & TWOMEGMLIM;
+                    if (a>=videolatchaddress && a<videomax) mmu_trans_all[context][i].writefn=vidram;
+                }
+        }
+    videoramdirty=32768;   videoximgdirty|=9;    LisaScreenRefresh();
+    videoramdirty=32768;   videoximgdirty|=9;
+}
+
+extern void disable_4MB_macworks(void);
+
 void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
 {
     int i,j; uint32 a, videomax=0;
@@ -2142,57 +2240,38 @@ void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
   //  char shout[1024];
   //  #endif
 
-    DEBUG_LOG(100,"@%08x:%02x videolatch/motherboard error led",addr,data);
+    ALERT_LOG(100,"@%08x:%02x videolatch/motherboard error led, set by pc:%d/%08x",addr,data,context,reg68k_pc);
 
     videoramdirty=32768;
 
     if ((addr & 0x000000fff)==0x00000800)
     {
-        if (data & 0x80)  {  DEBUG_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x",addr,data);  return;}
+        if (!!(data & 0x80))  {  ALERT_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x set by pc:%d/%08x",addr,data,context,reg68k_pc); return;}
+        data &= 0x7f;
+      //if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
 
-        if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
+
+      if  ( (uint32)(data*32768)<maxlisaram && (uint32)(data*32768)>=minlisaram )
             {
+                videolatch=data & 0x7f; videolatchaddress=(videolatch*32768);
+                ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);
+                if (lastvideolatch!=videolatch)refresh_vidram_fns();
                 lastvideolatch=videolatch; lastvideolatchaddress=videolatchaddress;
-                videolatch=data; videolatchaddress=(videolatch*32768);
 
-                //ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);
+                if ((reg68k_pc & 0x00ff0000)==0x00fe0000 && macworks4mb) {ALERT_LOG(0,"disabling 4mb macworks"); disable_4MB_macworks();}
 
-                //20051111
-                if (maxlisaram==1024*1024) videolatchaddress-=0x80000;
-
-                videomax=videolatchaddress+32768;
-
-                // erase old vidram fn's and update the new one.
-                DEBUG_LOG(100,"new videolatch address:%02x->@%08x:Refreshing mmu_t tables for vidram for %08x-%08x at pc=%d/%08x",data,addr,videolatchaddress,videomax-1,context,pc24);
-
-                for (j=0; j<5; j++) for (i=0; i<32768; i++)
-                    {
-                     // clear existing vidram and turn it into just ram
-                        if (mmu_trans_all[j][i].writefn==vidram)  mmu_trans_all[j][i].writefn=ram;
-
-                        if (mmu_trans_all[j][i].writefn==ram)
-                            {
-                                a=( (i<<9)+mmu_trans_all[j][i].address) & TWOMEGMLIM;
-                                if (a>=videolatchaddress && a<videomax) mmu_trans_all[j][i].writefn=vidram;
-                            }
-                    }
-                videoramdirty=32768;   videoximgdirty|=9;    LisaScreenRefresh();
-                videoramdirty=32768;   videoximgdirty|=9;
             }
-            else {DEBUG_LOG(100,"video latch write:OUT OF RANGE:%02x->@%08x %08x-%08x at pc=%d/%08x\n",
+            else {ALERT_LOG(100,"video latch write:OUT OF RANGE:%02x->@%08x %08x-%08x at pc=%d/%08x\n",
                     data,
                     addr,
                     videolatchaddress,
                     videomax-1,
                     context,
                     pc24);}
-
          //   if (data!=((maxlisaram>>15)-1))
          //       {   debug_log_enabled=1; debug_on(""); DEBUG_LOG(100,"Debug ON - latch write");
          //           DEBUG_LOG(100,"Debug Enabled because of write %02x to %08x video latch at pc=%d/%08x",data,addr,context,pc24);
          //       }
-
-
     }
 }
 
@@ -2518,6 +2597,7 @@ uint8  *lisa_mptr_ram(uint32 addr)
 }
 
 
+
 uint8  lisa_rb_ram(uint32 addr)
 {
 
@@ -2525,7 +2605,6 @@ uint8  lisa_rb_ram(uint32 addr)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) return (uint8)(lisaram[physaddr]);
-
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2542,7 +2621,7 @@ uint16 lisa_rw_ram(uint32 addr)
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) return LOCENDIAN16(*(uint16 *)(&lisaram[physaddr]) );
 
-   // something went wrong here!
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2563,7 +2642,7 @@ uint32 lisa_rl_ram(uint32 addr)
    CPU_READ_MODE=1;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
-
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    return 0x39393939;
 }
 
@@ -2575,7 +2654,7 @@ void   lisa_wb_ram(uint32 addr, uint8 data)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) {*(uint8  *)(&lisaram[physaddr])=data; return;}
-
+// ALERT_LOG(0,"over/underflow at %08x",addr);
    CPU_READ_MODE=0;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2591,7 +2670,6 @@ void   lisa_ww_ram(uint32 addr, uint16 data)
    CHK_RAM_LIMITS(addr);
    //DEBUG_LOG(100,"mmu translation of %d/%08x is: %08x",context,addr,physaddr);
    if (physaddr >  -1) {*(uint16 *)(&lisaram[physaddr]) = LOCENDIAN16(data); return;}
-
    CPU_READ_MODE=0;
    CHK_PHYS_OFLOW(addr);
    CHK_PHYS_UFLOW(addr);
@@ -2934,12 +3012,12 @@ uint32 lisa_rl_ro_violn(uint32 addr)               {return lisa_rl_vidram(addr);
 #endif
 
 uint8  *lisa_mptr_bad_page(uint32 addr)            {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); return NULL;}
-uint8  lisa_rb_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-uint16 lisa_rw_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-uint32 lisa_rl_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; lisa_mmu_exception(addr); return 0;}
-void   lisa_wb_bad_page(uint32 addr, uint8 data)   {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
-void   lisa_ww_bad_page(uint32 addr, uint16 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
-void   lisa_wl_bad_page(uint32 addr, uint32 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; lisa_mmu_exception(addr); UNUSED(data); }
+uint8  lisa_rb_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+uint16 lisa_rw_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+uint32 lisa_rl_bad_page(uint32 addr)               {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_R_ODD_ADR(addr); CPU_READ_MODE=1; if (abort_opcode!=2) lisa_mmu_exception(addr); return 0;}
+void   lisa_wb_bad_page(uint32 addr, uint8 data)   {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr);                      CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
+void   lisa_ww_bad_page(uint32 addr, uint16 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
+void   lisa_wl_bad_page(uint32 addr, uint32 data)  {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); CHK_W_ODD_ADR(addr); CPU_READ_MODE=0; if (abort_opcode!=2) lisa_mmu_exception(addr); UNUSED(data); }
 
 // Do reads of the ROM
 uint8  *lisa_mptr_sio_rom(uint32 addr)             {CHECK_DIRTY_MMU(addr);  DEBUG_LOG(100,"@%08x",addr); return (uint8 *)(&lisarom[addr & 0x3fff]);}
@@ -3095,12 +3173,6 @@ void   lisa_wb_sio_mrg(uint32 addr, uint8 data)
         if (con)  {  mmu_all[0][a].slr=r; mmu_all[0][a].changed|=1;}
         mmu_all[con][a].slr=r; mmu_all[con][a].changed |=1;
 
-
-       // #ifdef DEBUG
-       //   dumpmmupage(con,a,buglog);
-       // #endif
-
-
         // must correct mmu here!
         GET_MMU_DIRTY(0); if ((a+1)!=mmudirty)  {SET_MMU_DIRTY((mmudirty<<8) | (a+1));  if (context) mmuflush(0);}
         return;
@@ -3118,8 +3190,10 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
 
     if (addr & 8) // Segment Origin Register
     {
-        data &=0xfff;
+        data &=0x0fff;
         if (data==mmu_all[con][a].sor)   {DEBUG_LOG(100,"mmu[%d][%d].sor no change needed ",con,a);return;} // don't bother wasting time here - sync new just incase.
+
+        //ALERT_LOG(0,"Wrote %03x to mmu[%d][%d].sor addr=%08x",data,context,a,addr);
 
         // Shadow the write to context 0 and 1 (context 0 is our START mode, context 1 is the real lisa context 0)
         if (con==1)    { mmu_all[0][a].sor=data; mmu_all[0][a].changed|=2;}
@@ -3138,19 +3212,14 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
                       mmu_all[con][a].sor,data,(uint32)(pagestart<<9),(uint32)(pageend<<9),rfn,wfn);
         }
         #endif
-        // DEBUG_LOG(100, "  MMUPATTERN: mmu_all[%d][%d]newsor=%04x",con,a,mmu_all[con][a].newsor);
-
-        //DEBUG_LOG(100, "mmu write %04x to mmu_all[%d][(%02x)%d].slr",data,con,a,a);
-
-      //  #ifdef DEBUG
-      //    dumpmmupage(con,a,buglog);
-      //  #endif
-
         return;
     }
     else // Segment Limit Register
     {
         data &=0x0fff;
+
+        //ALERT_LOG(0,"Wrote %03x to mmu[%d][%d].slr addr=%08x",data,context,a,addr);
+
         if (data==mmu_all[con][a].slr)
             {DEBUG_LOG(100,"no change to slr: mmu_all[%d][%d].slr=%04x changed=%d data=%04x",
                           con,a,
@@ -3180,15 +3249,7 @@ void   lisa_ww_sio_mrg(uint32 addr, uint16 data)
                       mmu_all[con][a].slr, slrname(mmu_all[con][a].slr),
                       mmu_all[con][a].sor,data,(uint32)(pagestart<<9),(uint32)(pageend<<9),rfn,wfn);
         }
-
-        // DEBUG_LOG(100, "  MMUPATTERN: mmu_all[%d][%d]newslr=%04x",con,a,mmu_all[con][a].newslr);
-
-        //DEBUG_LOG(100, "mmu write %04x to mmu_all[%d][(%02x)%d].sor",data,con,a,a);
-
-        //  dumpmmupage(con,a,buglog);
         #endif
-
-
 
         return;
     }
@@ -3250,34 +3311,34 @@ uint8  lisa_rb_sio_mmu(uint32 addr)
     lisa_mem_t f;
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(100,"preflush addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(100,"preflush addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(100,"post addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(100,"post addr=%08x, s1/s2=%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(100,"fetching mmu function called: %d %s seg1/seg2/start:%d/%d/%d con:%d context%d slr=%04x",f,mspace(f),
-            segment1,segment2,start,
-            con,context,mmu_all[con][a17].slr);
+//    DEBUG_LOG(100,"fetching mmu function called: %d %s seg1/seg2/start:%d/%d/%d con:%d context%d slr=%04x",f,mspace(f),
+//            segment1,segment2,start,
+//            con,context,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_byte[f](addr);
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
     if (physaddr >  -1) return (uint8)(lisaram[physaddr]);
@@ -3323,10 +3384,10 @@ uint16 lisa_rw_sio_mmu(uint32 addr)
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_word[f](addr);
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
     if (physaddr >  -1) return LOCENDIAN16(*(uint16 *)(&lisaram[physaddr]) );
@@ -3350,30 +3411,30 @@ uint32 lisa_rl_sio_mmu(uint32 addr)
     DEBUG_LOG(100,"@%08x",addr);
     CHK_R_ODD_ADR(addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=rmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"fetching mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
     if (f!=ram && f!=vidram) return mem68k_fetch_long[f](addr);
-    DEBUG_LOG(100,"ram sio from %08x",CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %08x",CHK_MMU_A_REGST((con),addr));
 
     CHK_RAM_A_LIMITS(con,addr);
 
@@ -3396,28 +3457,28 @@ void   lisa_wb_sio_mmu(uint32 addr, uint8 data)
 
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x slr=%04x chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
 
     if (f!=ram && f!=vidram) {mem68k_store_byte[f](addr,data); return;}
 
@@ -3440,34 +3501,34 @@ void   lisa_ww_sio_mmu(uint32 addr, uint16 data)
     uint16 con=CXSEL;
     lisa_mem_t f;
     addr &=ADDRESSFILT;
-    DEBUG_LOG(100,"@%08x",addr);
+//  DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     // Flush MMU cache if needed.
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
 
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[con][a17].slr);
 
 
     if (f!=ram && f!=vidram) {mem68k_store_word[f](addr,data); return;}
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_W_ODD_ADR(addr);
     CHK_RAM_A_LIMITS(con,addr);
@@ -3487,31 +3548,31 @@ void   lisa_wl_sio_mmu(uint32 addr, uint32 data)
     lisa_mem_t f;
     addr &=ADDRESSFILT;
 
-    DEBUG_LOG(100,"@%08x",addr);
+//    DEBUG_LOG(100,"@%08x",addr);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     GET_MMUS_DIRTY(x); if (mmudirty) mmuflush(0);
 
-    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
-        addr,segment1,segment2,start,context,con,
-        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
-        mmu_trans_all[con][a9].address,a17,
-        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
-        mmu_all[con][a17].changed);
+//    DEBUG_LOG(5,"post addr=%08x, s1/s2/start=%d/%d/%d context=%d, con=%d r=%s,w=%s,ea=%08x mmu[%d].sor=%04x,slr=%04x,chg:%d\n",
+//        addr,segment1,segment2,start,context,con,
+//        mspace(mmu_trans_all[con][a9].readfn),mspace(mmu_trans_all[con][a9].writefn),
+//        mmu_trans_all[con][a9].address,a17,
+//        mmu_all[con][a17].sor,mmu_all[con][a17].slr,
+//        mmu_all[con][a17].changed);
 
     ///// changed context here to con!!!!!
     f=wmmuslr2fn(mmu_all[context][a17].slr,a9); /// *** CONTEXT or CON????
 
-    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
+//    DEBUG_LOG(3,"storing mmu function called: %d %s con:%d slr=%04x",f,mspace(f),con,mmu_all[context][a17].slr);
 
     if (f!=ram && f!=vidram) {mem68k_store_long[f](addr,data); return;}
-    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
+//    DEBUG_LOG(100,"ram sio from %d/%08x",(con),CHK_MMU_A_REGST((con),addr));
 
     CHK_W_ODD_ADR(addr);
     CHK_RAM_A_LIMITS(con,addr);
@@ -3996,16 +4057,14 @@ uint8  lisa_rb_Oxf800_statreg(uint32 addr)
  retval |=STATREG_INVBIT;
 #endif
 
-
 if (cxdiff>=64236)
    {
        video_scan=cpu68k_clocks;
        cxdiff=0;
-
-       retval &= ~STATREG_VERTICALRTC;
-
+       retval &= ~STATREG_VERTICALRTC; // 2021.02.23 this was clears vertical bit=0
        cxdiff=cxdiff % 64236;
    }
+else   retval |= STATREG_VERTICALRTC;  // 2021.02.23 this did not exist - if these two are reversed Boot throws error 42, but UniPlus goes further, else gets stuck in infinite loop
 
 cxx=(int32)(cxdiff-2328);
 
@@ -4036,7 +4095,7 @@ else
     parity_error_hit=0;          // clear the parity error flag - do we do this now or when PAROFF happens?
     softmemerror=0;
 
-    DEBUG_LOG(100,"retval:%02x :: (active low) bit0softerr:%d,1parity:%d,2vret:%d::%d,3bustmout:%d,4vidbit:%d,5hzsync:%d,6invbit:%d  maxx",
+    DEBUG_LOG(100,"retval:%02x :: (active low) bit0softerr:%d, 1parity:%d, 2vret:%d::%d, 3bustmout:%d, 4vidbit:%d, 5hzsync:%d, 6invbit:%d  maxx",
                              retval,
                              retval &  STATREG_SOFTMEM_ERR,
                              retval &  STATREG_HARDMEM_ERR,
@@ -4046,7 +4105,7 @@ else
                              retval &  STATREG_HORIZONTAL,
                              retval &  STATREG_INVBIT);
 
-   //if (vertical != ((retval &  STATREG_VERTICALRTC) ?1:0) )
+   //if (vertical != ((retval &  STATREG_VERTICALRTC) ?1:0) );
    //   DEBUG_LOG(100,"Vertical=%d statreg bit is: %d at clk:%016llx",vertical,(retval &  STATREG_VERTICALRTC),cpu68k_clocks );
 
    if (verticallatch)        retval &=~STATREG_VERTICALRTC;

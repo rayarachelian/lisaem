@@ -12,6 +12,9 @@
 // only needed for DEBUG()
 #include <vars.h>
 
+extern void a_line(void);
+extern void trap_opcode(uint32 n);
+
 #ifdef XXXDEBUG
   #define GENDBG(x) { if ((ipc->opcode & 0xf1f8)==0x31b0)  {fprintf(stdout,"//DBG:%s:%s:%d IR:%04x %s\n",__FILE__,__FUNCTION__,__LINE__,ipc->opcode,x);} }
 #else

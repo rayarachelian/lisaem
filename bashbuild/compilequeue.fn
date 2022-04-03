@@ -2,7 +2,7 @@
 #          Unified Build Script lib  -  A Part of LisaEm
 #                    http://lisaem.sunder.net
 #                   The Lisa Emulator Project
-#   Copyright (C) 2020 Ray A. Arachelian, All Rights Reserved
+#   Copyright (C) 2022 Ray A. Arachelian, All Rights Reserved
 # Released under the terms of the GNU General Public License 2.0
 #----------------------------------------------------------------
 #
@@ -20,7 +20,7 @@ function trim_duplicate_args() {
   local SEEN=""
   local ARGS=""
   for var in "$@"; do
-      if [[ -z "$( echo $SEEN | grep :::$var::: | egrep -v ':::-L:::|:::-I:::|:::-framework:::' )" ]]; then
+      if [[ -z "$( echo $SEEN | grep :::$var::: | egrep -v ':::-L:::|:::-I:::|:::-framework:::|:::-arch:::' )" ]]; then
          ARGS="$ARGS $var"
          SEEN="$SEEN :::$var::: "
       fi
@@ -180,9 +180,11 @@ function waitq()
            while IFS= read -r -u42 l; do
                  count=$(( count + 1))
                  if [[ $count -gt 3 ]] && [[ $count -lt 9 ]]; then 
-                    [[ "${l:0:2}" != '!!' ]] && printf "%s" "${l}" 1>&2 || printf "%s\n" "${l:2}" 1>&2
-                 else
-                    [[ $count -eq 9       ]] && printf "%s" "$l" 1>&2
+                    if   [[ "${l:0:2}" == '!!' ]] || [[ "${l:0:2}" == '++' ]]; then
+                         printf "%s\n" "${l:2}" 1>&2
+                    else
+                         printf "%s" "${l}" 1>&2 
+                    fi
                  fi
                  echo "$l" >>${BUILDWARNINGS}
            done 42<"$z"

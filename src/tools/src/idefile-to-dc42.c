@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 	uint8 *data, *tags;
 	uint32 datasize, tagsize;
 	
-	for (i=1; i<argc; i++)
+	for (i=1; i<(uint32)argc; i++)
 	{
 		if (strcmp(argv[i],"-h")==0 || strcmp(argv[i],"--help")==0 )
         {

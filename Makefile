@@ -1,6 +1,12 @@
 # This is a fake Makefile.  For build environments
 # that require ./configure && make.  You really
 # should use the build.sh script directly.
+
+all:    src/host/wxui/lisaem_wx.cpp
+        pwd
+        /bin/ls -l
+	./build.sh build 
+
 build:   src/host/wxui/lisaem_wx.cpp
 	./build.sh build 
 
@@ -8,10 +14,10 @@ clean:   src/host/wxui/lisaem_wx.cpp
 	./build.sh clean
 
 install: src/host/wxui/lisaem_wx.cpp
-	./build.sh build  --install
+	./build.sh build install
 
 package: src/host/wxui/lisaem_wx.cpp
-	./build.sh build  --package
+	./build.sh build package
 me:
 	
 a:

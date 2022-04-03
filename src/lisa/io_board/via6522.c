@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2021.03.26                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -30,6 +30,12 @@
 *           keyboard/mouse/clock controller, and expansion slot parallel cards.        *
 *                                                                                      *
 \**************************************************************************************/
+
+#define PROLOOP_EV_IRB 0                   // event=0 <- Read from IRB
+#define PROLOOP_EV_IRA 1                   // event=1 <- Read from IRA
+#define PROLOOP_EV_ORA 2                   // event=2 <- write to ORA
+#define PROLOOP_EV_ORB 3                   // event=3 <- write to ORB
+#define PROLOOP_EV_NUL 4                   // event=4 <- null event - called occasionally by event handling to allow timeouts
 
 
 #define FIX_VIA_IFR(vianum)  {                                                               \
@@ -183,17 +189,30 @@ void  via2_orb(uint8 data);
 // VIA Wrapper around ProFile loop to handle BSY (CA1) IRQ's -- if they're enabled that is.
 void VIAProfileLoop(int vianum, ProFileType *P, int event)
 {
-int BSY=P->BSYLine;
+    if (event<0) return;
 
-//    if (via[2].ProFile->DENLine!=0) return;
-
-    ProfileLoop(P,event);
+    int BSY=(!(P->BSYLine!=0));     // before
+    if (event!=100) ProfileLoop(P,event); // ignore null events - 2021.06.06
+    int NBSY=(!(P->BSYLine!=0));    // after
 
     // IF BSY has changed, and CA1 IRQ's are enabled, then, see if we need to send an IRQ based on polarity in PCR CA1 bit
-    if (P->BSYLine !=BSY)
+    if (NBSY != BSY) // ignore when there's no transition.
     {
+      // PCR bit 0 :=0 IRQ on high to low transition BSY=(1 0)NBSY
+      // PCR bit 0 :=1 IRQ on low to high transition BSY=(0 1)=NBSY
+      // can use XOR below with BSY
+      if ( BSY ^ (via[vianum].via[PCR] & 1) )
+         {
+           if ((via[vianum].via[IFR] & VIA_IRQ_BIT_CA1)==0)
+                {DEBUG_LOG(0,"CA1 IER is not enabled, not checking for IRQ");}
+           else {via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;
+                DEBUG_LOG(0,"profile.c:Enabling BSY IRQ on CA1 for VIA #%d BSY transitioned to:%d%d PCR flag:%d",vianum,BSY,NBSY,(via[vianum].via[PCR] & 1));}
+           return;
+         }
+    }
+/*
       //- not sure which is right. 1=positive edge, 0=negative edge, I think the logical XOR
-      //if (P->BSYLine!=0) && ((via[vianum].via[PCR] & 1)!=0) )   via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;
+      //if ( (P->BSYLine!=0) && ((via[vianum].via[PCR] & 1)!=0) )   via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;  //2021.03.19 turned this back on.
 
         DEBUG_LOG(0,"oldbsy:%d newbsy:%d PCR_bit0:%d   tag:profile.c",BSY,P->BSYLine,via[vianum].via[PCR]);
 
@@ -213,8 +232,7 @@ int BSY=P->BSYLine;
                               (via[vianum].via[PCR] & 1), pc24);
                 }
         // too bad we don't have a ^^ operator like we do && and || - logical XOR would be nice here.
-
-    }
+*/
 }
 
 
@@ -534,12 +552,10 @@ UNUSED(s); UNUSED(data); UNUSED(V);
 
 int check_contrast_set(void)
 {
-
-//    if ((via[2].via[DDRB] & via[2].via[ORBB] & 0x80)==0x80 && via[2].via[DDRA]) // this is OK (DDRA used with port B!)
     if ((via[2].via[DDRB] & 0x84)==0x84 && (via[2].via[ORBB] & 0x4)==4 && via[2].via[DDRA]!=0) // this is OK (DDRA used with port B!)
     {
         contrast=via[2].via[DDRA] & via[2].via[ORAA]; videoramdirty|=9;
-        DEBUG_LOG(0,"Setting Contrast:%02x",contrast);
+//      ALERT_LOG(0,"Setting Contrast:%02x",contrast);
         if ( contrast==0xff) disable_vidram(); else enable_vidram();
 
         contrastchange();  // force UI to adjust display
@@ -623,7 +639,7 @@ void via2_orb(uint8 data)
     //  if ( PARITY_BIT   & via[2].via[DDRB]) {via[2].ProFile->Parity=(data &  PARITY_BIT) ? 0:1;}   //5 Parity error bit is input
         if ( DSK_DIAG_BIT & via[2].via[DDRB]) {DEBUG_LOG(0,"Write to DSK_DIAG on via2_orb!:%02x",data & DSK_DIAG_BIT);} // 6 Floppy Disk Diag is input
 
-        // this is wrong, reet is on VIa1!
+       // this is wrong, reset is on VIa1 - this is an input from the IWM WRQ pin 9, to PB7 - input only? there's a buffer at U1C LS367 pin 14->13
        // if ( CTRL_RES_BIT & via[2].via[DDRB]) {if ((data & CTRL_RES_BIT)==0)                         //7 Controller reset
        //                                           { DEBUG_LOG(0,"Sent Controller Reset to ProFile:%02x",data & CTRL_RES_BIT);
        //                                             ProfileReset(via[2].ProFile);
@@ -869,8 +885,8 @@ void via1_orb(uint8 data)
     if (data & 32 & via[1].via[DDRB]) {DEBUG_LOG(0,"lisa writing to Parity RESET: %02x ->%02x\n",data, data & 0x40);} // PRES/ Parity Reset
 
     if (data & 64 & via[1].via[DDRB]) {DEBUG_LOG(0,"lisa writing to cops handshake: %02x ->%02x\n",data, data & 0x40);} // cops handshake
-    // PB7=CRES/
 
+    // PB7=CRES/
     if (0x80 & via[1].via[DDRB])
         {
             DEBUG_LOG(0,"via1_orb ProFile !RESET :%02x %02x (0 means no reset, 80 means reset)\n",data,data & 0x80); //20051214 flipped
@@ -1006,6 +1022,9 @@ write to register
             DEBUG_LOG(0,"T1LH1");                                                  // 7 T1HL value copied into T1HL, no transfer to T1CH
             via[1].via[T1LH]=(xvalue);                                             // Set timer1 latch and counter
             via_running=1;
+            
+            VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             //2005.05.31 - this next line was disabled - should it have been?
             //via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
             // VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer?
@@ -1180,8 +1199,6 @@ write to register
 
         case IFR1 :                      /* IFR  */
             via[1].via[IFR] &= (0x7f^(xvalue & 0x7f));          // 1 writes to IFR are used to clear bits!
-
-            
             FIX_VIA_IFR(1);
 
             DEBUG_LOG(0,"VIA1 IFR Write:%02x::%s %s %s %s %s %s %s %s\n",xvalue,
@@ -1279,6 +1296,8 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
         case T1LL1  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL1");
+            VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             return (via[1].via[T1LL]);
 
         case T1LH1  :   // Time 1 High Order Latch
@@ -1376,8 +1395,12 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
     via[1].active=1;                        // these are always active as they're on the
     via[2].active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"writing %02x to register %d (%s) @%08x", xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
-
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 writing to register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+       DEBUG_LOG(0,"writing %02x to register %d (%s) @%08x", xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #endif
 
     switch (addr & 0x79)  // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
     {
@@ -1551,7 +1574,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
             via_running=1;
             //2005.05.31 - this next line was disabled - should it have been?
             //via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
-            // VIA_CLEAR_IRQ_T1(1);     // clear T1 irq on T1 read low or write high - does this clear the timer?
+            VIA_CLEAR_IRQ_T1(2);     // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
 
             DEBUG_LOG(0,"lh-t1clk:%d (%04x) t1lh1=%02x T1 will now expire at:%llx - %llx cycles from now - clock now:%llx",
                     ((via[2].via[T1LH]<<8)|via[2].via[T1LL]) ,
@@ -1713,9 +1736,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         case IFR2:                      /* IFR  */
 
-            via[2].via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
-            FIX_VIA_IFR(2);
-            DEBUG_LOG(0,"IFR2 write bits: %s %s %s %s %s %s %s %s",
+            DEBUG_LOG(0,"IFR2=%02x before write bits= %s %s %s %s %s %s %s %s", via[2].via[IFR],
                            (via[2].via[IFR] &   1) ? "ifr0CA2:on"              :"ifr0CA2:off",
                            (via[2].via[IFR] &   2) ? "bsy_ifr1CA1:on"          :"bsy_ifr1CA1:off",
                            (via[2].via[IFR] &   4) ? "ifr2SR :on"              :"ifr2SR :off",
@@ -1725,6 +1746,18 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
                            (via[2].via[IFR] &  64) ? "ifr6T1 :on"              :"ifr6T1 :off",
                            (via[2].via[IFR] & 128) ? "ifr7ANY:on"              :"ifr7ANY:off");
 
+            via[2].via[IFR]&=~(xvalue);  // 1 writes to IFR are used to clear bits!
+            FIX_VIA_IFR(2);
+
+            DEBUG_LOG(0,"IFR2 write=%02x bits: %s %s %s %s %s %s %s %s",xvalue,
+                           (via[2].via[IFR] &   1) ? "ifr0CA2:on"              :"ifr0CA2:off",
+                           (via[2].via[IFR] &   2) ? "bsy_ifr1CA1:on"          :"bsy_ifr1CA1:off",
+                           (via[2].via[IFR] &   4) ? "ifr2SR :on"              :"ifr2SR :off",
+                           (via[2].via[IFR] &   8) ? "parity_ifr3CB2:on"       :"parity_ifr3CB2:off",
+                           (via[2].via[IFR] &  16) ? "not_connected_ifr4CB1:on":"not_connected_ifr4CB1:off",
+                           (via[2].via[IFR] &  32) ? "ifr5T2 :on"              :"ifr5T2 :off",
+                           (via[2].via[IFR] &  64) ? "ifr6T1 :on"              :"ifr6T1 :off",
+                           (via[2].via[IFR] & 128) ? "ifr7ANY:on"              :"ifr7ANY:off");
             return;
 
         case IER2:
@@ -1733,6 +1766,11 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
             if  (xvalue & 0x80) via[2].via[IER] |=xvalue;
             else                via[2].via[IER] &=(0x7f^(xvalue&0x7f));
+
+            // clear out anything that IER has disabled on the write.  2020.11.06
+            via[2].via[IFR] &= via[2].via[IER];
+            FIX_VIA_IFR(2);
+
 
 
             // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.
@@ -1776,12 +1814,25 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
     via[1].active=1;                        // these are always active as they're on the
     via[2].active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"reading from register %d (%s)", ((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 reading from register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+       DEBUG_LOG(0,"reading from register %d (%s)", ((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #endif
+
+
+
+    
+
+    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_NUL); // 2021.05.24
 
     switch (addr & 0x79)                // was 7f, changing to 79
     {
         case IRB2   :
                     {
+                    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRB); // 2021.05.24
+
                      #ifdef DEBUG
                      uint8 flipped=via[2].via[IRBB];
                      #endif
@@ -1836,6 +1887,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
                       }
 
         case IRANH2 : via[2].last_a_accs=0;
+                      //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRA); // 2021.05.24
+
                       if (via[2].ProFile) via[2].ProFile->last_a_accs=0;
 
                       via[2].via[IRAA]=(via2_ira(15));
@@ -1846,6 +1899,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
 
         case IRA2   : via[2].last_a_accs=0;
+                      //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_IRA); // 2021.05.24
+
                       if (via[2].ProFile) via[2].ProFile->last_a_accs=0;
 
 
@@ -1864,6 +1919,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
         case T1LL2  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL2=%02x",(via[2].via[T1LL]));
+            VIA_CLEAR_IRQ_T1(2);  // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+
             return (via[2].via[T1LL]);
 
         case T1LH2  :   // Time 1 High Order Latch
@@ -2191,8 +2248,14 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
     via[2].active=1;                     // these are always active as they're on the
     V->active=1;                         // motherboard of the machine...
 
-    DEBUG_LOG(0,"VIA:%d reading from register %d (%s)", V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
+    #ifdef DEBUG
+    if (V->ProFile)
+       {DEBUG_LOG(0,"profile.c:State:%d VIA:%d reading from register %d (%s)", V->ProFile->StateMachineStep,V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));}
+    else
+       {DEBUG_LOG(0,"VIA:%d reading from register %d (%s)", V->vianum,((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));}
+    #endif
 
+    if (V->ProFile) VIAProfileLoop(V->vianum,V->ProFile,PROLOOP_EV_NUL);  // 2021.05.24
 
     switch (addr & 0x79)                // was 7f, changing to 79
     {
@@ -2279,6 +2342,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
 
         case T1LL2  :   // Timer 1 Low Order Latch
             DEBUG_LOG(0,"T1LL2=%02x",(V->via[T1LL]));
+            VIA_CLEAR_IRQ_T1(V->vianum);
             return (V->via[T1LL]);
 
         case T1LH2  :   // Time 1 High Order Latch
@@ -2367,10 +2431,15 @@ uint8 lisa_rb_ext_2par_via(ViaType *V,uint32 addr)
 void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 {
 
-    via[1].active=1;                        // these are always active as they're on the
+    via[1].active=1;                    // these are always active as they're on the
     V->active=1;                        // motherboard of the machine...
 
-    DEBUG_LOG(0,"VIA:%d writing %02x to register %d (%s) @%08x", V->vianum,xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #ifdef DEBUG
+    if (via[2].ProFile)
+       DEBUG_LOG(0,"profile.c:State:%d VIA:2 writing to register %d (%s)", via[2].ProFile->StateMachineStep,((addr & 0x7f)>>3),via_regname(((addr & 0x7f)>>3) ));
+    #else
+           DEBUG_LOG(0,"VIA:%d writing %02x to register %d (%s) @%08x", V->vianum,xvalue, (addr & 0x79)/8 ,via_regname((addr & 0x79)/8),addr );
+    #endif
 
 
     switch (addr & 0x79)  // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
@@ -2723,7 +2792,9 @@ void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 
         case IFR2 :                      /* IFR  */
 
-            V->via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
+            //V->via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
+              V->via[IFR]&=~(xvalue);  // 1 writes to IFR are used to clear bits!
+
             if ( V->via[IFR] & 127) V->via[IFR]|=128;   // if all are cleared, clear bit 7 else set it
             else V->via[IFR]=0;
 
@@ -2745,6 +2816,11 @@ void lisa_wb_ext_2par_via(ViaType *V,uint32 addr, uint8 xvalue)
 
             if  (xvalue & 0x80)  V->via[IER] |=       xvalue;
             else                 V->via[IER] &=(0x7f^(xvalue&0x7f));
+
+            // clear out anything that IER has disabled on the write.  2020.11.06
+            V->via[IFR] &= V->via[IER];
+            if ( V->via[IFR] & 127) V->via[IFR]|=128;   // if all are cleared, clear bit 7 else set it
+            else V->via[IFR]=0;
 
 
             // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.

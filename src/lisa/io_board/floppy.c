@@ -3,7 +3,7 @@
 *              The Lisa Emulator Project  V1.2.7      RC2 2020.06.21                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -153,30 +153,30 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status);
 
 
 #define GOBYTE        (0) //gobyte     1
-#define COMMAND       (0) //gobyte     1                // synonym
+#define COMMAND       (0) //gobyte     1              // synonym
 #define FUNCTION      (1) //function   3
-#define DRIVE         (2) //drive      5               // 00=lower, 80=upper
+#define DRIVE         (2) //drive      5              // 00=lower, 80=upper
 #define SIDE          (3) //side       7
 #define SECTOR        (4) //sector     9
 #define TRACK         (5) //track      b
-#define SPEED         (6)                  // rotation speed 0=normal, DA is fast
-#define CONFIRM       (7)                  // format confirm
+#define SPEED         (6)                             // rotation speed 0=normal, DA is fast
+#define CONFIRM       (7)                             // format confirm
 #define STATUS        (8)
-#define INTERLEAVE    (9)                  // sector interleave
-#define TYPE          (0xA)                // drive type id 0-twig, 1-sony, 2-double sony
+#define INTERLEAVE    (9)                             // sector interleave
+#define TYPE          (0xA)                           // drive type id 0-twig, 1-sony, 2-double sony
      // $FCC015 - DRVTYPE...
      #define  TWIGGY_TYPE 0
      #define SONY400_TYPE 1
      #define SONY800_TYPE 2
 
-#define STST          (0xB)                // rom controller self test status
-#define ROMVER        (0x18)               // ROM Version
+#define STST          (0xB)                           // rom controller self test status
+#define ROMVER        (0x18)                          // ROM Version
 // above are correct, not sure about below
 
 
-#define DISKID        9                        // synonym
-#define INTSTAT       (0x5f>>1)                // interrupt status == 2f
-#define INTSTATUS     (0x5f>>1)                // interrupt status ==2f
+#define DISKID        9                               // synonym
+#define INTSTAT       (0x5f>>1)                       // interrupt status == 2f
+#define INTSTATUS     (0x5f>>1)                       // interrupt status ==2f
 // fcc05d=pending IRQ's?
 
 
@@ -186,15 +186,15 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status);
 
 #define LISATYPE   0x0018
 #define LISATYPE_LISA1  0
-#define LISATYPE_LISA2  (32|128)              // Lisa 2 with slow timers
-#define LISATYPE_LISA2F (64|128)              // Lisa 2 with fast timers (or pepsi)
+#define LISATYPE_LISA2  (32|128)                      // Lisa 2 with slow timers
+#define LISATYPE_LISA2F (64|128)                      // Lisa 2 with fast timers (or pepsi)
 #define LISATYPE_LISA2PEPSI (128)
 
 
 
 
-#define DISKDATAHDR   (0x1f4)                 // disk buffer header
-#define DISKDATASEC   ((DISKDATAHDR)+12)      // disk buffer data  // check this!!!
+#define DISKDATAHDR   (0x1f4)                         // disk buffer header
+#define DISKDATASEC   ((DISKDATAHDR)+12)              // disk buffer data  // check this!!!
 
 // other status and error vars
 #define  FLOPPY_dat_bitslip1                  0x005b
@@ -622,15 +622,15 @@ void FloppyIRQ(uint8 RWTS)
 {
 
       fdir_timer=cpu68k_clocks+(RWTS==2 ? (HALF_OF_A_SECOND):(HUN_THOUSANDTH_OF_A_SEC));  //THOUSANDTH_OF_A_SECOND;
+      cpu68k_clocks_stop=MIN(fdir_timer+1,cpu68k_clocks_stop); //2021.06.11
       my_rwts=RWTS;
-
 
       #ifndef USE64BITTIMER
       prevent_clk_overflow_now();
       #endif
 
       DEBUG_LOG(0,"Scheduling FDIR to fire at clock:%016llx  Time now is %016llx",fdir_timer,cpu68k_clocks);
-      get_next_timer_event();
+      //2021.06.10 causing IRQ before PC+=iib->opcodesize update! can we live without this?  //get_next_timer_event();
       DEBUG_LOG(0,"returning from FloppyIRQ - event should not have fired now uness CPU stopped, check it please.");
 }
 
@@ -683,6 +683,9 @@ void floppy_sec_dump(int lognum, DC42ImageType *F,int32 sectornumber, char *text
 }
 #endif
 
+extern void enable_4MB_macworks(void);
+
+
 static void do_floppy_read(DC42ImageType *F)
 {
         long sectornumber=0;
@@ -733,17 +736,29 @@ static void do_floppy_read(DC42ImageType *F)
         floppy_ram[0x1F4+4]=0;  floppy_ram[0x1F4+5]=0;  floppy_ram[0x1F4+6]=0;  floppy_ram[0x1F4+7]=0;
         floppy_ram[0x1F4+8]=0;  floppy_ram[0x1F4+9]=0;  floppy_ram[0x1F4+10]=0; floppy_ram[0x1F4+11]=0;
 
-        DEBUG_LOG(0,"Entering floppy motor sounds...");
         floppy_motor_sounds(floppy_ram[TRACK]);
-        DEBUG_LOG(0,"back");
- 
-        DEBUG_LOG(0,"reading tags for sector %d",sectornumber);
-        ptr=dc42_read_sector_tags(F,sectornumber);
-        if (ptr!=NULL) memcpy(&floppy_ram[DISKDATAHDR],ptr,F->tagsize);
- 
+
         DEBUG_LOG(0,"reading data for sector:%d", sectornumber);
         ptr=dc42_read_sector_data(F,sectornumber);  if (!ptr) {DEBUG_LOG(0,"Could not read sector #%ld",sectornumber); return;}
         memcpy(&floppy_ram[DISKDATASEC],ptr,F->datasize);
+
+        if (sectornumber==0) {
+            bootblockchecksum=0;
+            for (uint32 i=0; i<F->datasize; i++) bootblockchecksum=( (uint32)(bootblockchecksum<<1) | ((uint32)(bootblockchecksum & 0x80000000) ? 1:0) ) ^ (uint32)ptr[i] ^ i;
+        }
+
+        DEBUG_LOG(0,"reading tags for sector %d",sectornumber);
+        ptr=dc42_read_sector_tags(F,sectornumber);
+        if (ptr!=NULL) memcpy(&floppy_ram[DISKDATAHDR],ptr,F->tagsize);
+
+        if (sectornumber==0) {
+            for (uint32 i=0; i<F->tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ ptr[i] ^ i;
+
+            ALERT_LOG(0,"Bootblock checksum:%08x",bootblockchecksum);
+
+            if (bootblockchecksum==0xce0cbba3 && macworks4mb) enable_4MB_macworks(); 
+        }
+
 
 //        #ifdef DEBUG
 //        if (debug_log_enabled)  floppy_sec_dump(0,F,sectornumber,"read");
@@ -908,9 +923,6 @@ void floppy_go6504(void)
     floppy_ram[0x7b]=0;
 
 
-
-
-
     floppy_last_macro=k;                       // copy the new gobyte over the last one;
 
     #ifdef DEBUG
@@ -929,18 +941,19 @@ void floppy_go6504(void)
     }
     #endif
 
+#ifdef IGNORE_FDIR_ON_COMMANDS
     // RWTS can't execute if there's a pending IRQ - return an error.
-    if (k==FLOP_CTRLR_RWTS && (floppy_ram[FLOP_PENDING_IRQ_FLAG]!=0 || fdir_timer!=-1) )
-            {
-                #ifdef DEBUG
-                DEBUG_LOG(0,"floppy: DANGER cannot execute cmd - IRQ pending.\n");
-                append_floppy_log("floppy: DANGER cannot execute cmd - IRQ pending\n");
-                #endif
-
-                floppy_ram[STATUS]=FLOP_STAT_IRQPND;
-                return;
+     if (k==FLOP_CTRLR_RWTS && (floppy_ram[FLOP_PENDING_IRQ_FLAG]!=0 || fdir_timer!=-1) )
+             {
+                 #ifdef DEBUG
+                 DEBUG_LOG(0,"floppy: DANGER cannot execute cmd - IRQ pending.\n");
+                 append_floppy_log("floppy: DANGER cannot execute cmd - IRQ pending\n");
+                 #endif
+ 
+                 floppy_ram[STATUS]=FLOP_STAT_IRQPND;
+                 return;
             }
-
+#endif
 
     DEBUG_LOG(0," SRC:gobyte:%02x, function:%02x drive:%02x gobyte@%d fn@%d side/trk/sec:%d/%d/%d\n",
             floppy_last_macro,floppy_ram[FUNCTION],floppy_ram[DRIVE],GOBYTE,FUNCTION,
@@ -1166,7 +1179,33 @@ void floppy_go6504(void)
             break; //this is fucking bullshit!
 
         case  FLOP_CTRLR_JSR :  // trap these and complain loudly of 6504 usage. //
-            //fprintf(buglog,"SRC:The Lisa is trying to tell the 6504 floppy controller to execute code.  This is not supported by the emulator!\n");
+              ALERT_LOG(0,"SRC:The Lisa is trying to tell the 6504 floppy controller to execute code. (%08x) JSR %02x%02x  This is not always supported by the emulator!\n",
+              floppy_ram[0], floppy_ram[2],floppy_ram[1]);
+            
+              if (floppy_ram[0x200]==0xa0 &&  // 0200   A0 00      LDY #$00  
+                  floppy_ram[0x201]==0x00 &&   
+                  floppy_ram[0x202]==0x88 &&  // 0202   88         DEY  FF FE
+                  floppy_ram[0x203]==0xc8 &&  // 0203   C8         INY  00 00   
+                  floppy_ram[0x204]==0x88 &&  // 0204   88         DEY  FF FE
+                  floppy_ram[0x205]==0xd0 &&  // 0205   D0 FB      BNE $0202   // loop around 256 times, Y=0
+                  floppy_ram[0x206]==0xfb &&    
+                  floppy_ram[0x207]==0x88 &&  // 0207   88         DEY         // this should now be FF?
+                  floppy_ram[0x208]==0x84 &&  // 0208   84 00      STY $00     // store FF in zero?
+                  floppy_ram[0x209]==0x00 && 
+                  floppy_ram[0x20a]==0xa5 &&  // 020A   A5 00      LDA $00     // loop forever? wtf? why?
+                  floppy_ram[0x20b]==0x00 && 
+                  floppy_ram[0x20c]==0xd0 &&  // 020C   D0 FC      BNE $020A   // wonder if it will later modify this code after this piece executes.
+                  floppy_ram[0x20d]==0xfc && 
+                  floppy_ram[0x20e]==0x60   ) // 020E   60         RTS
+              {
+                #ifdef DEBUG
+                //debug_on("MacWorks+II forever loop");
+                #endif
+                floppy_ram[0]=0xff;
+                reg68k_regs[1]=0x1ff;
+                ALERT_LOG(0,"MW+II 6504 timing/go-away-loop part 1 completed.");
+                return;
+              }
                                                      // hack to allow MacWorks XL 3.0 code to run - think that this reads the
                                                      // write protect tab of the current floppy, not 100% sure.
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1302,7 +1341,7 @@ void floppy_go6504(void)
             return;
         default:
             ALERT_LOG(0,"SRC:unrecognized command GOBYTE:%08x, FUNCTION:%08x\n",floppy_last_macro,floppy_ram[FUNCTION]);
-            RWTS_IRQ_SIGNAL(FLOP_STAT_INVCMD);
+            //RWTS_IRQ_SIGNAL(FLOP_STAT_INVCMD);
     }
 }
 
@@ -1345,16 +1384,26 @@ half=(size/2) -1;
 void floppy_return(DC42ImageType *F, uint8 boot, uint8 status)
 {
 
-   //floppy_ram[TYPE]=SONY400KFLOPPY; /// HACK!!!
-    if (!F) return;
+    if (!!(floppy_ram[ROMVER] & 0x80))
+       floppy_ram[TYPE]=(double_sided_floppy) ? SONY800KFLOPPY : SONY400KFLOPPY;
+    else 
+       floppy_ram[TYPE]=TWIGGYFLOPPY;
+    //ALERT_LOG(0,"Set drive type to:%d",floppy_ram[TYPE]);
 
-    switch(F->ftype)
-        {// floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
-            case  TWIGGYFLOPPY:   // FALLTHROUGH
-            case  SONY400KFLOPPY: // FALLTHROUGH
-            case  SONY800KFLOPPY: floppy_ram[TYPE]=F->ftype; break;
-            default: floppy_ram[TYPE]=SONY400KFLOPPY;  // lie.
-        }
+    if (!F) return;
+       // override drive type if needed.
+       if (F->numblocks==1702 && floppy_ram[TYPE]!=0)   floppy_ram[TYPE]=TWIGGYFLOPPY;
+       if (F->numblocks==800  && floppy_ram[TYPE]==0)   floppy_ram[TYPE]=SONY400KFLOPPY; // ignore 400k disk in 800k drive, but not 400k in twiggy
+       if (F->numblocks==1600 && floppy_ram[TYPE]!=2)   floppy_ram[TYPE]=SONY800KFLOPPY;
+
+//    switch(F->ftype)
+//        {// floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
+//            case  TWIGGYFLOPPY:   // FALLTHROUGH
+//            case  SONY400KFLOPPY: // FALLTHROUGH
+//            case  SONY800KFLOPPY: floppy_ram[TYPE]=F->ftype; break;
+//            default: floppy_ram[TYPE]=SONY400KFLOPPY;  // lie.
+//            ALERT_LOG(0,"Set drive type to:%d",floppy_ram[TYPE]);
+//        }
 
     if ( boot )
     {
@@ -1374,7 +1423,7 @@ void floppy_return(DC42ImageType *F, uint8 boot, uint8 status)
 
         floppy_ram[DISKID    ]=0x00;
         floppy_ram[INTERLEAVE]=0x01;
-        floppy_ram[TYPE      ]=SONY400_TYPE;
+  //    floppy_ram[TYPE      ]=SONY400_TYPE;
         floppy_ram[STST      ]=0x00;
         floppy_ram[INTSTATUS ]=0;
 
@@ -1873,6 +1922,11 @@ void init_floppy(long iorom)
  floppy_ram[0x72]=0xAD;
  floppy_ram[0x73]=0xDE;
  floppy_ram[0x74]=0xAA;
+
+if (!!(floppy_ram[ROMVER] & 0x80))
+    floppy_ram[TYPE]=(double_sided_floppy) ? SONY800KFLOPPY : SONY400KFLOPPY;
+else 
+    floppy_ram[TYPE]=TWIGGYFLOPPY;
 
  floppy_return(NULL,1,FLOP_STAT_NODISK);
 }

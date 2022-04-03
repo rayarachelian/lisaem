@@ -22,6 +22,7 @@ export CXXFLAGS="$CXXFLAGS -fno-common -fPIC -fwrapv -fno-strict-aliasing -Wno-w
 export SYSLIBS=""
 export GCCSTATIC=""
 
+export NOWARNFORMATTRUNC=""
 # is this needed for FreeBSD?
 # fix to alow modern XCode/stdc++ clang compilation, see: https://stackoverflow.com/questions/12920891/std-linker-error-with-apple-llvm-4-1
 # and https://apple.stackexchange.com/questions/350627/how-can-i-specify-the-c-version-to-use-with-xcode
@@ -37,9 +38,70 @@ export AROPTS="cru"
 export CLICMD=""
 export GUIAPP=""
 
+if [[ -f /etc/os-release ]]; then
+   eval $(sed -e 's/^/export OSREL_/g' /etc/os-release  )
+fi
+
+
 # Only used on Windows
 function windres() {
 true 
+}
+
+function FreeBSDPackage() {
+
+  pushd . >/dev/null 2>/dev/null
+
+  SUFFIX=""
+  [[ "${STABILITY}" != "RELEASE" ]] && [[ "${STABILITY}" != "PRODUCTION" ]] && export SUFFIX="-${STABILITY}-${RELEASEDATE}"
+
+  export STAGEDIR="${XTLD}/pkg/build/tmp/freebsd/"
+  export MANIFEST="${XTLD}/pkg/build/tmp/freebsd/+MANIFEST"
+
+  rm -rf "${STAGEDIR}"
+  mkdir -pm755 "${STAGEDIR}"
+
+cat >"${MANIFEST}" <<ENDFBSDMANIFESTEND
+name: ${LCNAME}
+version: "${VER}${SUFFIX}"
+origin: ${FREEBSDORIGIN}
+comment: "${DESCRIPTION}"
+desc: "${DESCRIPTION}"
+maintainer: "${AUTHEMAIL}"
+www: ${URL}
+prefix: /
+ENDFBSDMANIFESTEND
+
+  # copy/override any other manifests
+  cp "${XTLD}/pkg/templates/freebsd-package/"+* "${STAGEDIR}/" 2>/dev/null
+
+  # copy our artifacts to the staging area
+
+  if [[ ! -d "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" ]]; then
+     echo "PREFIX ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/ is missing, did build/install fail?" 1>&2
+     exit 1
+  fi
+
+  # copy from install dir
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${STAGEDIR}" && tar xpf -)
+
+  # create plist
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && find . -type f -print | cut -c2- > "${STAGEDIR}/plist" )
+
+  cd "${STAGEDIR}"
+
+  # add dependencies to the manifest
+  ( echo 'deps: {'
+     for pkg in $( echo "${FREEBSDDEPENDS}" | sed -e 's/,//g' ); do
+         pkg query "  %n: { version: \"%v\", origin: %o }" ${pkg}
+     done
+     echo '}'
+  ) 2>/dev/null >>"${MANIFEST}"
+
+  cd "${XTLD}/pkg"
+  pkg create -m "${STAGEDIR}/" -r "${STAGEDIR}/" -p "${STAGEDIR}/plist" -o .
+   
+  popd . >/dev/null 2>/dev/null
 }
 
 ##############################################################################
@@ -53,7 +115,7 @@ true
 function getcpus()
 {
   if [[ -z "$NUMCPUS" ]]; then
-     export NUMCPUS="$( sysctl -n hw.ncpu )"
+     export NUMCPUS="$(  sysctl hw.model hw.machine hw.ncpu | grep hw.ncpu: | cut -d: -f2 | sed -e's/ //g' )"
   fi
 }
 

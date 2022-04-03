@@ -2,7 +2,7 @@
 # Unified Build Script lib Windows Specific Settings  -  A Part of LisaEm
 #                    http://lisaem.sunder.net
 #                   The Lisa Emulator Project
-#   Copyright (C) 2019 Ray A. Arachelian, All Rights Reserved
+#   Copyright (C) 2022 Ray A. Arachelian, All Rights Reserved
 # Released under the terms of the GNU General Public License 2.0
 #-------------------------------------------------------------------------------
 #
@@ -11,6 +11,7 @@
 ###############################################################################
 
 export CYGWIN="$(uname -s)"
+export WINDOWS="$(uname -s)"
 
 [[ -z "$AR"      ]] && export AR=/bin/x86_64-w64-mingw32-ar.exe
 [[ -z "$AS"      ]] && export AS=/bin/x86_64-w64-mingw32-as.exe
@@ -33,6 +34,13 @@ export CYGWIN="$(uname -s)"
 export AROPTS="crD"
 export HASHOPTS="-b --tag"
 
+function set_pkg_prefix() {
+  if [[ "$WITHPGK" ]]; then
+     export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"         # /cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
+     export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/lib"
+  fi
+}
+
 ##############################################################################
 # getcpus
 #
@@ -43,9 +51,8 @@ export HASHOPTS="-b --tag"
 
 function getcpus()
 {
-  if [[ -z "$NUMCPUS" ]]; then
      export NUMCPUS="$( nproc )"
-  fi
+     [[ "$NUMCPUS" -lt 2 ]] && export NUMCPUS=2
 }
 
 
@@ -102,11 +109,11 @@ fi
 [[ "$4" == "both" ]] && mode="shared"
 
 if [[ "$mode" == "shared" ]]; then
-             echo "  Creating  $libname.dll" 1>&2
-             $CC -shared -o      ${dllname} ${objs}                  || exit 1
-             /bin/rm -f          ${ldllname}
-             ln -sf ${dllname}   ${ldllname}
-             #see: http://www.cygwin.com/cygwin-ug-net/dll.html
+     echo "  Creating  $libname.dll" 1>&2
+     $CC -shared -o      ${dllname} ${objs}                  || exit 1
+     /bin/rm -f          ${ldllname}
+     ln -sf ${dllname}   ${ldllname}
+     #see: http://www.cygwin.com/cygwin-ug-net/dll.html
 fi
 }
 
@@ -164,35 +171,228 @@ END
  fi
 }
 
-# /home/User/code/lisaem-1.2.7/.env-7707.reload.sh: line 3: /tmp//home/User/code/lisaem-1.2.7/.env-7707.reload.sh.env: No such file or directory
+# Create a zip file package
+function WinZIPPackage() {
+  PKGNAME="$1"
+  PKGPATH="$2"
+  if [[ "$( which zip 2>/dev/null)" ]]; then
+
+     zip -r -9 -q "${PKGNAME}" "$PKGPATH"
+     echo "Created zip package: ${PKGNAME} from ${PKGPATH}" 1>&2
+  else
+     echo "zip command not installed, cannot create ZIP package from files in ${PKGPATH}" 1>&2
+
+  fi
+
+  export PREFIX="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"
+  export PREFIXLIB="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/lib"
+}
+
+function HasNSIS() {
+  [[ -f /cygdrive/c/Program\ Files\ \(x86\)/NSIS/Bin/makensis.exe ]] && echo "yes" || echo ""
+}
+
+
+function GenerateNSISScript() {
+
+LICENSEDATA=""
+if [[ -f ../../../../../LICENSE.txt ]]; then
+   cp      ../../../../../LICENSE.txt .
+   LICENSEDATA="  LicenseData LICENSE.txt"
+fi
+
+PF64=""
+[[ "$( uname -m )" == "x86_64" ]] && PF64="64"
+
+# ├── LICENSE.txt
+# ├── resources
+# │   ├── lisa2icon.ico
+# │   ├── lisaem.ico
+# ├── pkg
+# │   ├── LisaEm-1.2.7-PRE-RC4-UNSTABLE-2021.09.29-win-x86_64.log
+# │   ├── build
+# │   │   └── tmp
+# │   │       ├── LisaEm
+# │   │       │   ├── bin
+# │   │       │   │   ├── blu-to-dc42.exe
+# CWD: lisaem-1.2.7/pkg/build/tmp/Sunder.net/LisaEm/*
+
+cat >${1} <<ENDNSISEND
+; based on: https://nsis.sourceforge.io/Sample_installation_script_for_an_application
+; -------------------------------
+; Start
+  Name "${SOFTWARE}"
+  !define MUI_PRODUCT "${SOFTWARE}"
+  !define MUI_NAME    "${SOFTWARE}"
+  !define MUI_FILE    "${SOFTWARE}.EXE"
+  !define MUI_VERSION "${VERSION}"
+  !define MUI_BRANDINGTEXT "${SOFTWARE} ${VERSION}"
+  CRCCheck On
+  !include "\${NSISDIR}\\Contrib\\Modern UI\\System.nsh"
+;---------------------------------
+;General
+  OutFile "..\\..\\${PKGNAME}"
+  ;ShowInstDetails "nevershow"
+  ;ShowUninstDetails "nevershow"
+  SetCompressor "LZMA"
+
+;--------------------------------
+;Folder selection page c:\Program Files\Sunder.NET\LisaEm LisaEm dir comes from File /r
+  InstallDir "\$PROGRAMFILES${PF64}"
+;--------------------------------
+;Modern UI Configuration
+  !define MUI_WELCOMEPAGE  
+  !define MUI_LICENSEPAGE
+  !define MUI_DIRECTORYPAGE
+  !define MUI_ABORTWARNING
+  !define MUI_UNINSTALLER
+  !define MUI_UNCONFIRMPAGE
+  !define MUI_FINISHPAGE  
+;--------------------------------
+${LICENSEDATA}
+;-------------------------------- 
+;Installer Sections     
+Section ; "Install" Installation info
+ 
+;Add files
+  SetOutPath "\$PROGRAMFILES${PF64}"       ;\\${COMPANY}"
+; CWD: lisaem-1.2.7/pkg/build/tmp/Sunder.NET/LisaEm/*
+  File /r "${SOFTWARE}"
+ 
+;create desktop shortcut "C:\Program Files\LisaEm.EXE"
+  CreateShortCut "\$DESKTOP\\\${MUI_PRODUCT}.lnk" "\$INSTDIR\\${COMPANY}\\${SOFTWARE}\\${SOFTWARE}.EXE" 
+ 
+;create start-menu items
+  CreateDirectory "\$SMPROGRAMS\\${COMPANY}\\\${MUI_PRODUCT}"
+  CreateShortCut  "\$SMPROGRAMS\\${COMPANY}\\\${MUI_PRODUCT}\\Uninstall.lnk" "\$INSTDIR\\${COMPANY}\\${SOFTWARE}\\Uninstall.exe" "" "\$INSTDIR\\Uninstall.exe" 0
+  CreateShortCut  "\$SMPROGRAMS\\${COMPANY}\\\${MUI_PRODUCT}\\\${MUI_PRODUCT}.lnk" "\$INSTDIR\\${COMPANY}\\${SOFTWARE}\\${SOFTWARE}.exe" "" "\$INSTDIR\\${SOFTWARE}\\${SOFTWARE}.exe" 0
+
+;write uninstall information to the registry
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\${MUI_PRODUCT}" "DisplayName" "\${MUI_PRODUCT} (remove only)"
+  WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\${MUI_PRODUCT}" "UninstallString" "\$INSTDIR\\${COMPANY}\\${SOFTWARE}\\Uninstall.exe"
+ 
+  WriteUninstaller "\$INSTDIR\\${COMPANY}\\${SOFTWARE}\\Uninstall.exe"
+ 
+SectionEnd
+;--------------------------------    
+;Uninstaller Section  
+Section "Uninstall"
+ 
+;Delete Files 
+  RMDir /r "\$INSTDIR\\*.*"    
+ 
+;Remove the installation directory
+  RMDir "\$INSTDIR"
+ 
+;Delete Start Menu Shortcuts
+  Delete "\$DESKTOP\\\${MUI_PRODUCT}.lnk"
+  Delete "\$SMPROGRAMS\\\${MUI_PRODUCT}\\*.*"
+  RmDir  "\$SMPROGRAMS\\\${MUI_PRODUCT}"
+ 
+;Delete Uninstaller And Unistall Registry Entries
+  DeleteRegKey HKEY_LOCAL_MACHINE "SOFTWARE\\\${MUI_PRODUCT}"
+  DeleteRegKey HKEY_LOCAL_MACHINE "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\${MUI_PRODUCT}"  
+ 
+SectionEnd
+;--------------------------------    
+;MessageBox Section
+ 
+;Function that calls a messagebox when installation finished correctly
+Function .onInstSuccess
+  MessageBox MB_OK "You have successfully installed \${MUI_PRODUCT}. Use the desktop or Start Menu icon to start the program."
+FunctionEnd
+ 
+Function un.onUninstSuccess
+  MessageBox MB_OK "You have successfully uninstalled \${MUI_PRODUCT}."
+FunctionEnd
+ 
+;eof
+ENDNSISEND
+}
+
+
+function WinNSISPackage() {
+  if [[ -n "$( HasNSIS )" ]]; then
+
+     export PREFIX="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"
+     export PREFIXLIB="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/lib"
+
+     # since makensis is windows, do not put path inside PKGNAME, instead cd into the staged dir
+     # and then output the package through the script to some dirs back up.
+
+     PKGNAME="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.exe"
+     NSISSCRIPT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.nsi"
+     NSISOUTPUT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.log"
+
+     echo "Creating NSIS Windows Package: ${XTLD}/pkg/$PKGNAME" 1>&2
+     mkdir -pm755 "${XTLD}/pkg/build/tmp"
+
+     pushd        "${XTLD}/pkg/build/tmp" 2>/dev/null >/dev/null
+     GenerateNSISScript "$NSISSCRIPT"
+     cd "${COMPANY}/${SOFTWARE}"
+     # ├── build   <- package output here.
+     # │   ├── tmp <- log + nsi script here
+     # │   └── Sunder.NET  
+     # │       └── LisaEm <- staged install for package precopied in here, CWD
+     # │           ├── bin
+     /cygdrive/c/Program\ Files\ \(x86\)/NSIS/Bin/makensis.exe /V4 /O"..\\..\\$NSISOUTPUT" ..\\..\\"$NSISSCRIPT" 
+
+     if [[ -f "${XTLD}/pkg/${PKGNAME}" ]]; then
+        echo "Created ${XTLD}/pkg/build/$PKGNAME Log file in ${XTLD}/pkg/build/tmp/$NSISOUTPUT" 1>&2 
+     else
+        echo "NSIS Pkg failed ${XTLD}/pkg/build/$PKGNAME Log file in ${XTLD}/pkg/build/tmp/$NSISOUTPUT" 1>&2
+     fi
+
+     popd >/dev/null 2>/dev/null
+  fi
+}
 
 function CygwinSudoRebuild() {
-  if [[ -z "$(id | grep Administrator)" ]]; then
-     echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
-     echo "Enter yes to start this build script in an Administrative shell or hit ^c to abort" 1>&2
-     read x
+  if [[ -z "$(/bin/id | grep Administrator)" ]]; then
+
+     if [[ -z "$YESTOALL" ]]; then
+        echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
+        echo "Enter yes to start this build script in an Administrative shell or hit ENTER to abort" 1>&2
+        [[ -z "$CYGWINYES" ]] && read x
+     else
+        x="$YESTOALL"
+     fi
      if [[ "$x" == "yes" ]]; then
-        file=${TLD}/.env-$$.reload.sh
+        export file="${TLD}/.env-$$.reload.sh"
         (
           echo '#!/usr/bin/env bash'
           echo "cd \"${XTLD}\""
           echo "export PATH=\"$PATH\""
+	  echo "export HASPERMISSION=yes"
           echo "./build.sh $@"
-          echo "echo Press ENTER to close window"
+          echo "echo Press ENTER to close Admin shell window"
           echo "read x"
-        ) >$file
-       chmod 755 $file
-       cygstart -w --action=runas mintty.exe -w max -h -e /usr/bin/bash $file
+        ) >"$file"
+       chmod 755 "$file"
+       cygstart -w --action=runas mintty.exe -w max -h -e /usr/bin/bash "$file"
+         cat "$file"
        echo "Completed in Admin mintty window" 1>&2
+       #rm "$file"
        exit 0
      else
        export INSTALL=""
        echo "Skipping install" 1>&2
      fi
+  else
+     export HASPERMISSION="yes"
+     echo "In Admin mode"
+     read x
   fi
 }
 
 
+function set_pkg_prefix() {
+  if [[ -n "$WITHPKG" ]]; then
+     export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/"
+     export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/"
+     ACTION="Packaging"
+  fi
+}
 
 ###############################################################################
 ###############################################################################
@@ -231,5 +431,15 @@ export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -fno-rtti"
 export CLICMD="-mconsole"
 export GUIAPP="-mwindows"
 
-PREFIX="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
-PREFIXLIB="/cygdrive/c/Program Files/Sunder.NET/LisaEm"
+# installing on Windows goes to C:\Program Files\... rather than packaging which goes under ${XTLD}/pkg/build/tmp/
+for i in $@; do
+  [[ "$i" == "install" ]] && PRE="/cygdrive/c/"
+done
+for i in $@; do
+  [[ "$i" == "package" ]] && PRE=""
+done
+
+if [[ -z "$PREFIX" ]]; then
+   export PREFIX="/cygdrive/c/${PRE}Program Files/${COMPANY}/${SOFTWARE}"
+   export PREFIXLIB="${PRE}Program Files/${COMPANY}/${SOFTWARE}/lib"
+fi

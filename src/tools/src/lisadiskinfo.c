@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
             {
             if (buffer[128]=='S' && buffer[128+1]=='I' && buffer[128+2]=='T' && buffer[128+3]=='!')
                printf("StuffIt! Archive\n");
-               valid=1;
+            valid=1;
             }
           }
 

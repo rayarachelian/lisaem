@@ -1,12 +1,268 @@
 ------------------------------------------------------------------------------
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
---- 1.2.7    Released on (TBA) (Major release for all platforms)
 
-------------------------------------------------------------------------------
-Lisa Emulator Change History                         http://lisaem.sunder.net/
-------------------------------------------------------------------------------
---- 1.2.7    Released on (TBA) (Major release for all platforms)
+2022.04.01 - RC4
+
+2022.03.31 - add alt-icons from Andrew Yaros posted here: 
+             https://lisalist2.com/index.php/topic,52.msg1909.html#msg1909
+           - added GNU readline/history support for lisafsh-tool on systems
+	           where the library is pre-installed in /usr/local and is static
+
+2022.03.30 - windows build fixes
+
+2022.03.18 - Xenix console -> TerminalWx fixed.
+
+2022.03.12 - Monitor OS 0.12.3 work now
+
+2022.03.06 - Work on getting TerminalWx window for Monitor OS 0.12.3             
+           - TerminalWx window for Xenix but not quite right, 
+             (Xenix doesn't boot yet, this is for the future)
+
+2022.03.03 - TerminalWx Window for LPW via SOROC->VT100 translation
+
+2022.02.28 - Hide TerminalWx windows instead of close to avoid segfault
+           - Quit LisaEm when main LisaEm window is closed to avoid segfault
+
+2022.02.22 - TerminalWx window for UniPlus
+
+2022.01.15 - Multiple TerminalWx fixups + feature adds
+
+2021.12.23 - fixed copy + Edit: Select all in TerminalWx code
+
+2021.11.01 - profile.c cleanup/debugging
+
+2021.10.30 - added package creation for OpenBSD 7 - end of Packagetober
+             but it doesn't quite work correctly yet, so disabled for now
+
+2021.10.24 - added FreeBSD 13 port for lisaem-1.2.7
+
+2021.10.23 - added classic Solaris package creation for OpenIndiana, i.e.:
+             pkg_add -i . SUNDERNETlisaem.1.2.7.OI_2021.04.x86-64.pkg
+           - added IPS Solaris package creation for OpenIndiana
+
+2021.10.22 - added FreeBSD package + port prototype (on FreeBSD 13) and
+             scripts/build-wx3.1.5-gtk updates
+           - added Solaris/OpenIndiana compile/build support and
+             scripts/build-wx3.1.5-gtk updates
+
+2021.10.21 - snapcraft seems to work at last
+
+2021.10.08 - added SnapCraft package creation (must install snapcraft tools)
+
+2021.10.06 - added RPM Package Creation support (must install rpmdevtools
+             package to allow rpm package building via ./build.sh pkg )
+2021.10.05 - added Debian Package creation
+
+2021.10.02 - added NSIS installer support for windows for Packagetober
+
+
+2021.09.10 - fixed crash on macos 11.x - wxDisplay constructor parent param
+           - added _MACOSVER C define to help select wxDisplay parent params
+
+           - non-production macos beta/RC releases will be renamed in the dmg 
+             with the version info, releases will remain named LisaEm.app
+
+           - Added --clean-preferences to macos x lisaem.sh to clear
+             saved preferences incase LisaEm is misbehaving.
+
+           - Added package option to windows build (implies install), makes a
+             zip file which you'll extract in C:\Program Files - this is not
+             a real installer yet, sorry.
+
+2021.09.08 - added --list option to lisaem.sh to show available binaries for
+             macos obese binaries.
+
+2021.09.06 - added back lost --diet option to macos lisaem.sh option to remove
+             unusable obese/universal binaries on your specific system.
+           - modifications to allow cross platform build from x86_64 to M1 arm
+
+2021.09.03 - fix macos missing ptsname_r (only exists in linux)
+           - unstable push
+
+2021.08.24 - added "Select existing ProFile" option when ProFile hard disk
+             file path does not exist.
+
+2021.08.20 - trying to find why booting is broken again
+
+2021.08.02 - fixes to TerminalWx to allow Windows to compile
+
+2021.08.01 - fixed windows compile issues around strcasestr, lstat, z8530-pty
+
+           - incorporating PR changes from pull #7 from @Neelix57 via github
+
+2021.07.12 - fixes to decode-vsrom tool for output + various formats such as
+             matching service mode and BLU displays
+
+2021.06.26 - attempting a new HLE intercept for UniPlus sunix v1.1 kernel
+             not yet working
+
+2021.06.19 - added decode-vsrom tool 
+
+2021.06.09 - Issue with floppy emulation caused wrong interrupt service routine
+             vector execution since it happened inside an opcode before the
+             PC got updated with the size of the opcode. Detected in UniPlus
+             kernel v1.1 sunix installer
+
+2021.06.06 - got UniPlus v1.4 kernel booting up (used a pre-installed UniPlus
+             BLU image from widget converted to dc42)
+
+2021.05.12 - added some new dc42/*raw conversion tools and added -i,-d,-s
+             options to existing disk tools to turn de/interleave on/off.
+             raw-to-dc42 -d aphid.image   for example can allow you to
+             move a Cameo/Aphid image to LisaEm, likely
+             dc42-to-raw -i lisaem-profile.dc42 should copy a LisaEm
+             image to Cameo/Aphid.
+
+2021.05.07 - added some 6504 code for MW+II, but it hangs before it does
+             the PFG detection, also display has some junk
+
+2021.05.02 - still trying to get UniPlus to work with the emulated ProFile
+
+2021.04.30 - more work on 4MB MacWorks, but need to find the right MacWorks
+             version and setup for MMU
+
+2021.04.13 - Added LOS 3.1 HLE block read code
+
+2021.04.12 - finished bisecting out the introduced profile bugs that were
+             preventing LOS from booting up. Meh.
+
+2021.04.04 - fixed another reboot bug
+
+           - fixed more ProFile state synchronization issues
+
+           - diffing code between working and non-working profile code
+             in profile.c irq.c reg68k.c hle.c rom.c romless.c to bisect
+             issue breaking LOS profile access
+
+2021.03.30 - modified interrupts to push cpu stop clock by a few thousand 
+             cycles in the future when IRQ Mask prevents interrupt. Also stopped
+             checking IRQs lower than the mask. Otherwise timer code got
+             executed for every cycle needlessly slowing down emulation.
+
+           - more fixes to ProFile code (now LOS hangs around state 6)
+             sometime after 3/24, broke LOS profile emulation in my
+             attempts to get uniplus booting.
+
+           - HLE ProFile code for the ROM works well, as does ROM loading
+             sectors for LOS in the boot loader, but not after LOS kernel
+             loads.
+
+2021.03.21 - reformatted this file + fixed some spelling errors
+           
+           - more work on IRQ firing mechanisms to fix BSY/CA1 issues
+
+2021.03.20 - added UniPlus deserialize command + patch in LisaEm
+             was able to get a BLU image of a UniPlus Widget that was
+             serialized to start up, but not boot all the way yet.
+
+           - oops, missed setting triggering IRQs for when CA1 is flipped on
+             VIAs. This broke profile signaling for UniPlus
+
+2021.03.19 - working on patching UniPlus sunix v1.1 installation kernel
+   to
+2021.03.15
+           - fixed a floppy controller bug
+
+           - added checkbox to report back double sided Sony 800 floppies
+
+           - now COPS reset only sends Lisa Keyboard ID to Boot ROM
+             to prevent messing up UniPlus's display reporting of
+             the keyboard id to match what physical Lisas do
+
+2021.03.08 - added UniPlus High Level Emulation ProFile data xfer code
+
+2021.03.07 - patching UniPlus handshaking so it gets past ASSERTION()s
+
+2021.03.03 - added uniplus-set-profile-size tool that modifies the uniplus
+             unix kernel to allow much larger ProFile compatible hard disks
+             (i.e. on X/ProFile, IDE:File, Aphid/Cameo devices.)
+             
+2021.02.21 - UniPlus no longer crashes with double panic, starts up and
+             now complains about the profile handshaking.
+           - added timestamps, sizes, flags to lisafsh-tool dir command
+
+2020.02.20 - fixed rom.c merging/stitching when 341-17[5|6]-?.bin is used
+
+2020.02.19 - fixed some bugs with lisafsh-tool where not all directory blocks
+             are listed, replaced it with a lot more detail including desktop
+             names, sizes, dates, flags
+
+2020.01.12 - adding capture, xmodem to TerminalWx for interfacing with BLU
+
+2020.01.11 - TerminalWx functioning now
+
+2020.01.09 - switched Preferences for serial ports to pull down menu as it
+             now has too many items
+
+2020.12.22 - added TerminalWx code as library to endpoint for serial ports
+
+2020.12.09 - added host serial port support, either wired or USB adapter for
+             linux, should work on macos and FreeBSD as well, but as of yet
+             untested. The text parameter is the device name such as
+             /dev/ttyS0 or /dev/ttyUSB0. When used by itself, the guest OS and
+             its applications can set the port parameters such as baud rate,
+             stop bits, and parity. In some applications it would be more
+             useful to override this, for example by setting a high baud rate
+             or hardware handshaking (which LisaTerminal does not support).
+             To do this append a pipe character followed by the settings
+             and options using commas as separators. i.e.:
+             "/dev/ttyUSB0|38400,n,8,1,hw" additionally ,sw is allowed for
+             xon/xoff software handshaking, or ,-sw or ,-hw is allowed to
+             disable those. Host serial and shell are not available on
+             windows yet. Future releases may add these features, possibly
+             by using WinPTY.
+
+2020.11.28 - more testing of Serial Port A
+
+2020.11.27 - attempting to get Serial port A to not hang, under Lisa Office
+             System, but didn't get any useful results, so disabling the 
+             Serial A port for now.
+
+2020.11.26 - more guard code around xon/xoff handling
+           - rewrote SCC reconnect/disconnect code for ROM SCC tests vs LOS
+           - SCC port B xon/xoff now works properly
+
+2020.11.22 - found a bug in the EXITR macro and fixed it
+           - using the new MMU code MacWorks XL starts up
+           - verified + fixed high contrast turns display yellow in MonitorOS
+
+2020.11.19 - rewrote 3 MMU ea code candidates + wrote testers
+
+2020.11.08 - found a possible MMU bug where stack space is incorrect via
+             debugging uniplus crashing
+           - monitor OS was crashing on boot
+           - MacWorks was crashing on boot
+             
+2020.11.06 - fixed Xenix pfcmd bad state: 0306 but Xenix still doesn't start
+           - enabled illegal instructions to follow the ILLEGAL trap, this
+             got UniPlus to get further along, but double panics on startup
+
+2020.10.23 - more work on Xenix profile access
+
+2020.10.22 - added dc42-to-tar to extract tar archives from multi-floppy xenix
+             tar archives, but needs more work to complete
+
+2020.10.24 - informix for xenix deserialization + tool
+
+2020.10.17 - attempting to get Xenix to accept LisaEm profile emulation
+
+2020.09.15 - debugging mouse clicks in LOS - behaves as if LOS is not
+             receiving mouse up events, though they are being sent, making
+             windows drag. Also it seems it only notices mouse movement
+             on mouse down rather than all mouse move events.
+           - even though pty code uses a 32K buffer for serial ports, we get
+             cut off after about 30 or so chars, so ls -l on host via
+             LisaTerm gets cut off. Need some way to limit number of times
+             we send IRQ 6 to let LOS know that SCC has received data
+
+2020.09.14 - debugging hangs caused by PTY
+
+2020.09.12 - added PTY support, ran/fixed into a bug in fliflo queue
+
+2020.09.06 - investigating a serial A issue that causes freezing issues in LOS
+
+2020.08.28 - fixed crash on reboot caused by freeing lisaram
 
 2020.08.23 - fixed lisaem.sh CPU name on PowerPC
            - fixed crash on ROMless boot when user selects ProFile but cancels
@@ -22,9 +278,11 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 2020.08.03 - revert the pc24->pc32 changes as they caused an increase in RAM
              requirements by an additional 640MB when not in used to accomodate
              for the extra 256X increase in address space.
+
            - MacWorks is no longer crashing in Hard Disk Initialize on return
              to the Finder, however, it Sad Mac's out when trying to boot from
              the hard disk, so there are other issues there.
+
            - cleaning up the source code a bit to remove some dead code, and
              unneeded debugging scaffolding.
              
@@ -59,6 +317,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              the hard drive. Created tool to add the bozo bit and updated the
              deserialize to remove it as well. Office tools no longer required
              repeated deserialization when the disk is installed each time.
+
            - firing up my old NeXT slab to test some more 68000 opcodes as it
              would be useful to fix the LPW linker in order to help with the
              Apple Lisa LOS source code project that AEK has going.
@@ -124,7 +383,9 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              adding fix for -lstdc++.6 vs -lstdc++
 
 2020.03.25 - more bashbuild fixes, updates, enhancements
+
            - automating scripts for macos dmg
+
            - adding a macos binary launcher - instead of making a fat universal
              binary using lipo, a script replaces the lisaem binary which then
              detects the OS and CPU architecture, and tries to locate the 
@@ -133,6 +394,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              the most suited one for the current os will be launched.
 
 2020.03.14 - more bashbuild fixes
+
            - power off hidpi reset to 1.0 bug fix
 
 2020.03.12 - bashbuild fixes
@@ -153,11 +415,13 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 
 2020.02.18 - hqx now works on windows, though there's some flashing, and mouse
              location is off, even in 4k mode
+
            - fixed skinless mode centering
 
 2020.02.17 - fixed GTK mouse location for all supported scaling modes
 
 2020.02.16 - fixed skinless mouse coordinates for 50% 
+
            - fixed menu shortcuts
 
 2020.02.12 - adding code to support libSDL2 because wxSound on all modern GTK
@@ -250,6 +514,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              and image display for KiTTY (will do for iTerm2 as well),
              sub-build scripts are now source'd instead of executed 
              separately for better performance.
+
            - started work on adding pty support for the serial ports
 
 2019.11.19 - Completed move to build system from LisaEm 1.3.0 and cleaned up
@@ -262,6 +527,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              threw out due to various pivots.
 
 2019.11.16 - fixed a minor Mojave/Catalina library issue
+
            - looking into adding support for real serial ports and tty/pty
              ports on Linux/*bsd systems.
 
@@ -283,14 +549,17 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              bugs.
 
 2019.11.06 - fixed some screenshot bugs around hq3x
+
            - fixed pause checkbox menu item incorrectly showing paused
            
 2019.11.05 - fixed a bunch of crashy bugs around skinless modes 
+
            - mouse location is still incorrect
 
 2019.11.04 - fixed 2Y mode rendering issues
 
 2019.11.03 - got rid of the extraneous clipboard wspaste_clipboard stuff
+
            - increased clipboard paste from 8k to 32K, don't think there's
              much need for larger pastes in terms of being able to paste
              code into LPW Edit, but maybe will allow larger pastes with a 
@@ -314,14 +583,15 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              and doesn't segfault immediately on startup.
 
 2019.10.08 - hqx3.5 renderer work cont'd
+
            - clang compiled Lisaem on x86_64 macosx segfaults at unknown
              location while initializing data from config files, couldn't find
              it yet via llldb, will try again, possibly switching to gcc and
              gdb via brew.sh
 
-2019.10.07 - build sucessful on x86_64 macosx10.9.5 in 64 bits
+2019.10.07 - build successful on x86_64 macosx10.9.5 in 64 bits
 
-2019.10.06 - build sucessful on ppc32 macosx10.5.8
+2019.10.06 - build successful on ppc32 macosx10.5.8
 
 2019.10.05 - added a skin selector dialog box
 
@@ -440,7 +710,9 @@ to   08.27 - moved skin settings to their own class
 2018.03.18 - wipe/free CPU IPCTs and memory on reboot
 
 2018.03.14 - buserror bug manifests in LisaTest (2 disk version) as well
+
            - Fixed messagebox/yesnodialog from C (was showing blank dialog)
+
            - Stephen Hawking has left our universe, ever the joker, he 
              picked Pi day :(
 
@@ -605,8 +877,10 @@ to   08.27 - moved skin settings to their own class
 2007.06.30 - added Mac OS trap symbol printing for A-Line traps for tracelog
 
 2007.06.29 - fixed inability to detect no-floppy from Lisa boot ROM
+
            - fixed entry to Service mode - not perfect, need to attempt 
              to boot from bad profile.
+
            - fixed tracelog bugs (hardcoded /log/lisaem-output)
 
 ---          RC2 
@@ -648,9 +922,9 @@ to   08.27 - moved skin settings to their own class
              speed.
 
 2007.04.08 - added Unthrottled menu option for those who want to melt their
-	         host computer. :-)
+             host computer. :-)
 
-	       - added buffered raw keycodes to compensate for repeats.
+           - added buffered raw keycodes to compensate for repeats.
 
 2007.04.07 - bug with raw keycodes that prevents updates found and fixed.
 
@@ -658,8 +932,10 @@ to   08.27 - moved skin settings to their own class
              Vernet found that the slowdown issues go away with wxWidgets
              2.7.2, will test on all platforms before committing to either
              path.)
+
            - reworked display to draw directly to dc and skip full blit
              only done for AntiAlias mode, need to redo for all others.
+
            - reworked timing loop to no longer need wxMilliSleep
 
 
@@ -667,7 +943,9 @@ to   08.27 - moved skin settings to their own class
 
 
 2007.04.04 - fixes to initial video position on skinless mode.
+
            - added 8Hz display refresh rate for slow hosts.
+
            - on shutdown throttle is removed + display refresh forced to 8Hz
              to compensate for ~Imagewriter slowdowns.
 
@@ -676,17 +954,23 @@ to   08.27 - moved skin settings to their own class
              OS X and Win32.
 
 2007.04.01 - Added Reset button
+
            - messing around with the VIA timing in hopes of fixing the
              extra-fast clock.  Helps, but still a bit too fast.
+
            - fixing OS X issues
+
            - switching skins is really broken on OS X, so switched it
              to will be done next time you run LisaEm.  This sucks,
              but it sucks less than having a broken display.
+
            - Printing on OS X works, but sometimes locks up LisaEm
              on shutdown.
+
            - windows now save their positions and restore on next boot
 
 2007.03.30 - more printer work
+
            - timing correction: catch up on lost cycles if cpu<clock
 
 2007.03.28 - some light via work - attempting to fix any discrepancies
@@ -700,29 +984,37 @@ to   08.27 - moved skin settings to their own class
 
 2007.03.26 - with skins off, blacken whole screen instead to prevent artifacts
              except for OS X.
+
            - added option to completely hide the host mouse cursor.  It 
              surprisingly works better than I expected.
+
            - added Flush Printers menu item to force printouts to end
              once they're done.  Should also speed up shutdown since this
              happens there too.
 
 2007.03.24 - James Savage of the Retro Mac Cast found these two bugs:
+
            - saving PNG screenshots are always grayscale.  Should be
              color for full screenshots.
+
            - power button on skin is triggered by just moving the
              mouse over the power button.  Fixed so click is required.
+
            - fixed some issues with switching between skins on/off.
 
 2007.03.20 - pauses reported by Kallikak fixed, throttle mechanism rewritten
+
            - printing: added scale as some printerDC's are 600dpi and we
              work at 300dpi.
 
 2007.03.18 - printing: fixing half page issues
+
            - fixed memory clobbering bug in printing code - caused profile
              corruption on linux since dc42's are mmap'ed, would have caused
              random issues elsewhere.
 
 2007.03.17 - printing: fixed png background color issue
+
            - printing: pages were halved vertically, fixing this now but
              not quite right yet, only half a page makes it out
              now but it is the correct aspect ratio. 
@@ -730,19 +1022,24 @@ to   08.27 - moved skin settings to their own class
 2007.03.16 - added Refresh Rate to display menu: 60,20,12Hz. (Needs to be
              in odd multiplier of refresh rate, otherwise cursor in text
              fields will stop flashing)
+
            - Printing: tweaking color table in BMP generation as PNG's show 
              up with a gray background. (BMP's show up properly.)
 
 2007.03.15 - fixed mouse/skin issues.
+
            - fixed some serial port issues, but still crashes emulator.   
 
 2007.03.14 - skins initialization issues with skins on. caused mouse issues
              on startup.
+
            - skinless size increased as edges were getting cut off.
+
            - some z8530 fixes, but still does not properly work, causes LisaEm
              to quit.
 
 2007.03.13 - found a fixed config bug: serial b options copied from port a.
+
            - added a switch to turn off power to the virtual Profile before
              power on.  This allows you to prevent the boot ROM's Power on
              self test to automatically boot from the Profile.  It's useful
@@ -753,36 +1050,46 @@ to   08.27 - moved skin settings to their own class
 2007.03.11 - Proper BMP's are now generated for printing, conversion to PNG
              format works, but is a little bit off - background is gray,
              should be white as in paper white.
+
            - added command line ability to load preferences file when
              launching. i.e. ./lisaem ~ray/macworks.lisaem will open the
              macworks.lisaem preferences file from user ray's home.
 
 2007.03.10 - getting closer on proper BMP generation for printing
+
            - added throttle setting to global preferences.
+
            - added ROM checksum failure warning on power on.  If the ROM is 
              broken, it can crash the emulator.
 
 2007.03.09 - skins on/off added to Display menu.
+
            - found IW linefeed pixel bug (lack of initialization)
 
 2007.03.08 - video modes are a bit smarter - if display size is too small, 
              will refuse to change video modes and will instead switch to 
              lower mode, or shut off skins.
+
            - re-enaled 2Y and 2X3Y video modes (skinless of course.) with 
              checks for display size.
+
            - skin/less mode switch no longer requires restart of emulator.  
              Extra space past display region is blackened to ameliorate window
              sizing bugs.
+
            - Preferences "Apply" button (was save in preview versions) closes
              Preferences window.
 
 2007.03.06 - added skinless option (bug: size of window is too small/off). One 
              blit less during skinless mode so it's a bit faster on older 
              machines.
+
            - NMI key can be forced now.
 
 2007.03.02 - Video mode, sound effects, asciikeyboard as globally saved prefs.
+
            - added Sound Effects checkbox.
+
            - debugging printing - somehow all pages show up black.
 
 2007.03.01 - added NMI key to keyboard menu.
@@ -799,14 +1106,20 @@ to   08.27 - moved skin settings to their own class
              0xA8 via a #define.
 
 2007.02.03 - cheat_ram_test now a preference.
+
            - if starting without ROM, dialogbox is shown, then preferences are
              shown asking for config.
+
            - bug fix: after closing preferences, re-opening caused segfault.
+
            - finer speed control - much closer.
 
 2007.02.02 - fixed floppy insert on power off
+
            - fixed floppy trapping on insert of non-DC42/bad disk image.
+
            - fixed "Clock is not set" dialog box
+
            - fixed ContrastTrails (linx/win32)
 
 2007.02.01 - fixed raw kb entry - but CPU clock is still too fast.
@@ -819,17 +1132,23 @@ to   08.27 - moved skin settings to their own class
 2007.01.28   Fixes:
              - Fixes to libdc42 for profile access. Should be able to read and write to
                ProFile images to install Lisa Office System on a new disc.
+
              - Split ROM images are now supported - it will automatically merge them and
                save as *.ROM
+
              - Double-clicking on the mouse is now recognised in Lisa OS. This fix is a
                hack, and will need to be fixed properly in the future.
+
              - When quitting LisaEm on Mac OS X, the Preview Release used to crash. This
                has been fixed.
+
              - Crash on Restart from Lisa Office System Installer fixed.
              - Missing horizontal scrollbar on OS X seems to be fixed, but not sure why or
                how.
+
              - The duration of the click sound during the Lisa ROM tests was far too long,
                it now clicks rather than beeping.
+
              Known bugs:
              - Floppy animation does not work on OS X due to double buffering.
              - Floppy motor sounds and some other sounds do not work on OS X

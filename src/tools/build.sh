@@ -54,7 +54,12 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
+SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw decode-vsrom dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar dc42-add-tags dc42-diff dc42-copy-selected-sectors lisafsh-tool"
+
+
+# debug - comment out for release
+#echo "$@" >>/tmp/lisa-tools-builds.txt
+#env >>/tmp/lisa-tools-builds.txt
 
 WITHDEBUG=""             # -g for debugging, -p for profiling. -pg for both
 
@@ -85,7 +90,7 @@ CHECKFILES libdc42-gpl-license.txt $(for i in $SRCLIST; do echo src/$i.c; done)
 [[ -n "$MACOSX_MAJOR_VER" ]] && mkdir -pm 755 "${XTLD}/bin/$MACOSX_MAJOR_VER/"
 
 for i in $@; do
-
+ i=`echo "$i" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
  case "$i" in
 
   estimate) cd ${XTLD}/src
@@ -102,7 +107,7 @@ for i in $@; do
             echo "* Removing fsh tools objs and bins"
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types*
             cd "${XTLD}/bin/${MACOSX_MAJOR_VER}/" && for b in $SRCLIST; do rm -f ${b}${EXT}; rm -rf "${b}.dSYM"; done
-
+            ln -s ../../bin 2>/dev/null
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
             [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
@@ -155,17 +160,17 @@ for i in $@; do
                                [[ "$MACHINE" == "x86_64" ]] && export MACHINE="i386"
                                export ARCH="-m32" ; export SARCH="-m32"  ;;
 
- --without-debug)              WITHDEBUG=""
+ --no-debug)                   WITHDEBUG=""
                                WARNINGS=""                               ;;
 
- --with-debug)                 WITHDEBUG="$WITHDEBUG -g"
+ --debug)                      WITHDEBUG="$WITHDEBUG -g"
                                WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
 
 -D*)                           EXTRADEFINES="${EXTRADEFINES} ${i}";;
 
- --with-profile)               WITHDEBUG="$WITHDEBUG -p"                 ;;
+ --profile)                    WITHDEBUG="$WITHDEBUG -p"                 ;;
 
- --with-tracelog)              WITHTRACE="-DDEBUG -DTRACE"
+ --tracelog)                   WITHTRACE="-DDEBUG -DTRACE"
                                WARNINGS="-Wall"                          ;;
  --no-banner)                  NOBANNER="1";                             ;;
 
@@ -228,8 +233,8 @@ create_machine_h
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -243,7 +248,7 @@ if [[ "$needclean" -gt 0 ]]; then
 fi
 
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 ###########################################################################
 
@@ -253,7 +258,7 @@ CFLAGS="$CFLAGS   $NOEMPTYBODY $NODUPEDECL $NOINCOMPATIBLEPTR -Wno-implicit-func
                   -Wno-parentheses  -Wno-format -Wno-implicit-function-declaration \
                   -Wno-unused-parameter  -Wno-unused "
 
-echo Building lisa disk utilities...
+echo "* Building lisa disk utilities..."
 echo
 
 # Check to see if libdc42 exists locally, or globally
@@ -284,24 +289,75 @@ cd src
 [[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 
 [[ -z "$PERCENTCEILING"  ]] && export PERCENTCEILING=$(wc -w <<< "$SRCLIST" )
 
-export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
-LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+
+# lisafsh-tool will be able to use readline if it's on the system in the future, perhaps other tools will too.
+export HAVEREADLINE=""
+# check for readline.
+if  [[ -f /usr/local/include/readline/readline.h ]] && [[ -f /usr/local/include/readline/history.h  ]]; then
+   if  [[ -n "$(ls -l /usr/local/lib/libreadline*)" ]]; then
+       export HAVEREADLINE="yes"
+       # prefer static libs as we will distribute these as rpms, debs, etc.
+       if      [[ -f "/usr/lib64/libtinfo.a" ]]; then LTINFO="/usr/lib64/libtinfo.a"
+       else if [[ -f "/usr/local/lib/libncurses.a" ]]; then LTINFO="/usr/local/lib/libncurses.a"
+       else if [[ -f "/opt/local/lib/libncurses.a" ]]; then LTINFO="/opt/local/lib/libncurses.a"
+       fi
+       fi
+       fi
+       export READLINECCFLAGS="-DHAVEREADLINE -I /usr/local/include/ /usr/local/lib/libreadline.a /usr/local/lib/libhistory.a $LTINFO"
+   fi
+fi
+
+if  [[ -n "$WINDOWS" ]]; then
+    if  [[ -f /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libreadline.a ]] && [[ -f /usr/x86_64-w64-mingw32/sys-root/mingw/include/readline/readline.h ]] && \
+        [[ -f /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libhistory.a  ]] && [[ -f /usr/x86_64-w64-mingw32/sys-root/mingw/include/readline/history.h  ]]  && \
+        [[ -f /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libcurses.a   ]]; then
+        export HAVEREADLINE=""
+        export READLINECCFLAGS="-DHAVEREADLINE -L /usr/x86_64-w64-mingw32/sys-root/mingw/lib/ -I /usr/x86_64-w64-mingw32/sys-root/mingw/include/readline/ /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libreadline.a"
+        export READLINECCFLAGS="$READLINECCFLAGS /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libhistory.a /usr/x86_64-w64-mingw32/sys-root/mingw/lib/libcurses.a"
+    fi
+fi
+
+
+if [[ -z "$HAVEREADLINE" ]]; then
+   # compile them all without readline, if we don't have it.
+   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
+   LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
 	$(for i in $SRCLIST; do echo $i; done) )
+else
+   # compile all but lisafsh-tool without readline
+   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
+   LIST1=$(WAIT="no"  OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+	$(for i in $SRCLIST; do echo $i | grep -v lisafsh-tool; done) )
+
+   # enable readline and now compile just lisafsh-tool (and in the future anything else that uses it)
+   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c  $READLINECCFLAGS $WHICHLIBDC42"
+   LIST2=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+	$(for i in lisafsh-tool; do echo $i; done) )
+
+   export LIST1="$LIST1 $LIST2"
+   unset  LIST2
+fi
+
+if [[ ! -f "${XTLD}/bin/$MACOSX_MAJOR_VER/lisafsh-tool${EXT}" ]] && [[ ! -f "${TLD}/bin/$MACOSX_MAJOR_VER/lisafsh-tool${EXT}" ]] ; then
+   echo "Failed to build lisafsh-tool" 1>&2 
+   exit 55
+fi
 
 if [[ -z "$XTLD" ]]; then
    echo "Error XTLD is empty" 1>&2
    exit 99
 fi
 
-cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
+cd "${TLD}/bin/$MACOSX_MAJOR_VER"
 strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 
-if [[ -n "$INSTALL" ]]; then
-      cd "${XTLD}/bin/x/$MACOSX_MAJOR_VER"
-      [[ -n "$DARWIN" ]] && PREFIX=/usr/local/bin  # these shouldn't go into /Applications
-      echo "Installing tools to $PREFIX/bin"
+# only do install if we're not in a holographic sub shell
+if [[ -n "$INSTALL" ]] && [[ "$TLD" == "$XTLD" ]]; then
+      cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
+      [[ -n "$DARWIN" ]] && [[ -z "$PREFIX" ]] && PREFIX=/usr/local/ # these shouldn't go into /Applications
+      echo "Installing tools to $PREFIX"
       mkdir -pm755 "$PREFIX/bin" 2>/dev/null
       # * is for .exe on windows
       for i in $SRCLIST; do
@@ -310,5 +366,6 @@ if [[ -n "$INSTALL" ]]; then
       cd ..
 fi
 echo
-[ -z "$NOBANNER" ] && echo "Disk Tools build done."
+
+[[ -z "$NOBANNER" ]] && echo "Disk Tools build done." 1>&2
 true

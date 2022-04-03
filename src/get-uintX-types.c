@@ -10,6 +10,7 @@
 
 //    Because there's nothing quite like the thrill of reinventing the wheel again!   //
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +47,7 @@ if  (uname) {
 }
 
 out=fopen("machine.h","wt");
+
 if (!out) {perror("Could not create machine.h because "); return -1; }
 
 sz[0]=sizeof(char);
@@ -61,7 +63,7 @@ fprintf(out,
 "*                machine.h -  detected integer types for this host                     *\n"
 "*                              http://lisaem.sunder.net                                *\n"
 "*                                                                                      *\n"
-"*                   Copyright (C) 1998, 2020 Ray A. Arachelian                         *\n"
+"*                   Copyright (C) 1998, 2021 Ray A. Arachelian                         *\n"
 "*                                All Rights Reserved                                   *\n"
 "*                                                                                      *\n"
 "\\**************************************************************************************/\n\n"
@@ -75,24 +77,26 @@ fprintf(out,
 fprintf(out,"/*---------------------------------------------\n");
 fprintf(out,"  uname -msr: %s\n",buffer);
 fprintf(out," *---------------------------------------------*/\n");
-fprintf(out,"/* sizeof(char     )=%2d */\n",(int)(sizeof(char     )));
-fprintf(out,"/* sizeof(int      )=%2d */\n",(int)(sizeof(int      )));
-fprintf(out,"/* sizeof(short    )=%2d */\n",(int)(sizeof(short    )));
-fprintf(out,"/* sizeof(long     )=%2d */\n",(int)(sizeof(long     )));
-fprintf(out,"/* sizeof(long long)=%2d */\n",(int)(sizeof(long long)));
-fprintf(out,"/* sizeof(float    )=%2d */\n",(int)(sizeof(float    )));
-fprintf(out,"/* sizeof(double   )=%2d */\n",(int)(sizeof(double   )));
-fprintf(out,"/*---------------------------------------------*/\n\n");
+fprintf(out,"/* sizeof(char     )=%2d */\n",(int)(sizeof(char     ))); fflush(out);
+fprintf(out,"/* sizeof(int      )=%2d */\n",(int)(sizeof(int      ))); fflush(out);
+fprintf(out,"/* sizeof(short    )=%2d */\n",(int)(sizeof(short    ))); fflush(out);
+fprintf(out,"/* sizeof(long     )=%2d */\n",(int)(sizeof(long     ))); fflush(out);
+fprintf(out,"/* sizeof(long long)=%2d */\n",(int)(sizeof(long long))); fflush(out);
+fprintf(out,"/* sizeof(float    )=%2d */\n",(int)(sizeof(float    ))); fflush(out);
+fprintf(out,"/* sizeof(double   )=%2d */\n",(int)(sizeof(double   ))); fflush(out);
+fprintf(out,"/*---------------------------------------------*/\n\n"); fflush(out);
 
+errno=0;
 
 for (i=0; i<5; i++) {
       if (! h[sz[i]] ) {
             h[sz[i]]=1;
 
-            fprintf(out,"typedef          %-9s %s  int%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
-            fprintf(out,"typedef          %-9s %s sint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
-            fprintf(out,"typedef unsigned %-9s %s uint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 ); 
-            if (errno) {perror("couldn't write to machine.h because "); fclose(out); return -1;}
+            fprintf(out,"typedef          %-9s %s  int%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 );  fflush(out);
+            fprintf(out,"typedef          %-9s %s sint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 );  fflush(out);
+            fprintf(out,"typedef unsigned %-9s %s uint%d;\n",   szs[i], (sz[i]<2 ? " ":""), sz[i]*8 );  fflush(out);
+
+            if (errno) {fprintf(stderr,"Error occured at i=%d.\n",i); perror("couldn't write to machine.h because "); fclose(out); return -1;}
       }
 }
 fprintf(out,"#endif\n");

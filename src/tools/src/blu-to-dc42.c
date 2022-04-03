@@ -105,9 +105,9 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Drive image is from: %s of type %02x%02x%02x\n",block,block[0x0D],block[0x0E],block[0x0F]);
       fprintf(stderr, "Number of Blocks:%d size of each block:%d\n\n",blublocks,blocksize);
 
-      //                   0123456
-      if (strncmp(block,"Widget-",6)==0) {widget=1; fprintf(stderr,"\n widget detected \n");}
-       //                  01234567801234
+      //                         0123456
+      if (strncmp((char *)block,"Widget-",6)==0) {widget=1; fprintf(stderr,"\n widget detected \n");}
+      //                         01234567801234
     }
 
     i=lseek(blu, blocksize, SEEK_SET); // 0x214 = 532  // 20200309 -2 to fix file id tag for bootblock, not sure why it's needed yet.

@@ -123,6 +123,7 @@ void xxxcheckcontext(uint8 c, char *text)
 
 void disable_vidram(void)
 {
+    if (!lisaram) return;
         mem68k_memptr[vidram]=lisa_mptr_ram;
     mem68k_fetch_byte[vidram]=lisa_rb_ram;
     mem68k_fetch_word[vidram]=lisa_rw_ram;
@@ -136,7 +137,7 @@ void disable_vidram(void)
 
 void enable_vidram(void)
 {
-
+   if (!lisaram) return;
    if (has_lisa_xl_screenmod)
    {
         mem68k_memptr[vidram]=lisa_mptr_vidram;
@@ -756,30 +757,25 @@ void fill_mmu_segment(uint8 segment, int32 ea, lisa_mem_t rfn, lisa_mem_t wfn, i
 } //////// end of fill_segment /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-void invalidate_mmu_segment(uint8 segment)  {fill_mmu_segment(segment, 0L, bad_page, bad_page, -1,-1);}
-
+void invalidate_mmu_segment(uint8 segment)  {DEBUG_LOG(0,"invalidate %d",segment); fill_mmu_segment(segment, 0L, bad_page, bad_page, -1,-1);}
 
 void get_slr_page_range(int cx,int seg, int16 *pagestart, int16 *pageend, lisa_mem_t *rfn, lisa_mem_t *wfn)
 {
     uint8 page;
     uint16 slr=mmu_all[cx][seg].slr;
 
-    page=((slr & 0xff) ^ 0xff);         // common to all
+    page=   ((slr & 0xff) ^ 0xff);
 
     switch (slr & FILTR)
     {
-                                        //next two lines 2006-01-12
-     case SLR_RO_STK:           *pagestart=page;     *pageend=255;  *rfn=ram;     *wfn=ro_violn; return;
-     case SLR_RW_STK:           *pagestart=page;     *pageend=255;  *rfn=ram;     *wfn=ram;      return;
-
-     case SLR_RO_MEM:           *pagestart=0;        *pageend=page; *rfn=ram;     *wfn=ro_violn; return;
-     case SLR_RW_MEM:           *pagestart=0;        *pageend=page; *rfn=ram;     *wfn=ram;      return;
-
-     case SLR_IO_SPACE:         *pagestart=0;        *pageend=page; *rfn=io;      *wfn=io;       return;
-     case SLR_SIO_SPACE:        *pagestart=0;        *pageend=page; *rfn=sio_mmu; *wfn=sio_mmu;  return;
+     case SLR_RO_STK:           *pagestart=page;     *pageend=255;      *rfn=ram;     *wfn=ro_violn; return; // start=page|stkpage, end=255 works anything else crashes LOS
+     case SLR_RW_STK:           *pagestart=page;     *pageend=255;      *rfn=ram;     *wfn=ram;      return; // 2020.11.08 was pagestart=page;
+     case SLR_RO_MEM:           *pagestart=0;        *pageend=page;     *rfn=ram;     *wfn=ro_violn; return;
+     case SLR_RW_MEM:           *pagestart=0;        *pageend=page;     *rfn=ram;     *wfn=ram;      return;
+     case SLR_IO_SPACE:         *pagestart=0;        *pageend=page;     *rfn=io;      *wfn=io;       return;
+     case SLR_SIO_SPACE:        *pagestart=0;        *pageend=page;     *rfn=sio_mmu; *wfn=sio_mmu;  return;
      case SLR_UNUSED_PAGE:
-
-     default:                   *pagestart=0;        *pageend=255;  *rfn=bad_page;*wfn=bad_page; return;
+     default:                   *pagestart=0;        *pageend=255;      *rfn=bad_page;*wfn=bad_page; return;
     }
 }
 
@@ -787,69 +783,48 @@ void get_slr_page_range(int cx,int seg, int16 *pagestart, int16 *pageend, lisa_m
 // assumes that mmu[segment] has been set for both sor and slr.
 void create_mmu_segment(uint8 segment)
 {
-  //uint32 page=0;              // page #
     int32  ea; //epage,         // page and effective page (sor+/-page), and diff address ea
     uint16 sor, slr;            // mmu regs
-    uint32 segment8;            // segment shifted 8 bits over into place
-    //mmu_trans_t *mt=NULL;
     lisa_mem_t rfn=bad_page, wfn=bad_page;
-    int32 ps,pe;
     int16 pagestart, pageend;
 
+    int32 sor9, segment17;
     #ifdef DEBUG
     char s1[160]; // s2[160];
+    if (segment>127) { EXIT(42,0,"Create_mmu_segment passed segment>127!"); }
     #endif
 
-
-    if (segment>127) { EXIT(42,0,"Create_mmu_segment passed segment>127!"); }
     if (start)       { DEBUG_LOG(0,"context=0"); init_start_mode_segment(segment); return;}
 
-//    DEBUG_LOG(10,":create_mmu_context::context=%d s1/s2=%d/%d start=%d",context,segment1,segment2,start);
+    sor=mmu[segment].sor & 0x0fff;  
+    slr=mmu[segment].slr; 
 
 
-    sor=mmu[segment].sor & 0x0fff;  slr=mmu[segment].slr; segment8=segment<<8;
+    DEBUG_LOG(1,"MMU page type to set: %s (%04x) segment #%d in context %d",printslr(s1, 160, slr),slr,segment,context);
 
-    #ifdef DEBUG
-      DEBUG_LOG(1,"MMU page type to set: %s (%04x) segment #%d in context %d",printslr(s1, 160, slr),slr,segment,context);
-    #endif
-
-
-    ///if (  ((slr & FILTR)==SLR_RO_STK) ||  ((slr & FILTR)==SLR_RW_STK)  )       //20051119
-    ///{                                                                          //20051119
-    ///     ea=(sor<<9)-(segment<<17)  + (slr & 0xff)*512;                        //20051119
-    ///}                                                                          //20051119
-    ///else                                                                       //20051119
-
-    // effective_address = segment_origin*512 - (segment_start_address)
-    // later we do physical_address=logical_address+ea
-    ea=(sor<<9)-(segment<<17);
+    segment17=(int32)(segment<<17);
+    sor9=(int32)(sor<<9); 
+    ea=GET_MMU_EFFECTIVE_ADDRESS(segment17,sor9);
 
     get_slr_page_range(context,segment, &pagestart, &pageend, &rfn, &wfn);
     DEBUG_LOG(0,"MMU: Got values from page_range Segment:%d ea:%08x, rfn:%d, wfn:%d, pagestart:%08x,pageend:%08x\n",segment,ea,rfn,wfn,pagestart,pageend);
 
-#ifdef BUGGY_CODE
-    ps=(pagestart<<9)+(segment<<17)+ea;
-    pe=(pageend<<9)  +(segment<<17)+ea-1;
+    fill_mmu_segment(segment, ea, rfn, wfn, pagestart, pageend);
 
-    if (rfn==ram)
-    {  if (ps<minlisaram )
-                              while(pagestart<255 && (ps=((pagestart<<9)+(segment<<17)+ea) )<minlisaram)
-                               { pagestart++;     }
+//    #ifdef DEBUG
+//    if ( (slr & FILTR)==SLR_RO_STK || (slr & FILTR)==SLR_RW_STK )  {
+//       ALERT_LOG(0,"stack segment:mmu[%d][%d].slr=%03x, sor=%03x, pagestart:%d pageend:%d",context,segment,slr,sor,pagestart,pageend);
+//       ALERT_LOG(0,"stack segment MMU: Got values from page_range Segment:%d ea:%08x, rfn:%d, wfn:%d, pagestart:%08x,pageend:%08x\n",segment,ea,rfn,wfn,pagestart,pageend);
+//       dumpmmupage(context, segment, stdout);
+//       if (buglog) dumpmmupage(context, segment, buglog);
+//
+//    }
+//    #endif
 
-       if (pe>maxlisaram )    while(pageend>0 && (pe=((pageend<<9)+(segment<<17)+ea) )<minlisaram)
-                               { pageend--;     }
-
-       if (ps>maxlisaram ) {rfn=OxVoid; wfn=OxVoid;}  // used to be bad_page
-       if (pe<minlisaram ) {rfn=OxVoid; wfn=OxVoid;}
-       if (pe>ps         ) {rfn=OxVoid; wfn=OxVoid;}
-    }
-#endif
-
-    fill_mmu_segment(segment, ea, rfn, wfn,pagestart,pageend);
     DEBUG_LOG(0,"MMU: Segment:%d ea:%08x, rfn:%d, wfn:%d, pagestart:%08x,pageend:%08x\n",segment,ea,rfn,wfn,pagestart,pageend);
 
     #ifdef DEBUG
-    check_mmu_segment(segment, ea, rfn,wfn,pagestart,pageend,"create_mmu_segment1");
+    check_mmu_segment(segment, ea, rfn, wfn, pagestart, pageend, "create_mmu_segment1");
     //DEBUG_LOG(10,"post check_mmu_segment:: context=%d s1/s2=%d/%d start=%d\n",context,segment1,segment2,start);
     #endif
     return;
@@ -881,6 +856,8 @@ MMU map recalculations.
 
 extern void reg68k_update_supervisor_internal(void);
 extern void reg68k_update_supervisor_external(void);
+
+extern void refresh_vidram_fns(void);
 
 // opts |=0x1000 turn on supervisor
 // opts |=0x2000 full mmu flush whether needed or not
@@ -986,6 +963,8 @@ void mmuflush(uint16 opts)
 
     lastcontext=context;
     DEBUG_LOG(10,"Done with MMU Flushcontext=%d s1/s2=%d/%d start=%d\n",context,segment1,segment2,start);
+
+//    refresh_vidram_fns();
 }
 
 
@@ -1157,7 +1136,8 @@ void validate_mmu_segments(char *from)
     for (segment=0; segment<128; segment++)
     {
       sor=mmu_all[cx][segment].sor & 0xfff;  slr=mmu_all[cx][segment].slr; segment8=segment<<8;
-      ea=(sor<<9)-(segment<<17);
+      ea=(int64)(-((int32)(segment<<17))+((int32)(sor<<9)) ); // 2020.11.21
+
       get_slr_page_range(context,segment, &pagestart, &pageend, &rfn, &wfn);
       check_mmu_segment(segment, ea, rfn, wfn, pagestart,pageend,from);
     }

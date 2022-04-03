@@ -1,12 +1,16 @@
-echo "This OS has not yet been implemented" 1>&2
-exit 1
-
-export PREFIX="/opt/SUNDERNETlisaem/bin"
-export PREFIXLIB="/opt/SUNDERNETlisaem/share/"
 export AROPTS="cru"
-
 export HASHOPTS="-b --tag"
+export SUNOS="SunOS"
+export LINKOPTS="${LINKOPTS} -L /lib -lnsl"
+[[ -z "$GDB"    ]] && export GDB="$(which adb)"
 
+# we could also do /opt/${CONAM}${LCNAME}/ for these
+export PREFIX="/usr/bin"
+export PREFIXLIB="/usr/share/"
+
+[[ "$( isainfo -b )"=="64" ]] && export KINDARCH="$( isainfo | sed -e 's/amd64/x86-64/g' | cut -d' ' -f1 )" && export ARCH="-march=${KINDARCH}"
+
+export OSBANNER="$(head -1 /etc/release | awk '{print $1,$2,$3}' | sed -e 's/ /_/g' )"
 
 ##############################################################################
 # getcpus
@@ -14,37 +18,38 @@ export HASHOPTS="-b --tag"
 # Gets the number of CPUs available on the machine so we can issue multiple
 # compiles simultaneously
 #
-# This has now moved to each OS.sys file in bashbuild ::TODO:: remove me
 ##############################################################################
 
-if ! is_function_defined getcpus; then
 function getcpus()
 {
   if [[ -z "$NUMCPUS" ]]; then
-   case `uname -s` in
-     AIX)              NUMCPUS=`lsdev -Ccprocessor | grep -ci available                                              2>/dev/null`  ;;
-     Darwin)           #NUMCPUS=`/usr/sbin/ioreg | /usr/bin/egrep -c "+-o CPU.@.*active.*|+-o MacRISC2CPU.*active.*" 2>/dev/null`  # ::TODO:: add check for G4/G5
-                       NUMCPUS=`sysctl -n hw.ncpu`                                                                                 ;;
-     SunOS)            NUMCPUS=`/usr/sbin/psrinfo  | /usr/bin/grep -ci on-line                                       2>/dev/null`  ;;
-     CYGWIN*|Linux)    NUMCPUS=`nproc 2>/dev/null`                                                                                 ;;
-     OpenBSD|FreeBSD)  NUMCPUS=`sysctl -n hw.ncpu                                                                    2>/dev/null`  ;;
-   esac
+   if [[ -n "$( which nproc 2>/dev/null )" ]]; then
+       NUMCPUS=$( nproc )
+   else
+       NUMCPUS=$( /usr/sbin/psrinfo  | /usr/bin/grep -ci on-line 2>/dev/null)
+   fi
    [[ -z "$NUMCPUS" ]] && sysctl hw.ncpu 2>/dev/null| cut -f2 -d:
    NUMCPUS=$(( $NUMCPUS + 0 )) 2>/dev/null  # in case we get a non-numeric, normalize it.
-   [[ $NUMCPUS -lt 1 ]] && NUMCPUS=1
   fi
 
-  #too bad there's no simple way to detect hyperthreads vs real cores on the above.
-
-  # normalize to a number, just incase we got passed garbage
-  NUMCPUS=`printf "%d\n" "$NUMCPUS" 2>/dev/null`
-  # ensure at least 1
-  [ $NUMCPUS -lt 1 ] && NUMCPUS=1
+  # we need a minimum of two for our job queues.
+  [[ $NUMCPUS -lt 2 ]] && NUMCPUS=2
 
   export NUMCPUS
 }
 
-fi
+
+# Solaris which is a csh script which outputs only to stdout, not to stderr when not found.
+# unlike in linux/freebsd, replace it with a version of our own that does what we expect
+
+function which() {
+ WHICH="$( /usr/bin/which $1)"
+ if [[ "${WHICH:0:3}" == "no " ]]; then 
+    echo ""; return 1
+ fi
+ echo "$WHICH"
+ return 0
+}
 
 
 ##############################################################################
@@ -87,35 +92,158 @@ ldllname="${dir}/${libname}.dll"
 
 [[ "$4" == "both" ]] && mode="static"
 
-
-if [[ "$mode" == "static" ]]
-then
-     echo "  Creating  $libname.a" 1>&2
-     $AR "$AROPTS" "${daname}" ${objs} || exit 1
-     ranlib ${daname}         || exit 1
-     /bin/rm -f       ${ldaname}
-     ln -sf ${daname} ${ldaname}
+if [[ "$mode" == "static" ]]; then
+   echo "  Creating  $libname.a" 1>&2
+   $AR "$AROPTS" "${daname}" ${objs} || exit 1
+   ranlib ${daname}         || exit 1
+   /bin/rm -f       ${ldaname}
+   ln -sf ${daname} ${ldaname}
 fi
 
 
 [[ "$4" == "both" ]] && mode="shared"
 
-if [[ "$mode" == "shared" ]]
-then
-
-             # not tested yet!
-             echo "  Creating  $libname.so" 1>&2
-             ld -G -z text -o    ${dsoname} ${objs}   || exit 1
-             /bin/rm -f          ${ldsoname}
-             ln -sf ${dsoname}   ${ldsoname} 
-             echo -n "" >/dev/null
-}
+if [[ "$mode" == "shared" ]]; then
+   echo "  Creating  $libname.so" 1>&2
+   ld -G -z text -o    ${dsoname} ${objs}   || exit 1
+   /bin/rm -f          ${ldsoname}
+   ln -sf ${dsoname}   ${ldsoname} 
+   echo -n "" >/dev/null
+fi
 
 export CLICMD=""
 export GUIAPP=""
+}
 
 # only used on windows
 function windres() {
-true 
+  true 
 }
 
+
+function SunOSPackage() {
+  if [[ -z "$( which pkginfo )" ]] || [[ -z "$( which pkgproto )" ]] || [[ -z "$( which pkgmk )" ]]; then return 0; fi
+
+  pushd . 2>/dev/null >/dev/null
+
+  BANNER="$( head -1 /etc/release | awk '{print $1,$2,$3}' )"
+  PKGPATH="${XTLD}/pkg/build/tmp/${CONAM}${LCNAME}/"
+
+  # :TODO: find out package naming convention proper for OI, etc. this is reasonable, but not official
+  PKGNAME="${CONAM}${LCNAME}.${VERSION}.${OSBANNER}.${KINDARCH}.pkg"
+
+  mkdir -pm755 "$PKGPATH"
+  cd           "$PKGPATH"
+
+  # copy any templates we've got
+  cp -pr "${XTLD}/pkg/templates/SunOS-pkg/"* "${PKGPATH}" 2>/dev/null >/dev/null
+
+  # copy our artifacts over
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}" && tar cpf - . ) | (cd "${PKGPATH}" && tar xpf - )
+
+cat >"${PKGPATH}/pkginfo" <<ENDSOLPKGEND
+PKG="${CONAM}${LCNAME}"
+NAME="${SOFTWARE} ${VERSION} $(isainfo | cut -f1 -d' ' ) ${BANNER}"
+VERSION="${VERSION}"
+CATEGORY="${SUNOSCATEGORY}"
+ARCH="$(uname -m)"
+VENDOR="${COMPANY}"
+PSTAMP="$RELEASEDATE"
+EMAIL="${AUTHEMAIL}"
+ISTATES="S s 1 2 3"
+RSTATES="S s 1 2 3"
+BASEDIR="/"
+ENDSOLPKGEND
+
+  # create the prototype file
+  touch prototype
+  (
+    # add Package scripts + metadata to Prototype
+    for i in prototype preinstall postinstall checkinstall pkginfo; do [[ -f "$i" ]] && echo "i $i"; done
+    # create the prototype file
+    find . | pkgproto | sed -e "s/$USER/root/g" -e "s/staff/bin/g" | egrep -v 'prototype|preinstall|postinstall|checkinstall|pkginfo'
+  ) >prototype
+
+  rm -rf                "/tmp/${CONAM}${LCNAME}"
+  ( pkgmk -o -r . -b . -d /tmp 2>&1) > "${XTLD}/pkg/pkgmk.log"
+
+  cd /tmp/; 
+  ( pkgtrans -os . "${XTLD}/pkg/${PKGNAME}" "${CONAM}${LCNAME}" 2>&1 ) > "${XTLD}/pkg/pkgtrans.log"
+  cd "${XTLD}/pkg/"
+
+  if [[ -n "$( which xz )" ]]; then
+     xz -z -f -e -T $NUMCPUS "${PKGNAME}" && export PKGNAME="${PKGNAME}.xz"
+  else
+     [[ -n "$( which bzip2 )" ]] && bzip2 -9 -f "${PKGNAME}" && export PKGNAME="${PKGNAME}.bz2"
+  fi
+
+  rm -rf "/tmp/${CONAM}${LCNAME}"
+
+  echo "  + ${XTLD}/pkg/${PKGNAME}" 1>&2
+  popd 2>/dev/null >/dev/null
+}
+
+function SunOSIPSPackage() {
+  if [[ -z "$( which pkg )"  ]] || [[ -z "$( which pkgsend )" ]] || [[ -z "$( which pkgmogrify )" ]] || [[ -z "$( which pkgdepend )" ]] || [[ -z "$( which pkglint )" ]]   ; then return 0; fi
+  if [[ -z "${SUNOSIPSREPO}" ]] || [[ -z "${SUNOSIPSPUBLISHER}" ]]; then return 0; fi
+
+  pushd . 2>/dev/null >/dev/null
+
+  # based on https://blogs.oracle.com/solaris/post/solaris-11-high-level-steps-to-create-an-ips-package
+
+  BANNER="$( head -1 /etc/release | awk '{print $1,$2,$3}' )"
+
+  PKGNAME="$( echo ${LCNAME}@${VER},$(uname -r).${RELEASEDATE} |  tr -s '[:upper:]' '[:lower:]' )"
+  PKGPATH="${XTLD}/pkg/build/tmp/${PKGNAME}"
+
+  mkdir -pm755 "${PKGPATH}"
+  cd           "${PKGPATH}"
+
+  # copy any templates we've got
+  cp -pr "${XTLD}/pkg/templates/SunOS-ips/"* "${PKGPATH}" 2>/dev/null >/dev/null
+
+  # copy our artifacts over
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}" && tar cpf - . ) | (cd "${PKGPATH}" && tar xpf - )
+
+  MANIFEST1="${LCNAME}pkg.p5m.1"
+  MANIFEST2="${LCNAME}pkg.p5m.2"
+  MANIFEST3="${LCNAME}pkg.p5m.3"
+  MANIFESTR="${LCNAME}pkg.p5m.3.res"
+
+  cd ..
+
+cat >>mypkg_attr <<ENDSUNOSPKGATTREND 
+set name=pkg.fmri value=${PKGNAME}
+set name=pkg.summary value="${SOFTWARE}"
+set name=pkg.description value="${DESCRIPTION}"
+set name=pkg.publisher value="${SUNOSIPSPUBLISHER}"
+set name=pkg.fmri.publisher value="${SUNOSIPSPUBLISHER}"
+set name=variant.arch value=$(uname -p)
+ENDSUNOSPKGATTREND
+
+  # generate manifest
+  pkgsend generate "${PKGNAME}" | pkgfmt > "${MANIFEST1}"
+
+  # add metadata to manifest
+  pkgmogrify "${MANIFEST1}" mypkg_attr | pkgfmt > "${MANIFEST2}"
+
+  # Generate dependencies
+  pkgdepend generate -md "${PKGNAME}" "${MANIFEST2}" | pkgfmt > "${MANIFEST3}"
+
+  # Resolve package dependencies
+  pkgdepend resolve -m "${MANIFEST3}"
+
+  # Verify the package
+  (pkglint "${MANIFESTR}" 2<&1 ) 2>&1 >"${LCNAME}-manifest-lint.log"
+
+  # create a repo
+  pkgrepo create "${SUNOSIPSREPO}"
+  
+  pkgrepo -s     "${SUNOSIPSREPO}" set publisher/prefix="${SUNOSIPSPUBLISHER}"
+
+  echo -n "  + " 1>&2
+  # publish the package to the local repo:
+  pkgsend -s "${SUNOSIPSREPO}" publish -d "${PKGNAME}" "${MANIFESTR}" && echo "  IPS Package sent to local repo: ${XTLD}/pkg/build/tmp/${SUNOSIPSREPO} you may wish to save this directory." 1>&2
+
+  popd >/dev/null 2>/dev/null
+}

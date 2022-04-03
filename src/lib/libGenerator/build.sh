@@ -5,7 +5,7 @@
 # this standard block ends around line 45
 #------------------------------------------------------------------------------------------#
 
-set >/tmp/build-libgen.txt
+#set >/tmp/build-libgen.txt
 # ensure we're running from our directory and that we haven't been called from somewhere else
 cd "$(dirname $0)"
 [[ "$(basename $0)" != "build.sh" ]] && echo "$0 must be named build.sh" 1>&2 && exit 9
@@ -83,8 +83,6 @@ WITH68KFLAGS="-dNORMAL_GENERATOR_FLAGS"
 WITHOPTIMIZE="-O2 -ffast-math -fomit-frame-pointer"
 
 
-# turn this on by default.
-
 for opt in $@; do [[ "$opt" == "--no-banner" ]] && NOBANNER=1; done
 
 if [[ -z "$NOBANNER" ]]
@@ -127,7 +125,7 @@ for j in $@; do
             CLEANARTIFACTS  "*.a" "*.o" "*.dylib" "*.so" .last-opts last-opts machine.h "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k
             rm -f /tmp/slot.*.sh*
 
-            if [[ -n "`which ccache`" ]]; then ccache -c >/dev/null 2>/dev/null; fi
+            if [[ -n "`which ccache 2>/dev/null`" ]]; then ccache -c >/dev/null 2>/dev/null; fi
 
             #if we said clean install or clean build, then do not quit
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
@@ -169,7 +167,7 @@ for j in $@; do
   --no-debug)                   WITHDEBUG=""
                                 WARNINGS=""                               ;;
 
-  --debug*)                     WITHDEBUG="$WITHDEBUG -g"
+  --debug*)                     WITHDEBUG="$WITHDEBUG -g -DDEBUG"
                                 WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" 
                                 WITHTRACE="-DDEBUG"
                                 ;;
@@ -179,7 +177,7 @@ for j in $@; do
  #--reg-ipc-comments)           WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS -DIPC_COMMENT_REGS"
  #                              WARNINGS="-Wall"                          ;;
 
-  --debug-on-start)             WITHDEBUG="$WITHDEBUG -g -DDEBUGLOG_ON_START"
+  --trace*on-start)             WITHDEBUG="$WITHDEBUG -g -DDEBUGLOG_ON_START"
                                                                           ;;
   -D*)                          EXTRADEFINES="${EXTRADEFINES} ${opt}";;
 
@@ -187,9 +185,9 @@ for j in $@; do
   --*mem)                       WITHDEBUG="$WITHDEBUG -g -DDEBUGMEMCALLS"
                                 WARNINGS="-Wall"                          ;;
 
-  --with-profile)               WITHDEBUG="$WITHDEBUG -p"                 ;;
+  --profile)                    WITHDEBUG="$WITHDEBUG -p"                 ;;
 
-  --without-optimize)           WITHOPTIMIZE=""                           ;;
+  --no-optimize)                WITHOPTIMIZE=""                           ;;
   --no-68kflag-optimize)        WITH68KFLAGS=""                           ;;
 
 
@@ -203,27 +201,25 @@ done
 
 
 
-if [ -n "$UNKNOWNOPT" ]
-then
+if [[ -n "$UNKNOWNOPT" ]]; then
  echo
  echo "Unknown options $UNKNOWNOPT"
  cat <<ENDHELP
 
 Commands:
  clean                    Removes all compiled objects, libs, executables
+                          (will not build unless you also specify build)
  build                    Compiles lisaem (default)
- clean build              Remove existing objects, compile everything cleanly
+ clean build              Remove existing objects, recompile everything cleanly
  install                  Not yet implemented on all platforms
  uninstall                Not yet implemented on all platforms
 
-Debugging Options:
+Debugging Options:        (you can skip with, and replace no for without)
 --without-debug           Disables debug and profiling
 --with-debug              Enables symbol compilation
 --with-debug-mem          Enable memory call debugging
---with-ipc-comments       Enable IPC comments facility
---with-reg-ipc-comments   Enable IPC comments and register recording
 --with-tracelog           Enable tracelog debugging
---with-debug-on-start     Turn on debug log as soon as libGenerator is started.
+--with-tracelog-on-start     Turn on debug log as soon as libGenerator is started.
 
 Other Options:
 --without-optimize        Disables optimizations
@@ -231,11 +227,10 @@ Other Options:
 --no-banner               Suppress version/copyright banner
 
 Environment Variables you can pass:
-
-CC                        Path to C Compiler
-CPP                       Path to C++ Compiler
-WXDEV                     Cygwin Path to wxDev-CPP 6.10 (win32 only)
-PREFIX                    Installation directory
+ CC,CPP,GDB                Paths to C Compiler tools
+ CPP                       Path to C++ Compiler
+ WXDEV                     Cygwin Path to wxDev-CPP 6.10 (win32 only)
+ PREFIX                    Installation directory
 
 i.e. CC=/usr/local/bin/gcc ./build.sh ...
 
@@ -258,8 +253,8 @@ fi
 
 needclean=0
 
-MACHINE="`uname -mrsv`"
-[[ "$MACHINE"   != "$LASTMACHINE" ]] && needclean=1
+THISMACHINE="`uname -mrsv`"
+[[ "$THISMACHINE"   != "$LASTMACHINE" ]] && needclean=1
 #debug and tracelog changes affect the whole project, so need to clean it all
 [[ "$WITHTRACE" != "$LASTTRACE" ]] && needclean=1
 [[ "$WITHDEBUG" != "$LASTDEBUG" ]] && needclean=1
@@ -276,7 +271,7 @@ fi
 echo "LASTTRACE=\"$WITHTRACE\""  > .last-opts
 echo "LASTDEBUG=\"$WITHDEBUG\""  >>.last-opts
 echo "LASTBLITS=\"$WITHBLITS\""  >>.last-opts
-echo "LASTMACHINE=\"$MACHINE\""  >>.last-opts
+echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 
 ###########################################################################
 echo Building libGenerator...
@@ -299,24 +294,31 @@ export CFLAGS="$ARCH $CFLAGS $NOWARNFORMATTRUNC $NOUNKNOWNWARNING $EXTRADEFINES"
 
 if [[ "$DEPS" -gt 0 ]] ######################################################################
 then
+
+  # when cross compiling, we need def68k and gen68k to be native as they generate C code locally
+  # on macos x 10.5 rosetta works from i386 on ppc, but not here.
+
+  export ZARCH="$ARCH"
+  [[ -n "$DARWIN" && "$OSVER" > "11.0" ]] && [[ "$OMACHINE" == "x86_64" || "$OMACHINE" == "arm64" ]] && export ZARCH="   -m64 -arch x86_64 -arch arm64   "
+
   export COMPILEPHASE="gen"
   export PERCENTJOB=0 NUMJOBSINPHASE=24
   export OUTEXT=""
-  export COMPILECOMMAND="$CC $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $ARCH -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
+  export COMPILECOMMAND="$CC $ZARCH $CLICMD $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE -c :INFILE:.c -o ../:OUTFILE:.o $INC $CFLAGS"
   LIST=$(WAIT="yes" INEXT=c OUTEXT=o OBJDIR=obj VERB=Compiled COMPILELIST tab68k def68k )
 
   cd ${XTLD}/obj
   waitqall
-  $CC $CLICMD $ARCH  -o def68k tab68k.o def68k.o
+  #echo $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
+  $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
 
   cd ${XTLD}/cpu68k
   echo -n "  "
   ../obj/def68k || exit 1
 
   echo "  Compiled gen68k.c..."
-  $CC $CLICMD $ARCH $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
-
-  $CC $CLICMD $ARCH $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o 
+  $CC $ZARCH $CLICMD  $WITHDEBUG $WITHTRACE -c gen68k.c -o ../obj/gen68k.o $CFLAGS $INC  || exit 1
+  $CC $ZARCH $CLICMD  $M -o ../obj/gen68k ../obj/tab68k.o ../obj/gen68k.o 
   echo -n "  "
   ${XTLD}/obj/gen68k || exit 1
 

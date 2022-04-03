@@ -64,7 +64,8 @@ if ! is_bashbuild_loaded 2>/dev/null; then
       echo "Starting compile at $STARTCOMPILE $(date)" >"${BUILDWARNINGS}"
    fi
 
-   [[ -z "$TLD" ]] && export TLD="$( /bin/pwd )"  # | sed -e's/ /?/g' )"
+   [[ -z "$TLD" ]] && export   TLD="$( /bin/pwd )"  # | sed -e's/ /?/g' )"
+   [[ -z "$XTLD" ]] && export XTLD="$( /bin/pwd )"  # | sed -e's/ /?/g' )"
    if [[ -n "$(echo $TLD | grep ' ')" ]]; then
       echo "Please place this source code in a directory whose path does not contain spaces" 1>&2
       echo "(shell scripts generally have issues with this and will fail to work properly)" 1>&2
@@ -108,9 +109,9 @@ if ! is_bashbuild_loaded 2>/dev/null; then
    [[ -z "$UPXCMD"  ]] && export  UPXCMD="$( which upx       2>/dev/null )"
 
    # load system specific settings/scripts and all the functions needed
-   fn=""
-   for fn in $(ls -1 $TLD/bashbuild/${OS}*.sys 2>/dev/null); do source "${fn}"; done
-   [[ -z "$fn" ]] && ( echo "Could not load settings for \"$OS\" operating system" 1>&2; exit 60; )
+   fn=""; foundos=""
+   for fn in $(ls -1 $TLD/bashbuild/${OS}*.sys 2>/dev/null); do source "${fn}"; foundos=1; done
+   [[ -z "$foundos" ]] && ( echo "Could not load settings for \"$OS\" operating system" 1>&2; exit 60; )
 
    # :TODO: each OS file should include functions for making packages, linking, compiling, etc.
    #        these should have a standard naming convention such as Linux-pkg.sys, etc.
@@ -128,7 +129,7 @@ if ! is_bashbuild_loaded 2>/dev/null; then
 
    # calculate all include and lib file paths, if wx-config.fn is in bashbuild
    # they'll be included here as well. If your project doesn't rely on wxWidgets
-   # you should remove wx-config.fn
+   # you should remove post-wx-config.fn 
 
    # since variables set inside bash functions are all local we have to do it like this.
    eval $(set_includes_and_libs)
@@ -171,7 +172,7 @@ function strip_and_compress() {
   sync
   for app in $@; do
       #echo "  Compiled size:        $(du -h ${app} 2>/dev/null)" 1>&2
-      echo  "  Compiled size:        $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+      echo  "  Compiled size:        $( printf '%-5s %s ' $(ls -lah ${app}  2>/dev/null | awk '{print $5,$9}' ))" 1>&2
   done
 
   # strip is fast, don't bother producing output
@@ -193,16 +194,17 @@ function strip_and_compress() {
   waitqall
 
   # hashes are relatively fast, don't bother producing output
+  rm -f hashes.txt
   for app in $@; do
-      [[ -n "$MD5SUM"  ]] && qjob "" $MD5SUM  $HASOPTS "${app}" ">>hashes.txt"
-      [[ -n "$SHA1SUM" ]] && qjob "" $SHA1SUM $HASOPTS "${app}" ">>hashes.txt"
-      [[ -n "$SHA256"  ]] && qjob "" $SHA256  $HASOPTS "${app}" ">>hashes.txt"
+      [[ -n "$MD5SUM"  ]] && $MD5SUM  $HASOPTS "${app}" >>hashes.txt 2>/dev/null
+      [[ -n "$SHA1SUM" ]] && $SHA1SUM $HASOPTS "${app}" >>hashes.txt 2>/dev/null
+      [[ -n "$SHA256"  ]] && $SHA256  $HASOPTS "${app}" >>hashes.txt 2>/dev/null
   done
   waitqall
   sync
   for app in $@; do
       #echo "  Final size   :        $(du -h ${app} 2>/dev/null)" 1>&2
-      echo  "  Final size   :        $(ls -lah ${app} 2>/dev/null | awk '{print $5,$9}')" 1>&2
+      echo  "  Final size   :        $( printf '%-5s %s ' $(ls -lah ${app}  2>/dev/null | awk '{print $5,$9}' ))" 1>&2
   done
 }
 

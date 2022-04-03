@@ -57,10 +57,10 @@ void debug_on(char *reason)
     char filename[1024];
     FILE *loglist=NULL;
 
-    if (!lisaram) return;
+    //if (!lisaram) {ALERT_LOG(0,"Cannot open log, no LisaRAM yet"); sleep(10); return; }
 
-    if (buglog==NULL) buglog=stderr;                    // never set up properly
-    if (buglog!=stderr) return;                         // already enabled?
+    if (buglog==NULL) buglog=stderr;          
+    if (buglog!=stderr) {ALERT_LOG(0,"Not enabling tracelog - already enabled"); return;}
 
 #ifdef __WXMSW__
      return;
@@ -131,10 +131,10 @@ void debug_off(void)
 void  mc68k_reset(void)
 {
 
-  fprintf(buglog,"CPU RESET OPCODE Called");
+  if (buglog) fprintf(buglog,"CPU RESET OPCODE Called");
   floppy_6504_wait=0;
 
-  ALERT_LOG(0,"DANGER - Add more I/O RESET code here");
+  ALERT_LOG(0,"Maybe - Add more I/O RESET code here");
 }
 
 
@@ -292,6 +292,9 @@ void switch_mouse_vector(void)
 //static int crapcycles=0;
 // remove me
 
+extern void apply_xenix_hle_patches(void);
+extern void apply_monitor_hle_patches(void);
+
 int check_running_lisa_os(void)
 {
    uint32 v1,v2;
@@ -300,9 +303,7 @@ int check_running_lisa_os(void)
 
    mouse_x_tolerance=1;           mouse_y_tolerance=1;
    mouse_x_halfing_tolerance=1;   mouse_y_halfing_tolerance=1;
-
    v1=lisa_ram_safe_getlong((uint8)1,(uint32)0x0064);  v2=lisa_ram_safe_getlong((uint8)1,(uint32)0x0068);
-
 
    //crapcycles++;
    //if (crapcycles>20) {fprintf(stderr,"v1:%08x v2:%08x @%08x\n",v1,v2,pc24); crapcycles=0;}
@@ -312,43 +313,59 @@ int check_running_lisa_os(void)
             //if (lisa_os_mouse_x_ptr!=0x00000486) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 486",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000486;   lisa_os_mouse_y_ptr=0x00000488;
             running_lisa_os=LISA_ROM_RUNNING;
-            //ALERT_LOG(0,"Lisa ROM Running");
+            DEBUG_LOG(0,"Lisa ROM v1:%08x v2:%08x",v1,v2);
             return running_lisa_os;
       }
    else
-   if ((v1 & 0x00ff0000) ==0x00520000  && (v2 & 0x00ff0000)==0x00520000)           // Lisa OS + Workshop
+   if (((v1 & 0x00ff0000) ==0x00520000  && (v2 & 0x00ff0000)==0x00520000) ||          // Lisa OS 3.x + Workshop
+       ((v1 & 0x00ff0000) ==0x00500000  && (v2 & 0x00ff0000)==0x00500000) )           // LOS 1.2
       {
+        // LOS 1.2: v1=0050080e v2=0050098c; test1,2,3: 426effe8, e5402070, 00363d68
         //if (lisa_os_mouse_x_ptr!=0x00cc00f0) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to cc00f0",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr =0x00cc00f0;   lisa_os_mouse_y_ptr=0x00cc00f2;
             mouse_x_tolerance=4;   mouse_y_tolerance=4;
             running_lisa_os=LISA_OFFICE_RUNNING;
-            //ALERT_LOG(0,"Lisa Office System Running");
+            DEBUG_LOG(0,"Lisa Office System v1:%08x v2:%08x",v1,v2);
             return running_lisa_os;}
    else
-   if ( ((v1 & 0x00ff0000) ==0x00ec0000  && (v2 & 0x00fff000)==0x00ec0000) ||      // LisaTest - this one might be wrong!
-        ((v1 & 0x000ff000) ==0x000ec000  && (v2 & 0x000ff000)==0x000ec000)  )      // LisaTest for Peripherals v1=000ec92a v2=000eca7a
+   if ( ((v1 & 0x00ff0000) ==0x00ec0000  && (v2 & 0x00fff000)==0x00ec0000) ||         // LisaTest - this one might be wrong!
+        ((v1 & 0x000ff000) ==0x000ec000  && (v2 & 0x000ff000)==0x000ec000)  )         // LisaTest for Peripherals v1=000ec92a v2=000eca7a
       {//                 v1:000ec92a                       v2:000eca7a
         //if (lisa_os_mouse_x_ptr!=0x00000fec) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to fec",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000fec;   lisa_os_mouse_y_ptr=0x000000fee;
             running_lisa_os=LISA_TEST_RUNNING;
-           // ALERT_LOG(0,"Lisa Test Running: v1=%08x v2=%08x",v1,v2);
+            DEBUG_LOG(0,"LisaTest v1:%08x v2:%08x",v1,v2);
+
             return running_lisa_os;}
-   else
-   if ((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500)            // Monitor OS (No mouse used)
+   else                   // 000ff000                          000fff00
+   if ( ((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500) ||         // Monitor OS (No mouse used)
+        ((v1 & 0x00fff000) ==0x001c2000  && (v2 & 0x00ffff00)==0x001c2500) ||         // this is a clue - address has changed!!!! maybe that's why LOS crashes!
+        ((v1 & 0x00fff000) ==0x00142000  && (v2 & 0x00fff000)==0x00142000) ||
+        ((v1 & 0x00fff000) ==0x00162000  && (v2 & 0x00fff000)==0x00162000) )
       {
            //if (lisa_os_mouse_x_ptr!=0x00000fec) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to fec",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000fec;   lisa_os_mouse_y_ptr=0x000000fee;
             running_lisa_os=LISA_MONITOR_RUNNING;
-            //ALERT_LOG(0,"Lisa Monitor Running: v1=%08x v2=%08x",v1,v2);
+            DEBUG_LOG(0,"Lisa Monitor Running: v1=%08x v2=%08x",v1,v2);
+            if (monitor_patch) apply_monitor_hle_patches();
             return running_lisa_os;}
-   else
-   if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||           // Macworks XL 3.0
-        ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) )            // 2020.08.03 did this move due to extra RAM?
+   else                    //00fff000                          00fff000
+   if ( ((v1 & 0x00fff000) ==0x000e4000  && (v2 & 0x00fff000)==0x000e4000) ||         // Macworks XL 3.0
+        ((v1 & 0x00fff000) ==0x00144000  && (v2 & 0x00fff000)==0x00144000) ||         // 2020.08.03 did this move due to extra RAM?
+        ((v1 & 0x00fff000) ==0x001b6000  && (v2 & 0x00fff000)==0x001b6000) ||         // 2021.03.23 and yet a new address!
+        ((v1 & 0x00fff000) ==0x00156000  && (v2 & 0x00fff000)==0x00156000) ||         // MacWorks XL 4.5 v1=00156206 v2=00156384; test1,2,3: 50555445, 400022d8, 91fc0000| 23:27:31.1 1242627682
+        ((v1 & 0x00fff000) ==0x001c4000  && (v2 & 0x00fff000)==0x001c4000) || 
+        ((v1 & 0x00fff000) ==0x00164000  && (v2 & 0x00fff000)==0x00164000) ||
+         (bootblockchecksum==0xce0ca734  || bootblockchecksum==0xce0cbba3) ||         // MWXL3.0, MWXL4.5 floppy
+         (bootblockchecksum==0xb66c2a5d                                  ) ||         // MW+II v2.3.0 floppy
+         (bootblockchecksum==0x703fe7ba                                  ) ||         // MWXL 3.0 profile boot block
+         (bootblockchecksum==0xce0cb94e                                  )            // MW1.018 for system 6
+        )
       {
            //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;
             mouse_x_tolerance=4;   mouse_y_tolerance=4;
-            //ALERT_LOG(0,"MacWorks Running");
+            DEBUG_LOG(0,"MacWorks v1:%08x v2:%08x",v1,v2);
             running_lisa_os=LISA_MACWORKS_RUNNING;
             return running_lisa_os;}
    else
@@ -357,12 +374,36 @@ int check_running_lisa_os(void)
             //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;
             running_lisa_os=LISA_XENIX_RUNNING;
-            //ALERT_LOG(0,"MicroSoft Xenix Running: v1=%08x v2=%08x",v1,v2);
+            DEBUG_LOG(0,"MicroSoft Xenix Running: v1=%08x v2=%08x",v1,v2);
+            if (xenix_patch) apply_xenix_hle_patches();
             return running_lisa_os;
       }
+   else
+   if  ((v1 & 0x00ffffff) ==0x0001c26c  && (v2 & 0x00ffffff)==0x0001c270)           // UniPlus -  v1=0001c26c v2=0001c270|
+      {
+            lisa_os_mouse_x_ptr=0x0000082e;   lisa_os_mouse_y_ptr=0x00000082c;      // Unknown mouse handler locations for now, will revisit after getting it working
+            running_lisa_os=LISA_UNIPLUS_RUNNING;
+            DEBUG_LOG(0,"UniPlus Running: v1=%08x v2=%08x",v1,v2);
+            return running_lisa_os;
+      }
+   else
+   if  ((v1 & 0x00ffffff) ==0x0001c4ac  && (v2 & 0x00ffffff)==0x0001c4b0)           // UniPlus SUNIX-   v1=0001c4ac v2=0001c4b0
+      {
+            running_lisa_os=LISA_UNIPLUS_SUNIX_RUNNING;
+            DEBUG_LOG(0,"UniPlus sunix v1.1 kernel Running: v1=%08x v2=%08x",v1,v2);
+            return running_lisa_os;
+      }
+      // LOS 1.2: v1=0050080e v2=0050098c; test1,2,3: 426effe8, e5402070, 00363d68
+      // src/lisa/motherboard/glue.c:check_running_lisa_os:382:Unknown OS Running: v1=0001c4ac v2=0001c4b0| 20:10:38.8 441279005
+
+
+   abort_opcode=2; uint32 test1=fetchlong(0x400040); abort_opcode=0;
+   abort_opcode=2; uint32 test2=fetchlong(0x400080); abort_opcode=0;
+   abort_opcode=2; uint32 test3=fetchlong(0x400088); abort_opcode=0;
+
 
    running_lisa_os=UNKNOWN_OS_RUNNING;
-   ALERT_LOG(0,"Unknown OS Running: v1=%08x v2=%08x",v1,v2);
+   ALERT_LOG(0,"Unknown OS Running: v1=%08x v2=%08x; test1,2,3: %08x, %08x, %08x",v1,v2,test1, test2, test3);
    return running_lisa_os;
 }
 
@@ -441,9 +482,6 @@ void debugger(void)
     uint32 oldcx=context;
     uint32 dcx=context, mdcx=context;
     uint i;
-
-
-
 
  //         .........1.........2.........3.........4.........5.........6.........7
  //         123456789012345678901234567890123456789012345678901234567890123456789012345678
