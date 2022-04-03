@@ -50,6 +50,46 @@ Usage: lisaem [-h] [-p] [-q] [-f <str>] [-d] [-F[-]] [-z <double>] [-s[-]] [-c <
   -k, --kiosk           kiosk mode (suitable for RPi Lisa case)
   -o, --originctr       skinless mode: center video(-o) vs topleft(-o-)
 ```
+## 2022.04.01
+
+Added TerminalWx console + preferences.
+
+If you're using text based OS such as Monitor, LPW, UniPlus, (and eventually Xenix), if you enable the console TerminalWx window, you'll get a small terminal window that opens up along with the main window.
+The purpose of this is to allow you to capture text output, or upload a text file, etc. rather than use the more limited graphical window.
+
+UniPlus now works on LisaEm, however, you'll need to use a pre-install Widget/ProFile image that you'd download to a modern machine using BLU and then convert it using the blu-to-dc42 too.
+
+Speaking of, many new tools have now been added and updated as well. They are:
+
+```
+blu-to-dc42                    - convert a BLU image to DC42 for use in LisaEm
+dc42-add-tags                  - add tags to an image without them (does not fix missing tags)
+dc42-copy-boot-loader          - copy the boot sector and loader from one image to another
+dc42-copy-selected-sectors     - copy a list of sectors from one image to another
+dc42-diff                      - diff two disk images
+dc42-dumper                    - dump an image to text files
+dc42-resize-to-400k            - resize a short DC42 to 400K
+dc42-to-blu                    - convert a DC42 image to BLU so you can upload it back to a physical Lisa hard drive
+dc42-to-raw                    - convert a DC42 image to RAW format
+dc42-to-rraw                   - same but puts the tags at the ends of sectors rather than the start
+dc42-to-split-raw              - convert a disk image to split
+dc42-to-tar                    - untar a bunch of Xenix floppies to individual files
+decode-vsrom                   - given a video state ROM dump, decode the serial number stored within
+idefile-to-dc42                - convert an IDE:File image to Disk Copy format (written by Natalia Portillo)
+lisadiskinfo                   - get info about a disk image
+lisafsh-tool                   - Lisa File System shell tool - interactively work with a disk image (now with ReadLine support)
+lisa-serial-info               - info about your Lisa's serial #
+los-bozo-on                    - DRM Protect a Lisa Office System Tool
+los-deserialize                - Deserialize and UnDRM a (un)branded Lisa Office System Tool
+patchxenix                     - Patch Xenix for use with X/ProFile drives
+raw-to-dc42                    - convert raw disk images to DC42 for use with LisaEm
+rraw-to-dc42                   - convert reverse raw (tags at the end) disk images to DC42 for use with LisaEm
+uniplus-bootloader-deserialize - deserialize the UniPlus loader off a ProFile/Widget hard drive
+uniplus-set-profile-size       - don't use yet. This modifies the UniPlus kernel partition table sizes to use larger hard drives.
+```
+
+LisaFSH Tool now has readline support so tab expansion of commands and history are now available (for systems with GNU readline, history, ncurses)
+
 
 ## 2021.01.15
 
@@ -99,9 +139,11 @@ Next, open the Cygwin terminal (MinTTY), use the scripts in the scripts director
 The scripts directory contains several scripts that you could use to build wxWidgets for your system. We will generally link LisaEm statically, especially for macOS x and 
 
 ```
-build-wx3.1.2-modern-macosx.sh
-build-wxwidgets-cygwin-windows.sh
-build-wxwidgets-gtk.sh
+scripts/build-wx3.0.2-elder-macosx.sh
+scripts/build-wx3.1.2-modern-macosx.sh
+scripts/build-wx3.1.5-cygwin-windows.sh
+scripts/build-wx3.1.5-gtk.sh
+scripts/build-wx3.1.5-modern-macosx.sh
 ```
 After wxWidgets is installed to `/usr/local/wxsomething`, add `/usr/local/wxsomething/bin` to your path before running the LisaEm build script.
 
@@ -152,7 +194,7 @@ Native OS provided copies of wxWidgets, such as those packaged with various Linu
 
 Binary distributions of LisaEm for macOS X provided on `dmg` images, will include multiple binaries for multiple CPU architectures such as PPC, PPC64, i386, and x86-64. While the macOS x `lipo` command can glue multiple architecture binaries together, it cannot let you package up multiple copies of a single architecture. To get around this, I've added an internal selector script `lisaem.sh` in the resources directory which is copied to `LisaEm.app/Contents/MacOS/lisaem.sh` - this scripts looks at your system and figures out what macOS version and CPU architecture you're running and then attempts to find the most likely binary suitable for your machine and runs that one.
 
-Because some macOS/Xcode versions are only compatible with certain versions of wxWidgets, for example, Mac OS X 10.8 (Mountain Lion) will use a copy of LisaEm compiled against wxWidgets 3.0.4, while macOS 10.15 (Catalina) will run a copy of LisaEm compiled against wxWidgets 3.1.3. You can use the "About LisaEm" menu item under the credits to see the version.
+Because some macOS/Xcode versions are only compatible with certain versions of wxWidgets, for example, Mac OS X 10.8 (Mountain Lion) will use a copy of LisaEm compiled against wxWidgets 3.0.4, while macOS 10.15 (Catalina) will run a copy of LisaEm compiled against wxWidgets 3.1.5. You can use the "About LisaEm" menu item under the credits to see the version.
 
 Additionally a `--delete-other-binaries` option is provided in the script, so if you run `/Applications/LisaEm.app/Contents/MacOS/lisaem.sh --delete-other-binaries` from iTerm or Terminal, it will delete the shipped binaries that are not appropriate to your system, saving you a few MB.
 
