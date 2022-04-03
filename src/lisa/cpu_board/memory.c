@@ -716,11 +716,9 @@ int getsnbit(void)
 
 int peeksnbit(void) {return (  ((serialnum240[serialnumshiftcount>>3]) & (1<<((serialnumshiftcount&7)^7))) ? 32768:0);}
 
-
-
 uint8  *lisa_mptr_OxERROR(uint32 addr)
 {
-    EXITR(321,NULL,"Something's wrong with the MMU - bad mapping at %8x****\n", addr);
+    EXITR(321,((uint8 *)(NULL)),"Something's wrong with the MMU - bad mapping at %8x****\n", addr);
 }
 
 uint8  lisa_rb_OxERROR(uint32 addr)
@@ -2251,7 +2249,9 @@ void   lisa_wb_Oxe800_videlatch(uint32 addr, uint8 data)
         if (!!(data & 0x80))  {  ALERT_LOG(100,"video latch write:MOTHERBOARD ERROR LED FLASHING: @%08x latch=%02x set by pc:%d/%08x",addr,data,context,reg68k_pc); return;}
         data &= 0x7f;
       //if  ( (maxlisaram!=1024*1024 && ((uint32)(data<<15) < maxlisaram ))  || (maxlisaram==1024*1024 && ((uint32)(data<<15) < maxlisaram+0x80000 )) )
-      if  ( (data*32768)<maxlisaram && (data*32768)>=minlisaram )
+
+
+      if  ( (uint32)(data*32768)<maxlisaram && (uint32)(data*32768)>=minlisaram )
             {
                 videolatch=data & 0x7f; videolatchaddress=(videolatch*32768);
                 ALERT_LOG(0,"Video Latch set to:%02x address:%08x",videolatch,videolatchaddress);

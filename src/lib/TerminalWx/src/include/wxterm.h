@@ -34,8 +34,6 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 class wxTerm : public wxWindow, public GTerm
 {
   int
-    m_charWidth,
-    m_charHeight,
     m_init,
     m_width,
     m_height,
@@ -49,9 +47,13 @@ class wxTerm : public wxWindow, public GTerm
     m_curBG,
     m_curFlags,
     m_curState,
-    m_curBlinkRate;
+    m_curBlinkRate,
+    m_fontsize;
 
-      int m_charsInLine;
+  char *m_fontname;
+
+
+  int m_charsInLine;
   int m_linesDisplayed;
 
   unsigned char
@@ -105,6 +107,9 @@ public:
     OVERSTRIKE = 1,
     FONT = 2
   };
+  int m_charWidth,
+      m_charHeight;
+
 
 private:
   BOLDSTYLE
@@ -123,9 +128,10 @@ private:
 
 public:
   wxTerm(wxWindow* parent, wxWindowID id,
-         const wxPoint& pos = wxDefaultPosition,
-         int width = 80, int height = 24,
-         const wxString& name = "wxTerm");
+               const wxPoint& pos = wxDefaultPosition,
+               int width = 80, int height = 24,
+               const wxString& name = "wxTerm",
+               int fontsize = 10, char *fontname="Courier New");
 
   virtual ~wxTerm();
 

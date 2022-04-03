@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                   A part of the Apple Lisa 2 Emulator Project                        *
 *                                                                                      *
-*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
 *                            All Rights Reserved                                       *
 *                                                                                      *
 *                     Release Project Name: LisaFSh Tool                               *
@@ -13,6 +13,12 @@
 #include <time.h>
 
 #include <libdc42.h>
+
+#ifdef HAVEREADLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+
+#endif
 
 const uint16 dispsize=16;
 
@@ -41,7 +47,7 @@ uint32 firstmddf=65536;
 
 char directory[65536];
 // these arrays are super inefficient, but wtf
-char filenames[65536][3][64];         // [fileid][size of file name][2] 0=Lisa name 1=sanitized name
+char filenames[65536][4][64];         // [fileid][size of file name][2] 0=Lisa name 1=sanitized name
                                       // cached file names for all the tags - kind of big, I know.
 
 uint32 size1[65536]; // one of these is physical size, the other logical
@@ -89,8 +95,8 @@ enum command_enum {nullcmd=-999,   secprevcmd=-2,   secnxt=-1,      // blank -/+
                    loadsec=19,     loadbin=20,      loadprofile=21, volname=22,        quit=23                 };
 enum command_enum command;
 
-#define QUITCOMMAND 22
-#define LASTCOMMAND 23
+#define QUITCOMMAND 23
+#define LASTCOMMAND 24
 
 char *cmdstrings[LASTCOMMAND+2] =
                   {"sector",       "cluster",       "display",     "setclustersize",   "dump",        "tagdump",
@@ -472,9 +478,10 @@ char *get_fileflags(uint16 f)
 
 void get_dir_file_names(DC42ImageType *F)
 {
- uint32 sector, mysect, i,j,k,l,m,ti,ts;                           // sector is the search for the allocation bitmap, as is the active sector
+ uint32 sector, mysect, i,j,k,l,m,ti,ts;                       // sector is the search for the allocation bitmap, as is the active sector
  uint16 fileid;
- uint8 *sec, *f;
+ uint8 *sec; 
+ char *f;
  //int offset=0x10;                                            // start offset
  char filename[128];                                           // current file name I'm working on
 
@@ -908,7 +915,6 @@ void extract_files(DC42ImageType *F)
               //write remainder of sector to the binary file
               //sec=&(sectors[sect*sectorsize+0xf0]);
               sec=(uint8 *)dc42_read_sector_data(F,sect);
-              //fwrite(sec,(F->datasize-0xf0),1,fb);     // bug found by Rebecca Bettencourt
               fwrite(sec+0xf0,(F->datasize-0xf0),1,fb);  // bug found by Rebecca Bettencourt
               if (errno) {fprintf(stderr,"An error occured on file %s",newfileb); perror("");
                          fclose(fb); fclose(fx); int i=chdir(".."); return;}
@@ -1030,7 +1036,65 @@ void extract_file_extents_from_tags(DC42ImageType *F)
 }
 
 
+#ifdef HAVEREADLINE
+char **command_name_completion(const char *, int, int);
 
+char *command_names[] = {
+     "!",
+     "help",
+     "?",
+     "version",
+     "+",
+     "-"
+     "editsector",
+     "edittag",
+     "difftoimg",
+     "loadsec",
+     "loadbin",
+     "loadprofile"
+     "display"
+     "dump"
+     "n",
+     "p",
+     "tagdump"
+     "sorttagdump",
+     "sortdump",
+     "bitmap",
+     "extract",
+     "dir",
+     "dirx",
+     "volname",
+     "quit",
+      NULL
+};
+
+char *
+command_name_generator(const char *text, int state)
+{
+    static int list_index, len;
+    char *name;
+
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+    }
+
+    while ((name = command_names[list_index++])) {
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
+
+    return NULL;
+}
+
+char **
+command_name_completion(const char *text, int start, int end)
+{
+    rl_attempted_completion_over = 1;
+    return rl_completion_matches(text, command_name_generator);
+}
+#endif
 
 void getcommand(void)
 {
@@ -1045,14 +1109,56 @@ for ( i=0; i<MAXARGS; i++) cargs[i]=NULL;
 memset(cargsstorage,0,8192);
 
 command=LASTCOMMAND;
-ss=fgets(line,8192,stdin);
 
-strncpy(cmd_line,line,8192);
-cmd_line[strlen(cmd_line)-1]=0;
+#ifdef HAVEREADLINE
+  rl_attempted_completion_function = command_name_completion;
 
-len=strlen(line);
-if (feof(stdin)) {puts(""); exit(1);}
-if (len) line[--len]=0; else return; // knock out eol char
+  cmd_line[0]=0;
+  line[0]=0;
+  ss = readline("lisafsh> ");
+  if  (ss!=NULL) {
+      strncpy(cmd_line,ss,8192);
+      strncpy(line,ss,8192);
+      add_history(ss);
+
+      // strip off any CR/LF from the end
+      for (int i=0; cmd_line[i]!=0; i++) {
+          if (cmd_line[i]<31) cmd_line[i]=' ';
+          if (    line[i]<31)     line[i]=' ';
+      }
+  }
+  else
+  {
+      strncpy(cmd_line,"quit",6);
+      strncpy(line,"quit",6);
+      add_history("quit");
+  }
+
+  line[8191]=0;
+  cmd_line[8191]=0;
+
+  len=strlen(cmd_line);
+
+  if (ss) free(ss);  
+  ss=line;
+  //fprintf(stderr,"\nreadline in use\n");
+  #else
+  printf("lisafsh> ");
+  ss=fgets(line,8192,stdin);
+  line[8191]=0;
+  strncpy(cmd_line,line,8192);
+  len=strlen(line);
+
+  // strip off any CR/LF from the end
+  for (int i=0; cmd_line[i]!=0; i++) {
+      if (cmd_line[i]<31) cmd_line[i]=' ';
+      if (    line[i]<31)     line[i]=' ';
+  }
+
+#endif
+
+if (feof(stdin)) {puts("EOF"); exit(1);}
+
 if (!len) {command=-1;return;}       // shortcut for next sector.
 if (line[0]=='!')                 {if (len==1) i=system("sh");
                                    else        i=system(&line[1]);
@@ -1065,11 +1171,15 @@ if (line[0]=='+' || line[0]=='-') {l=strtol(line,NULL,0);sector+=l; command=DISP
 space=strchr(line,32);
 if (space) space[0]=0;
 
-for (i=0; i<LASTCOMMAND; i++) if (strncmp(line,cmdstrings[i],16)==0) command=i;
+for (i=0; i<LASTCOMMAND; i++) 
+    if (strncmp(line,cmdstrings[i],16)==0) command=i;
+
 // shortcut for sector number
 iargs[0]=strtol(line,NULL,0); if ( line[0]>='0' && line[0]<='9' ) {command=0; return;}
-if (command==LASTCOMMAND) {puts("Say what?  Type in help for help..\n"); return;}
-if (command==QUITCOMMAND) {puts("Closing image"); dc42_close_image(&F); puts("Bye"); exit(0);}
+
+
+if (command==LASTCOMMAND) {puts("Say what?  Type in help for help...\n"); return;}
+if (command==QUITCOMMAND) {puts("Quit: Closing image"); dc42_close_image(&F); puts("Bye"); exit(0);}
 if (!space) return;
 line[len]=' ';
 line[len+1]=0;
@@ -1093,148 +1203,6 @@ while (  (space=strchr(s,(int)' '))!=NULL && lastarg<MAXARGS)
  }
 
 }
-
-
-
-//int floppy_disk_copy_image_open(DC42ImageType *F)
-//{
-//
-//return dc42_open(DC42ImageType *F, char *filename, char *options);
-//
-//}
-
-/*
-uint32 i,j;
-unsigned char comment[64];
-unsigned char dc42head[8192];
-uint32 datasize=0, tagsize=0, datachks=0, tagchks=0, mydatachks=0L, mytagchks=0L;
-uint16 diskformat=0, formatbyte=0, privflag=0;
-
-    errno=0;
-    fseek(F->fhandle, 0,0);
-    fread(dc42head,84,1,F->fhandle);
-    if (errno) {perror("Got an error."); exit(1);}
-
-    memcpy(comment,&dc42head[1],64);
-    comment[63]=0;
-    if (dc42head[0]>63) {fprintf(stderr,"Warning pascal str length of label is %d bytes!\n",(int) (dc42head[0]));}
-    else comment[dc42head[0]]=0;
-
-    F->sectoroffset=84;
-    datasize=(dc42head[64+0]<<24)|(dc42head[64+1]<<16)|(dc42head[64+2]<<8)|dc42head[64+3];
-    tagsize =(dc42head[68+0]<<24)|(dc42head[68+1]<<16)|(dc42head[68+2]<<8)|dc42head[68+3];
-    datachks=(dc42head[72+0]<<24)|(dc42head[72+1]<<16)|(dc42head[72+2]<<8)|dc42head[72+3];
-    tagchks =(dc42head[76+0]<<24)|(dc42head[76+1]<<16)|(dc42head[76+2]<<8)|dc42head[76+3];
-
-    tagstart=84+datasize;
-
-    diskformat=dc42head[80];
-    formatbyte=dc42head[81];
-    privflag=(dc42head[82]<<8 | dc42head[83]);
-
-    printf("Header comment :\"%s\"\n",comment);
-    printf("Data Size      :%ld (0x%08x)\n",datasize,datasize);
-    printf("Tag total      :%ld (0x%08x)\n",tagsize,tagsize);
-    printf("Data checksum  :%ld (0x%08x)\n",datachks,datachks);
-    printf("Tag checksum   :%ld (0x%08x)\n",tagchks,tagchks);
-    printf("Disk format    :%d  ",diskformat);
-
-    switch(diskformat)
-    {
-        case 0: printf("400K GCR\n"); break;
-        case 1: printf("800K GCR\n"); break;
-        case 2: printf("720K MFM\n"); break;
-        case 3: printf("1440K MFM\n"); break;
-        default: printf("unknown\n");
-    }
-    printf("Format byte    :0x%02x   ",formatbyte);
-    switch(formatbyte)
-    {
-        case 0x12: printf("400K\n"); break;
-        case 0x22: printf(">400k\n"); break;
-        case 0x24: printf("800k Apple II Disk\n"); break;
-        default: printf("unknown\n");
-    }
-    printf("Private        :0x%04x (should be 0x100)\n",privflag);
-    printf("Data starts at :0x%04x (%ld)\n",84,84);
-    printf("Tags start at  :0x%04x (%ld)\n",tagstart,tagstart);
-    sectorsize=512;
-    F->numblocks=datasize/sectorsize;
-    tagstart=84 + datasize;
-    tagsize=tagsize/F->numblocks;
-
-    F->numblocks=datasize/sectorsize;        // turn this back into 512 bytes.
-
-    if (F->numblocks==800)
-    {
-        F->maxtrk=80; F->maxsec=13;F->maxside=0;
-        F->ftype=1;
-    }
-    if (F->numblocks==1600)
-    {
-        F->maxtrk=80; F->maxsec=13 ;F->maxside=1;
-        F->ftype=2;
-    }
-    printf("No of sectors  :0x%04x (%d)\n",F->numblocks,F->numblocks);
-    printf("Sector size    :0x%04x (%d)\n",sectorsize,sectorsize);
-    printf("tag size       :0x%04x (%d)\n",tagsize,tagsize);
-
-    tagsize=12; // force it for now.
-
-    //printf("Allocating %d bytes (%d blocks * %d sectorsize)",4+F->numblocks*sectorsize,F->numblocks,sectorsize);
-    (uint8 *)sectors=malloc(4+ F->numblocks * sectorsize) ; if ( !sectors) {printf("- failed!\n"); return 1;}
-    puts("");
-
-    //printf("Allocating %d tag bytes (%d blocks * %d tagsize)",4+F->numblocks*tagsize,F->numblocks,tagsize);
-    (uint8 *)tags=        malloc(4+ F->numblocks * tagsize);     if ( !tags ) {printf(" - failed!\n"); return 1;}
-
-    //printf("Allocating %d bytes for free bitmap (%d blocks)",4+F->numblocks*tagsize,F->numblocks);
-    (uint8 *)allocated=   malloc(4+ F->numblocks             );     if ( !allocated) {printf(" - failed!\n"); return 1;}
-
-    //puts("");
-    memset(sectors,  0,( F->numblocks * sectorsize) );
-    memset(tags,     0,( F->numblocks * tagsize   ) );
-    memset(allocated,0,( F->numblocks                ) );
-
-    fflush(stdout);
-    fflush(stdout);
-
-        // do it in one shot
-    fseek(F->fhandle,84,0);
-    //fread((char *) sectors,sectorsize*F->numblocks,1,F->fhandle);
-    fread((char *) sectors,sectorsize,F->numblocks,F->fhandle);
-    if (errno) {perror("Got an error."); exit(1);}
-
-    mydatachks=dc42_get_data_checksum(F);
-
-    //fseek(F->fhandle, i *(tagsize)+(tagstart),0);
-    //fread((char *) tags,tagsize*F->numblocks,1,F->fhandle);
-    fread((uint8 *) tags, tagsize, F->numblocks, F->fhandle);
-    if (errno) {perror("Got an error whilst attempting to read tags."); exit(1);}
-
-    mytagchks=dc42_get_tag_checksum(F);
-
-    printf("Header/Calc data chksum   0x%08x / 0x%08x diff:%ld\n",datachks,mydatachks,mydatachks-mydatachks);
-    printf("Header/Calc tag chksum    0x%08x / 0x%08x diff:%ld\n",tagchks,mytagchks,  mydatachks-datachks  );
-
-    puts("");
-
-    havetags=dc42_has_tags(F);
-    if (!havetags)
-            {
-                puts("\n***** Looks like all tag data is null. You will not be able to do much with");
-                puts("this Disk Image!  See the documentation for more information.");
-            }
-
-
-    errno=0;
-    sorttag=(int *) malloc(F->numblocks * sizeof(int) +2);
-    if (!sorttag) {perror("Couldn't allocate space for sortted tag index array\n"); exit(2);}
-
-    return 0;
-}
-*/
-
 
 void hexprint(FILE *out, char *x, int size, int ascii_print)
 {
@@ -1359,7 +1327,6 @@ uint16 newsector=0;
 while (1)
  {
    fflush(stderr); fflush(stdout);
-   printf("lisafsh> ");
 
    getcommand();
 
@@ -1677,7 +1644,8 @@ while (1)
                  char dc42filename[FILENAME_MAX];
 
                  fprintf(stderr,"Checking to see if this is a DART image\n");
-                 strncpy(dc42filename,cargs[0],FILENAME_MAX);
+
+                 strncpy(dc42filename,cargs[0],FILENAME_MAX-2);
                  if   (strlen(dc42filename)<FILENAME_MAX-6)   strcat(dc42filename,".dc42");
                  else                                         strcpy( (char *)(dc42filename+FILENAME_MAX-6),".dc42");
 
@@ -1836,9 +1804,6 @@ while (1)
            puts("");
 
 
-
-
-
            //              1         2         3         4         5         6         7         8
            //    0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
 
@@ -1861,6 +1826,9 @@ while (1)
            puts("                  volname is \"-not a Macintosh disk-\" for non MFS/HFS img's");
            puts("quit            - exit program.");
            puts("");
+#ifdef HAVEREADLINE
+           puts("    GNU Readline support is compiled in, you can use history and tab completion.");
+#endif
            break;
 
            //              1         2         3         4         5         6         7         8

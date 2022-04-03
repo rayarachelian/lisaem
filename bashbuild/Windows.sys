@@ -2,7 +2,7 @@
 # Unified Build Script lib Windows Specific Settings  -  A Part of LisaEm
 #                    http://lisaem.sunder.net
 #                   The Lisa Emulator Project
-#   Copyright (C) 2019 Ray A. Arachelian, All Rights Reserved
+#   Copyright (C) 2022 Ray A. Arachelian, All Rights Reserved
 # Released under the terms of the GNU General Public License 2.0
 #-------------------------------------------------------------------------------
 #
@@ -51,9 +51,8 @@ function set_pkg_prefix() {
 
 function getcpus()
 {
-  if [[ -z "$NUMCPUS" ]]; then
      export NUMCPUS="$( nproc )"
-  fi
+     [[ "$NUMCPUS" -lt 2 ]] && export NUMCPUS=2
 }
 
 
@@ -110,11 +109,11 @@ fi
 [[ "$4" == "both" ]] && mode="shared"
 
 if [[ "$mode" == "shared" ]]; then
-             echo "  Creating  $libname.dll" 1>&2
-             $CC -shared -o      ${dllname} ${objs}                  || exit 1
-             /bin/rm -f          ${ldllname}
-             ln -sf ${dllname}   ${ldllname}
-             #see: http://www.cygwin.com/cygwin-ug-net/dll.html
+     echo "  Creating  $libname.dll" 1>&2
+     $CC -shared -o      ${dllname} ${objs}                  || exit 1
+     /bin/rm -f          ${ldllname}
+     ln -sf ${dllname}   ${ldllname}
+     #see: http://www.cygwin.com/cygwin-ug-net/dll.html
 fi
 }
 
@@ -172,8 +171,6 @@ END
  fi
 }
 
-# /home/User/code/lisaem-1.2.7/.env-7707.reload.sh: line 3: /tmp//home/User/code/lisaem-1.2.7/.env-7707.reload.sh.env: No such file or directory
-
 # Create a zip file package
 function WinZIPPackage() {
   PKGNAME="$1"
@@ -181,11 +178,14 @@ function WinZIPPackage() {
   if [[ "$( which zip 2>/dev/null)" ]]; then
 
      zip -r -9 -q "${PKGNAME}" "$PKGPATH"
-     echo "Created zip package: ${PKGNAME}" 1>&2
+     echo "Created zip package: ${PKGNAME} from ${PKGPATH}" 1>&2
   else
-     echo "zip command not installed, cannot create ZIP package" 1>&2
+     echo "zip command not installed, cannot create ZIP package from files in ${PKGPATH}" 1>&2
 
   fi
+
+  export PREFIX="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"
+  export PREFIXLIB="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/lib"
 }
 
 function HasNSIS() {
@@ -314,6 +314,9 @@ ENDNSISEND
 function WinNSISPackage() {
   if [[ -n "$( HasNSIS )" ]]; then
 
+     export PREFIX="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}"
+     export PREFIXLIB="${TLDR}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/lib"
+
      # since makensis is windows, do not put path inside PKGNAME, instead cd into the staged dir
      # and then output the package through the script to some dirs back up.
 
@@ -350,7 +353,7 @@ function CygwinSudoRebuild() {
      if [[ -z "$YESTOALL" ]]; then
         echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
         echo "Enter yes to start this build script in an Administrative shell or hit ENTER to abort" 1>&2
-        read x
+        [[ -z "$CYGWINYES" ]] && read x
      else
         x="$YESTOALL"
      fi
@@ -385,8 +388,8 @@ function CygwinSudoRebuild() {
 
 function set_pkg_prefix() {
   if [[ -n "$WITHPKG" ]]; then
-     export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIX"
-     export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIXLIB"
+     export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/"
+     export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/"
      ACTION="Packaging"
   fi
 }
@@ -428,9 +431,15 @@ export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -fno-rtti"
 export CLICMD="-mconsole"
 export GUIAPP="-mwindows"
 
+# installing on Windows goes to C:\Program Files\... rather than packaging which goes under ${XTLD}/pkg/build/tmp/
+for i in $@; do
+  [[ "$i" == "install" ]] && PRE="/cygdrive/c/"
+done
+for i in $@; do
+  [[ "$i" == "package" ]] && PRE=""
+done
+
 if [[ -z "$PREFIX" ]]; then
-   PREFIX="/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
-   PREFIXLIB="/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}/lib"
-else
-   if [[ -z "$PREFIXLIB" ]]; then export PREFIXLIB="$PREFIX/lib"
+   export PREFIX="/cygdrive/c/${PRE}Program Files/${COMPANY}/${SOFTWARE}"
+   export PREFIXLIB="${PRE}Program Files/${COMPANY}/${SOFTWARE}/lib"
 fi

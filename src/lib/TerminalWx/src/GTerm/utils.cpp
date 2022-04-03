@@ -224,4 +224,3 @@ void GTerm::clear_mode_flag(int flag)
 	mode_flags &= ~flag;
 	ModeChange(mode_flags);
 }
-

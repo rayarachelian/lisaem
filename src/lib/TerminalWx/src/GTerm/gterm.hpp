@@ -308,7 +308,7 @@ public:
 
 	// function to control terminal
 	virtual void ProcessInput(int len, unsigned char *data);
-   virtual void ProcessOutput(int len, unsigned char *data) { SendBack(len, (char *)data); }
+        virtual void ProcessOutput(int len, unsigned char *data) { SendBack(len, (char *)data); }
 	virtual void ResizeTerminal(int width, int height);
 	int Width() { return width; }
 	int Height() { return height; }
@@ -330,7 +330,7 @@ public:
 	// optional child-supplied functions
 	virtual void MoveChars(int sx, int sy, int dx, int dy, int w, int h) { }
 	virtual void ClearChars(int bg_color, int x, int y, int w, int h) { }
-   virtual void SendBack(int len, char *data) { }
+        virtual void SendBack(int len, char *data) { }
 	virtual void SendBack(char *data) { SendBack(strlen(data), data); }
 	virtual void ModeChange(int state) { }
 	virtual void Bell() { }

@@ -91,28 +91,28 @@ floppy.c:deserialize:1581:Disk signed by Lisa SN: 1 06 63
 
 
 */
-        plant  =                                       ((serialnum240[0x02] & 0x0f)<< 4) | ( serialnum240[0x03] & 0x0f);
-        year   =                                       ((serialnum240[0x04] & 0x0f)<< 4) | ( serialnum240[0x05] & 0x0f);
-        day    =   ((serialnum240[0x06] & 0x0f)<< 8) | ((serialnum240[0x07] & 0x0f)<< 4) | ( serialnum240[0x08] & 0x0f);
-        sn     =   ((serialnum240[0x09] & 0x0f)<<12) | ((serialnum240[0x0a] & 0x0f)<< 8) | ((serialnum240[0x0b]<<4) & 0x0f) |
-                                                                                            (serialnum240[0x0c]     & 0x0f);
+        plant  =                                       ((serialnumber240[0x02] & 0x0f)<< 4) | ( serialnumber240[0x03] & 0x0f);
+        year   =                                       ((serialnumber240[0x04] & 0x0f)<< 4) | ( serialnumber240[0x05] & 0x0f);
+        day    =   ((serialnumber240[0x06] & 0x0f)<< 8) | ((serialnumber240[0x07] & 0x0f)<< 4) | ( serialnumber240[0x08] & 0x0f);
+        sn     =   ((serialnumber240[0x09] & 0x0f)<<12) | ((serialnumber240[0x0a] & 0x0f)<< 8) | ((serialnumber240[0x0b]<<4) & 0x0f) |
+                                                                                            (serialnumber240[0x0c]     & 0x0f);
 // applenet
-        prefix =   ((serialnum240[0x10] & 0x0f)<< 8) | ((serialnum240[0x11] & 0x0f)<< 4) |  (serialnum240[0x12] & 0x0f);
-        net    =   ((serialnum240[0x13] & 0x0f)<<16) | ((serialnum240[0x14] & 0x0f)<<12) | ((serialnum240[0x15] & 0x0f)<<8) |
-                                                       ((serialnum240[0x16] & 0x0f)<< 4) |  (serialnum240[0x17] & 0x0f);
+        prefix =   ((serialnumber240[0x10] & 0x0f)<< 8) | ((serialnumber240[0x11] & 0x0f)<< 4) |  (serialnumber240[0x12] & 0x0f);
+        net    =   ((serialnumber240[0x13] & 0x0f)<<16) | ((serialnumber240[0x14] & 0x0f)<<12) | ((serialnumber240[0x15] & 0x0f)<<8) |
+                                                       ((serialnumber240[0x16] & 0x0f)<< 4) |  (serialnumber240[0x17] & 0x0f);
 
 
        printf ("serial240: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                     serialnum240[ 0], serialnum240[ 1], serialnum240[ 2], serialnum240[ 3],
-                     serialnum240[ 4], serialnum240[ 5], serialnum240[ 6], serialnum240[ 7],
-                     serialnum240[ 8], serialnum240[ 9], serialnum240[10], serialnum240[11],
-                     serialnum240[12], serialnum240[13], serialnum240[14], serialnum240[15]
+                     serialnumber240[ 0], serialnumber240[ 1], serialnumber240[ 2], serialnumber240[ 3],
+                     serialnumber240[ 4], serialnumber240[ 5], serialnumber240[ 6], serialnumber240[ 7],
+                     serialnumber240[ 8], serialnumber240[ 9], serialnumber240[10], serialnumber240[11],
+                     serialnumber240[12], serialnumber240[13], serialnumber240[14], serialnumber240[15]
                   );
        printf("serial250: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                     serialnum240[16], serialnum240[17], serialnum240[18], serialnum240[19],
-                     serialnum240[20], serialnum240[21], serialnum240[22], serialnum240[23],
-                     serialnum240[24], serialnum240[25], serialnum240[26], serialnum240[27],
-                     serialnum240[28], serialnum240[29], serialnum240[30], serialnum240[31]
+                     serialnumber240[16], serialnumber240[17], serialnumber240[18], serialnumber240[19],
+                     serialnumber240[20], serialnumber240[21], serialnumber240[22], serialnumber240[23],
+                     serialnumber240[24], serialnumber240[25], serialnumber240[26], serialnumber240[27],
+                     serialnumber240[28], serialnumber240[29], serialnumber240[30], serialnumber240[31]
                   );
 
        printf("Lisa SN: plant:%x born on year:0x%x (%d) day:0x%x (%d) sn:0x%x (%d) applenet %x-%x\n\n",

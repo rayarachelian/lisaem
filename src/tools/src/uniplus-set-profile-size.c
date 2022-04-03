@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                   A part of the Apple Lisa 2 Emulator Project                        *
 *                                                                                      *
-*                    Copyright (C) 2021  Ray A. Arachelian                             *
+*                    Copyright (C) 2022  Ray A. Arachelian                             *
 *                            All Rights Reserved                                       *
 *                                                                                      *
 *                     UniPlus Set ProFile Size Partition Table                         *
@@ -92,7 +92,7 @@ char *h(uint32 size) {
     return s;
 }
 
-void printpart(uint8 *fsec)
+void printpart(void)
 {
      printf("a: start: %10d size: %10d blocks (%12s) root on 10MB disk\n",      astart, a_size, h(a_size*512));
      printf("b: start: %10d size: %10d blocks (%12s) swap (2400 blks normal\n", bstart, b_size, h(b_size*512));
@@ -131,7 +131,7 @@ void writepart(DC42ImageType *F, uint8 *fsec) {
      fsec[0x1b0]=(h_size & 0xff000000)>>24;  fsec[0x1b1]=(h_size & 0x00ff0000)>>16; fsec[0x1b2]=(h_size & 0x0000ff00)>>8; fsec[0x1b3]=(h_size & 0x000000ff);
 
      printf("======= New Partition Table for profile: ==============\n");
-     printpart(fsec);
+     printpart();
 
      if (!save) {
          char answer[8];
@@ -232,7 +232,7 @@ void start(DC42ImageType *F)
 
      memcpy(sec,fsec,512);
      printf("======= Current ProFile Partition Table ==============\n");
-     printpart(sec);
+     printpart();
 }
 
 
@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
   puts("  ---------------------------------------------------------------------------");
   puts("    UniPlus Set ProFile Size v0.0.2                  http://lisaem.sunder.net");
   puts("  ---------------------------------------------------------------------------");
-  puts("          Copyright (C) 2021, Ray A. Arachelian, All Rights Reserved.");
+  puts("          Copyright (C) 2022, Ray A. Arachelian, All Rights Reserved.");
   puts("              Released under the GNU Public License, Version 2.0");
   puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
   puts("  ---------------------------------------------------------------------------\n");

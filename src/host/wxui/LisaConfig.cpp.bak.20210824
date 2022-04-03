@@ -58,7 +58,6 @@ extern "C"
  extern int double_sided_floppy;
  extern int hle;
  extern int macworks4mb;
- extern int consoletermwindow;
 
 }
 
@@ -141,8 +140,6 @@ void LisaConfig::Load(wxFileConfig *config, uint8 *floppy_ram)
    fprintf(stderr,"\nRead config RAM:%d\n\n",mymaxlisaram);
 
    saw_3a_warning=config->Read(_T("/no_warn_xl_rom"),0L);
-   consoletermwindow=config->Read(_T("/consoletermwindow"), 0L);
-
    config->Read(_T("/ROMFILE"), &rompath);
    config->Read(_T("/DUALPARALLELROM"), &dualrom);
 
@@ -248,8 +245,6 @@ void LisaConfig::Save(wxFileConfig *config, uint8 *floppy_ram)
    config->Write(_T("/DUALPARALLELROM"), dualrom );
 
    config->Write(_T("/no_warn_xl_rom"),saw_3a_warning);
-
-   config->Write(_T("/consoletermwindow"), consoletermwindow);
 
    // save parameter RAM
    wxString pramline;

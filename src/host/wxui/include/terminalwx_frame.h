@@ -41,8 +41,11 @@ class TerminalWxFrame: public wxFrame
         void OnXModemDownload(wxCommandEvent& event);
         void OnTimer(wxTimerEvent& event);
 
+        void OnChar(wxKeyEvent& event); // RA for console intercept
+
         void OnCopy(wxCommandEvent& event);
         void OnPaste(wxCommandEvent& event);
+        void OnSelectAll(wxCommandEvent& WXUNUSED(event));
 
         void OnFileCapture(wxCommandEvent& event);
 
@@ -58,26 +61,10 @@ class TerminalWxFrame: public wxFrame
         long int xferMode2;
         char lastchars[3];
 
-        //*)
-
-        //(*Identifiers(TerminalWxFrame)
-        static const long ID_TERM;
-        static const long idMenuQuit;
-        static const long ID_STATUSBAR1;
-        static const long ID_FileCapture;
-        static const long ID_TextUpload;
-        static const long ID_XMODEM_UP;
-        static const long ID_XMODEM_DN; 
-        static const long ID_TIMER;
-
-        //*)
-
-        //(*Declarations(TerminalWxFrame)
         wxStatusBar* StatusBar1;
-        ////TerminalWx* Term1;
-        //*)
 
-//        DECLARE_EVENT_TABLE()
+        DECLARE_EVENT_TABLE()
+
 };
 
 #endif

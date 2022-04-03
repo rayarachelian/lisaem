@@ -35,10 +35,27 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 #include "../GTerm/gterm.hpp"
 #include "wxterm.h"
 
-
-
 #define CURSOR_BLINK_DEFAULT_TIMEOUT	300
 #define CURSOR_BLINK_MAX_TIMEOUT	2000
+
+/* 
+** quick+dirty right trim C string - scan the string, l=last non-space character., c=current character. runs in O(n)
+** modifies the passed string in-place. Not for unicode strings.
+*/
+char *rtrim(char *s) {
+  char *c=s, *l=s;
+
+  while   (! *c) {
+          if (*c!=' ' && *c!=9) l=c; // find last non-space/tab character
+          c++;
+  }
+
+  l++;                               // move off the last character
+  if (*l==' ' || *l==9) *l=0;        // ensure it's white space incase it's at the end of the string, and then mark end of string.
+
+  return s;
+}
+
 
 /*
 **  Keycode translation tables
@@ -356,7 +373,7 @@ static unsigned char
 BEGIN_EVENT_TABLE(wxTerm, wxWindow)
   EVT_PAINT						(wxTerm::OnPaint)
   EVT_CHAR						(wxTerm::OnChar)
-  EVT_LEFT_DOWN					(wxTerm::OnLeftDown)
+  EVT_LEFT_DOWN				(wxTerm::OnLeftDown)
   EVT_LEFT_UP					(wxTerm::OnLeftUp)
   EVT_MOTION					(wxTerm::OnMouseMove)
   EVT_TIMER						(-1, wxTerm::OnTimer)
@@ -364,20 +381,23 @@ BEGIN_EVENT_TABLE(wxTerm, wxWindow)
   EVT_KEY_DOWN(wxTerm::OnKeyDown)
 #endif
 
-  EVT_SIZE						(wxTerm::OnSize)
-  EVT_SET_FOCUS					(wxTerm::OnGainFocus)
-  EVT_KILL_FOCUS				(wxTerm::OnLoseFocus)
+  EVT_SIZE            (wxTerm::OnSize)
+  EVT_SET_FOCUS				(wxTerm::OnGainFocus)
+  EVT_KILL_FOCUS			(wxTerm::OnLoseFocus)
 END_EVENT_TABLE()
 
 wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
                const wxPoint& pos,
                int width, int height,
-               const wxString& name) :
+               const wxString& name,
+               int fontsize, char *fontname):
   wxWindow(parent, id, pos, wxSize(-1, -1), wxWANTS_CHARS, name),
   GTerm(width, height)
 {
-  int
-    i;
+  int i;
+
+  m_fontsize=fontsize;
+  m_fontname=fontname;
 
   m_inUpdateSize = false;
   m_init = 1;
@@ -421,7 +441,6 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
   m_printerName = 0;
 
 
-
   m_normalFont = GetFont();
   m_underlinedFont = GetFont();
   m_underlinedFont.SetUnderlined(TRUE);
@@ -434,8 +453,6 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
 
   //ResizeTerminal(width, height);
-
-
   //SetVirtualSize(m_charWidth * 80, m_charHeight * 100);
   //SetScrollRate(m_charWidth, m_charHeight);
 
@@ -443,7 +460,9 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
   SetCursor(wxCursor(wxCURSOR_IBEAM));
 
-  wxFont monospacedFont(10, wxMODERN, wxNORMAL, wxNORMAL, false, "Courier New");
+
+  wxString wfontname=wxString(fontname, wxConvLocal, 2048);
+  wxFont monospacedFont(m_fontsize, wxMODERN, wxNORMAL, wxNORMAL, false, wfontname ); //"Courier New");
 
   SetFont(monospacedFont);
 
@@ -653,16 +672,16 @@ wxTerm::GetDefPCColors(wxColour colors[16])
   /*
   **  These colors need tweaking.  I'm sure they are not correct.
   */
-  colors[0] = wxColour(0, 0, 0);                             // black
-  colors[1] = wxColour(0, 0, 128);                           // blue
-  colors[2] = wxColour(0, 128, 0);                           // green
-  colors[3] = wxColour(0, 128, 128);                         // cyan
-  colors[4] = wxColour(128, 0, 0);                           // red
-  colors[5] = wxColour(128, 0, 128);                         // magenta
-  colors[6] = wxColour(128, 128, 0);                         // brown
-  colors[7] = wxColour(128, 128, 128);                       // white
-  colors[8] = wxColour(64, 64, 64);                          // gray
-  colors[9] = wxColour(0, 0, 255);                           // lt blue
+  colors[0]  = wxColour(0, 0, 0);                            // black
+  colors[1]  = wxColour(0, 0, 128);                          // blue
+  colors[2]  = wxColour(0, 128, 0);                          // green
+  colors[3]  = wxColour(0, 128, 128);                        // cyan
+  colors[4]  = wxColour(128, 0, 0);                          // red
+  colors[5]  = wxColour(128, 0, 128);                        // magenta
+  colors[6]  = wxColour(128, 128, 0);                        // brown
+  colors[7]  = wxColour(128, 128, 128);                      // white
+  colors[8]  = wxColour(64, 64, 64);                         // gray
+  colors[9]  = wxColour(0, 0, 255);                          // lt blue
   colors[10] = wxColour(0, 255, 0);                          // lt green
   colors[11] = wxColour(0, 255, 255);                        // lt cyan
   colors[12] = wxColour(255, 0, 0);                          // lt red
@@ -673,17 +692,17 @@ wxTerm::GetDefPCColors(wxColour colors[16])
   /*
   **  These are much better
   */
-  colors[0] = wxColour(0, 0, 0);                             // black
-  colors[1] = wxColour(0, 0, 170);                           // blue
-  colors[2] = wxColour(0, 170, 0);                           // green
-  colors[3] = wxColour(0, 170, 170);                         // cyan
-  colors[4] = wxColour(170, 0, 0);                           // red
-  colors[5] = wxColour(170, 0, 170);                         // magenta
-  colors[6] = wxColour(170, 170, 0);                         // brown
-  colors[7] = wxColour(170, 170, 170);                       // white
+  colors[0]  = wxColour(0, 0, 0);                            // black
+  colors[1]  = wxColour(0, 0, 170);                          // blue
+  colors[2]  = wxColour(0, 170, 0);                          // green
+  colors[3]  = wxColour(0, 170, 170);                        // cyan
+  colors[4]  = wxColour(170, 0, 0);                          // red
+  colors[5]  = wxColour(170, 0, 170);                        // magenta
+  colors[6]  = wxColour(170, 170, 0);                        // brown
+  colors[7]  = wxColour(170, 170, 170);                      // white
 #if 0
-  colors[8] = wxColour(85, 85, 85);                          // gray
-  colors[9] = wxColour(85, 85, 255);                         // lt blue
+  colors[8]  = wxColour(85, 85, 85);                         // gray
+  colors[9]  = wxColour(85, 85, 255);                        // lt blue
   colors[10] = wxColour(85, 255, 85);                        // lt green
   colors[11] = wxColour(85, 255, 255);                       // lt cyan
   colors[12] = wxColour(255, 85, 85);                        // lt red
@@ -691,13 +710,13 @@ wxTerm::GetDefPCColors(wxColour colors[16])
   colors[14] = wxColour(255, 255, 85);                       // yellow
   colors[15] = wxColour(255, 255, 255);                      // white
 #else
-  colors[8] = wxColour(50, 50, 50);                          // gray
-  colors[9] = wxColour(0, 0, 255);                         // lt blue
-  colors[10] = wxColour(0, 255, 0);                        // lt green
-  colors[11] = wxColour(0, 255, 255);                       // lt cyan
-  colors[12] = wxColour(255, 0, 0);                        // lt red
-  colors[13] = wxColour(255, 0, 255);                       // lt magenta
-  colors[14] = wxColour(255, 255, 0);                       // yellow
+  colors[8]  = wxColour(50, 50, 50);                         // gray
+  colors[9]  = wxColour(0, 0, 255);                          // lt blue
+  colors[10] = wxColour(0, 255, 0);                          // lt green
+  colors[11] = wxColour(0, 255, 255);                        // lt cyan
+  colors[12] = wxColour(255, 0, 0);                          // lt red
+  colors[13] = wxColour(255, 0, 255);                        // lt magenta
+  colors[14] = wxColour(255, 255, 0);                        // yellow
   colors[15] = wxColour(255, 255, 255);                      // white
 #endif
 #endif
@@ -940,13 +959,11 @@ void
 wxTerm::OnLeftDown(wxMouseEvent& event)
 {
 	SetFocus();
-
   ClearSelection();
   m_selx1 = m_selx2 = event.GetX() / m_charWidth;
   m_sely1 = m_sely2 = event.GetY() / m_charHeight;
   m_selecting = TRUE;
   CaptureMouse();
-
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -966,9 +983,8 @@ wxTerm::OnLeftUp(wxMouseEvent& event)
   m_selecting = FALSE;
   if(GetCapture() == this)
   {
-	ReleaseMouse();
+  ReleaseMouse();
   }
-
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -995,7 +1011,9 @@ wxTerm::OnMouseMove(wxMouseEvent& event)
       m_sely2 = Height() - 1;
 
     MarkSelection();
+    Refresh();
   }
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1035,6 +1053,7 @@ wxTerm::ClearSelection()
     m_curDC = 0;
     delete dc;
   }
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1101,7 +1120,7 @@ wxTerm::MarkSelection()
       Select(x, m_sely2, 1);
   }
 
-  this->wxWindow::Update();
+  //RA//this->wxWindow::Update();
 
   if(dc)
   {
@@ -1169,6 +1188,7 @@ wxTerm::GetSelection()
     x1++;
     if(x1 == Width())
     {
+      sel.Trim(); // RA trim ends of lines
       sel.Append('\n');
       x1 = 0;
       y1++;
@@ -1177,6 +1197,7 @@ wxTerm::GetSelection()
   if(GetChar(x1, y1))
     sel.Append(GetChar(x1, y1));
 
+  sel.Trim();
   return sel;
 }
 
@@ -1196,6 +1217,7 @@ wxTerm::SelectAll()
   m_selx2 = Width() - 1;
   m_sely2 = Height() - 1;
   MarkSelection();
+  Refresh();
 }
 
 /*
@@ -1224,12 +1246,12 @@ wxTerm::DrawText(int fg_color, int bg_color, int flags,
 {
   int
     t;
-
+  
   if(flags & BOLD && m_boldStyle == COLOR)
     fg_color = (fg_color % 8) + 8;
 
   if(flags & SELECTED)
-  {
+    {
     fg_color = 0;
     bg_color = 15;
   }
@@ -1252,8 +1274,10 @@ wxTerm::DrawText(int fg_color, int bg_color, int flags,
     string[i] = xCharMap[string[i]];
 #endif
 
-  wxString
-    str(string, len);
+
+  wxString str1=wxString( (char *)string, wxConvLocal, 2048);
+  wxString str=str1.Left(len);
+    //str(string, len); // not compatible with wx2.8 which I still support for LisaEM - RA
 
   if(m_boldStyle != FONT)
   {
@@ -1280,11 +1304,13 @@ wxTerm::DrawText(int fg_color, int bg_color, int flags,
     }
   }
 
-  x = x * m_charWidth;
-  y = y * m_charHeight;
   m_curDC->SetBackgroundMode(wxSOLID);
   m_curDC->SetTextBackground(m_colors[bg_color]);
   m_curDC->SetTextForeground(m_colors[fg_color]);
+
+  x = x * m_charWidth;
+  y = y * m_charHeight;
+
   m_curDC->DrawText(str, x, y);
   if(flags & BOLD && m_boldStyle == OVERSTRIKE)
   {
@@ -1330,8 +1356,8 @@ wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
   c = xCharMap[c];
 #endif
 
-  wxString
-    str((char)c);
+  wxString str(_T(""));
+  str << ((char)c);
 
   if(m_boldStyle != FONT)
   {
@@ -1477,7 +1503,8 @@ void
 wxTerm::MoveChars(int sx, int sy, int dx, int dy, int w, int h)
 {
   if(!m_marking)
-    ClearSelection();
+    {
+    ClearSelection();}
 
   sx = sx * m_charWidth;
   sy = sy * m_charHeight;
@@ -1508,8 +1535,8 @@ wxTerm::MoveChars(int sx, int sy, int dx, int dy, int w, int h)
 void
 wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
 {
-  if(!m_marking)
-    ClearSelection();
+  //RA//if(!m_marking)
+  //RA//  {ClearSelection();}
 
   x = x * m_charWidth;
   y = y * m_charHeight;
@@ -1546,7 +1573,7 @@ wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
 void
 wxTerm::ModeChange(int state)
 {
-  ClearSelection();
+  //RA//ClearSelection();
 
   if(state & GTerm::PC)
   {
@@ -1602,12 +1629,10 @@ void wxTerm::UpdateSize()
 	}
 
 	dc->SetFont(m_normalFont);
-	dc->GetTextExtent("M", &charWidth, &charHeight);
+	dc->GetTextExtent(_T("M"), &charWidth, &charHeight);
 	wxSize currentClientSize = GetClientSize();
 	int numCharsInLine = currentClientSize.GetX() / charWidth;
-	int numLinesShown = currentClientSize.GetY() / charHeight;
-
-
+	int numLinesShown  = currentClientSize.GetY() / charHeight;
 
 	if( (numCharsInLine != m_charsInLine) || (numLinesShown != m_linesDisplayed))
 	{
@@ -1671,7 +1696,7 @@ wxTerm::ResizeTerminal(int width, int height)
     dc.SetFont(m_normalFont);
   else
     dc.SetFont(m_boldFont);
-  dc.GetTextExtent("M", &m_charWidth, &m_charHeight);
+  dc.GetTextExtent(_T("M"), &m_charWidth, &m_charHeight);
   w = width * m_charWidth;
   h = height * m_charHeight;
 
@@ -1710,6 +1735,7 @@ wxTerm::ResizeTerminal(int width, int height)
     wxCommandEvent e(wxEVT_COMMAND_TERM_RESIZE, GetId());
     e.SetEventObject(this);
     GetParent()->GetEventHandler()->ProcessEvent(e);
+
   }
 }
 
@@ -1750,7 +1776,6 @@ wxTerm::ProcessInput(int len, unsigned char *data)
   wxClientDC
     dc(this);
 
-  ClearSelection();
   m_curDC = &dc;
   GTerm::ProcessInput(len, data);
   m_curDC = 0;
@@ -1884,7 +1909,7 @@ wxTerm::PrintChars(int len, unsigned char *data)
 void wxTerm::OnGainFocus(wxFocusEvent &event)
 {
 	this->clear_mode_flag(CURSORINVISIBLE);
-	wxLogDebug("TerminalWx Gained focus");
+	wxLogDebug(_T("TerminalWx Gained focus") );
 	GTerm::Update();
 }
 
@@ -1901,7 +1926,7 @@ void wxTerm::OnGainFocus(wxFocusEvent &event)
 void wxTerm::OnLoseFocus(wxFocusEvent &event)
 {
 	this->set_mode_flag(CURSORINVISIBLE);
-	wxLogDebug("TerminalWx Lost focus");
+	wxLogDebug( _T("TerminalWx Lost focus") );
 	GTerm::Update();
 }
 

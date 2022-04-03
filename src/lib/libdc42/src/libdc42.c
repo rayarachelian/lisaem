@@ -484,7 +484,7 @@ int dc42_close_image_by_handle(DC42ImageType *F)
    if (F->mmappedio==1) munmap(F->RAM,F->size);
    else
    #endif
-        free(F->RAM);
+   free(F->RAM);
 
    F->RAM=NULL;                                                                // decouple file and RAM, mark RAM as invalid
 
@@ -1422,7 +1422,7 @@ int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize) 
 
 // This does not open an image, do not use this on an already opened image.
 
-int dc42_add_tags(char *filename, uint32 tagsize) // tagsize is in bytes.  for a 400K disk use 400*1024 for datasize and, 400*2*12 for tagsize
+int dc42_add_tags(char *filename, uint32 tagsize) // tagsize is in bytes.  for a 400K disk use 400*2*12 for tagsize
 {
   FILE *image;
   uint32 oldtagsize, olddatasize, filesize, newfilesize;
@@ -1789,8 +1789,7 @@ int dc42_auto_open(DC42ImageType *F, char *infilename, char *options)
     if (dart_is_valid_image(filename))
     {
      char dc42filename[FILENAME_MAX+2];
-
-     strncpy(dc42filename,filename,FILENAME_MAX);
+     strncpy(dc42filename,filename,FILENAME_MAX-2);
      if   (strlen(dc42filename)<FILENAME_MAX-6)   strcat(dc42filename,".dc42");
      else                                         strcpy( (char *)(dc42filename+FILENAME_MAX-6),".dc42");
 

@@ -204,9 +204,9 @@ void VIAProfileLoop(int vianum, ProFileType *P, int event)
       if ( BSY ^ (via[vianum].via[PCR] & 1) )
          {
            if ((via[vianum].via[IFR] & VIA_IRQ_BIT_CA1)==0)
-                {ALERT_LOG(0,"CA1 IER is not enabled, not checking for IRQ");}
+                {DEBUG_LOG(0,"CA1 IER is not enabled, not checking for IRQ");}
            else {via[vianum].via[IFR] |=VIA_IRQ_BIT_CA1;
-                ALERT_LOG(0,"profile.c:Enabling BSY IRQ on CA1 for VIA #%d BSY transitioned to:%d%d PCR flag:%d",vianum,BSY,NBSY,(via[vianum].via[PCR] & 1));}
+                DEBUG_LOG(0,"profile.c:Enabling BSY IRQ on CA1 for VIA #%d BSY transitioned to:%d%d PCR flag:%d",vianum,BSY,NBSY,(via[vianum].via[PCR] & 1));}
            return;
          }
     }

@@ -767,18 +767,21 @@ GLOBAL(uint8,*lisaram,NULL);                 // pointer to Lisa RAM
 
 // this enables a hack that tricks the lisa into skipping the full ram test, thus speeding up
 // the boot process - this sets a PRAM variable saying RAM test is done.
-GLOBAL(int,cheat_ram_test,1);       // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
-DECLARE(int,hle);                   // flag to enable HLE hacks
+GLOBAL(int,cheat_ram_test,1);            // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
+DECLARE(int,hle);                        // flag to enable HLE hacks
 GLOBAL(uint32, bootblockchecksum,0);     // checksum of bootsector (sector 0) whether from profile or floppy.
 DECLARE(int,macworks4mb);
-GLOBAL(int,romless,0);
-GLOBAL(int,macworks_hle,1);         // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
-GLOBAL(int,los31_hle,1);            // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
-GLOBAL(int,uniplus_hacks,1);        // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
-GLOBAL(int,uniplus_loader_patch,1); // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
-GLOBAL(int,uniplus_sunix_patch,1);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+DECLARE(int,consoletermwindow);          // preference: enable TerminalWx window for console terminal (UniPlux, LPW, Xenix, etc.)
+GLOBAL(int,romless,0);                   // are we romless?
+GLOBAL(int,xenix_patch,1);               // 2022.03.06 flag to signal Xenix HLE patches
+GLOBAL(int,macworks_hle,1);              // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
+GLOBAL(int,los31_hle,1);                 // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
+GLOBAL(int,monitor_patch,1);             // 2022.03.06 flag to signal Monitor 12.x has been patched for HLE
+GLOBAL(int,uniplus_hacks,1);             // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
+GLOBAL(int,uniplus_loader_patch,1);      // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
+GLOBAL(int,uniplus_sunix_patch,1);       // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 GLOBAL(uint32,rom_profile_read_entry,0); // ROM entry to profile read block
-GLOBAL(int,double_sided_floppy,0);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+GLOBAL(int,double_sided_floppy,0);       // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 
 // other globally saved defaults
 GLOBAL(int,sound_effects_on,1);
@@ -2797,9 +2800,9 @@ GLOBAL(uint32,minlisaram,0);
               }                                                                                                             \
         }
 
-
+// {if (addr>0xffffff) {DEBUG_LOG(0, "Access above 24 bits: %08x", addr);}     addr &=0x00ffffff; }
 #ifdef DEBUG
-  #define HIGH_BYTE_FILTER()  {if (addr>0xffffff) {DEBUG_LOG(0, "Access above 24 bits: %08x", addr);}     addr &=0x00ffffff; }
+  #define HIGH_BYTE_FILTER()  { addr &=0x00ffffff; }
 
   #ifdef MMUVALIDATE
   #define IS_MMU_VALID_HERE() {if (VALIDATE_MMU(addr) != CHK_MMU_TRANS(addr)) { EXIT(1,0,"MMU VALIDATION FAILURE addr:%08x validates to:%08x but translated to %08x", addr,VALIDATE_MMU(addr),CHK_MMU_TRANS(addr));}}

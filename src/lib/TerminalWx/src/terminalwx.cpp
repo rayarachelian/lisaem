@@ -71,9 +71,16 @@ TerminalWx::~TerminalWx()
     //dtor
 }
 
+void TerminalWx::OnClose((wxCloseEvent& event)) {
+    Show(FALSE); // Hide() ?
+    event.Veto(); // suppress close event as this will cause segfault
+    event.Skip();
+}
 
 wxBEGIN_EVENT_TABLE(TerminalWx, wxTerm)
 
 EVT_TERMINAL_INPUT(TerminalWx::OnTerminalInput)
+EVT_CLOSE(         TerminalWx::OnClose)
+
 
 wxEND_EVENT_TABLE()

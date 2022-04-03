@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2021.06.09                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2022.04.01                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
@@ -357,13 +357,13 @@ void do_profile_read(ProFileType *P, uint32 block)
 
     if (block==0) {
         bootblockchecksum=0;
-        for (int i=0; i<P->DC42.datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
+        for (uint32 i=0; i<P->DC42.datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
     }
 
     blk=dc42_read_sector_tags(&(P->DC42),block);
 
     if (block==0) {
-        for (int i=0; i<P->DC42.tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
+        for (uint32 i=0; i<P->DC42.tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
         ALERT_LOG(0,"Bootblock checksum:%08x for %s",bootblockchecksum,P->DC42.fname);
     }
 
@@ -546,7 +546,7 @@ ALERT_LOG(0,"Attempting to open profile:%s",filename);
             //              5M   10M   16M   20M   32M   40M    64M
 
             ALERT_LOG(0,"Did not find %s, asking user what size drive to create",filename);
-            sz=pickprofilesize(&filename,1);  if (sz<-1 || sz>6) return -1;
+            sz=pickprofilesize(filename,1);  if (sz<-1 || sz>6) return -1;
 
             if (sz==-1) {
                 ALERT_LOG(0,"User chose to select an existing profile instead");                
@@ -668,9 +668,9 @@ char *profile_event_names[5]=
                                             {                                                                \
                                              if (P->StateMachineStep==GET_CMDBLK_STATE && !P->BSYLine)       \
                                                 {P->BSYLine=2;                                               \
-                                                ALERT_LOG(0,"force State:4b at timeout");     }              \
+                                                DEBUG_LOG(0,"force State:4b at timeout");     }              \
                                              else if (P->StateMachineStep!=IDLE_STATE) {                     \
-                                                 ALERT_LOG(0,"ZZZZZZZ Timeout, back to state 0 ZZZZZZZZZZ"); \
+                                                 DEBUG_LOG(0,"ZZZZZZZ Timeout, back to state 0 ZZZZZZZZZZ"); \
  	                                             P->StateMachineStep=IDLE_STATE;                             \
                                                  SET_PROFILE_LOOP_TIMEOUT(TENTH_OF_A_SECOND);                \
                                                  P->last_cmd=1;                                              \
@@ -747,7 +747,7 @@ void ProfileLoop(ProFileType *P, int event)
     if (  !(profile_power & (1<<(P->vianum-2)) )  ) return;
 
     if ( !P->DENLine && P->vianum==2) {DEBUG_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
-    if ( !P->DENLine && P->vianum!=2) {ALERT_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
+    if ( !P->DENLine && P->vianum!=2) {DEBUG_LOG(0,"DEN is disabled on via#%d- ignoring ProFile commands",P->vianum); return;}                   // Drive Enabled is off (active low 0=enabled, 1=disable profile)
         
 #ifdef DEBUG
 if (!EVENT_WRITE_NUL)
@@ -881,20 +881,13 @@ if (!EVENT_WRITE_NUL)
 //20201029//            return;
 //20201029//            }
          #ifdef DEBUG                         
-         if (!(EVENT_WRITE_NUL))   // don't fill up the log with useless shit when null event
-
-         DEBUG_LOG(0,"State:2 - waiting for 55, last PA=%02x, last_a_accs:%d  - BSY is now %d",
-                P->VIA_PA,
-                P->last_a_accs,P->BSYLine);
+         if (!(EVENT_WRITE_NUL)) DEBUG_LOG(0,"State:2 - waiting for 55, last PA=%02x, last_a_accs:%d  - BSY is now %d",P->VIA_PA, P->last_a_accs,P->BSYLine);
          #endif
 
-         P->BSYLine=1;
-         if (EVENT_WRITE_NUL) return;
-
+         P->BSYLine=1;  if (EVENT_WRITE_NUL) return;
 
      //    if ( EVENT_WRITE_ORA)//P->last_a_accs)// now wait for 0x55 ACK from Lisa, else, go back to idle
                 //{
-
                    if (P->VIA_PA==0x00 && EVENT_WRITE_ORA)  // 2021.09.14 for los1
                                                {
                                                  DEBUG_LOG(0,"VIA:%d Got %00x, will go back to idle now. last_a_accs=%d",
@@ -905,7 +898,7 @@ if (!EVENT_WRITE_NUL)
 
 
                     if (P->VIA_PA!=0x55 && P->VIA_PA!=0x01&& !EVENT_WRITE_ORA) {
-                                               ALERT_LOG(0,"VIA_PA=%02x - sending 01.",P->VIA_PA);    
+                                               DEBUG_LOG(0,"VIA_PA=%02x - sending 01.",P->VIA_PA);    
                                                P->VIA_PA=0x01;
                                                return;
                                                }
@@ -945,7 +938,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 		
          // uniplus loader hax - weirdly this expects BSY to be down before it sends CMD!
          if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) {
-             ALERT_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
+             DEBUG_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
              SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
              P->BSYLine=0; return;
          }
@@ -954,7 +947,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          
          if ( (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) && 
               (TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/1000)) ) ) {
-              ALERT_LOG(0,"UniPlus OS, faking BSYLine=1");
+              DEBUG_LOG(0,"UniPlus OS, faking BSYLine=1");
               SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
               via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // force IFR BSY/CA1 bit on //2021.06.13
               P->BSYLine=1; return;
@@ -1007,7 +1000,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
                            P->blocktowrite=(P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
 
-                           if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;} // prevent overrun ?
+                           if (P->indexwrite>542) {DEBUG_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;} // prevent overrun ?
                            return;
                          }
 
@@ -1122,7 +1115,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
              case 0 :
                       #ifdef DEBUG
                                            //   0     1    2    3    4     5   6    7     8     9   10   11   12   13   14  15
-                      ALERT_LOG(0,"step6: Reading block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
+                      DEBUG_LOG(0,"step6: Reading block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x %02x %02x %02x %02x %02x %02x",
                         blocknumber, blocknumber,
                         P->DataBlock[ 0],
                         P->DataBlock[ 1],
@@ -1387,7 +1380,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
              P->BSYLine=1;
              P->StateMachineStep=FINAL_FLIP_TO_IDLE_STATE; SET_PROFILE_LOOP_TIMEOUT(TEN_THOUSANDTH_OF_A_SEC);
          }
-         if (P->indexread==536) {ALERT_LOG(0,"Returning to idle state"); P->StateMachineStep=IDLE_STATE; P->BSYLine=1; P->indexread=4; P->indexwrite=0;} //2021.09.14
+         if (P->indexread==536) {DEBUG_LOG(0,"Returning to idle state"); P->StateMachineStep=IDLE_STATE; P->BSYLine=1; P->indexread=4; P->indexwrite=0;} //2021.09.14
 
 
          return;
@@ -1439,7 +1432,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
          }
          else
          {
-             ALERT_LOG(0,"Going back to idle since Lisa set CMDLine");
+             DEBUG_LOG(0,"Going back to idle since Lisa set CMDLine");
              P->StateMachineStep=IDLE_STATE;
          }
 

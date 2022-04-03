@@ -34,16 +34,16 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="PRE-RC4"                   # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
+    STABILITY="RC4"                       # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
                                           # RELEASE/PRODUCTION - PRE-* keep short
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2021.10.31"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2022.04.01"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
           URL="https://lisaem.sunder.net" # url to website of package
-COPYRIGHTYEAR="2021"
+COPYRIGHTYEAR="2022"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
 LICENSESHORT="GPL"                        # for use in RPM packages
@@ -131,7 +131,20 @@ function CLEAN() {
             cd "${TLD}"
             CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k hashes.txt "slot.*.sh" build-warnings.txt windres_private.res
             subbuild src/lib/libGenerator --no-banner clean
+
+	    # TerminalWx isn't something I intend to develop, but rather just use, so disable its warnings
+	    export OWARNINGS="$WARNINGS"
+	    export OCFLAGS="$CFLAGS"
+	    export OCPPFLAGS="$CPPFLAGS"
+	    export OCXXFLAGS="$CXXFLAGS"
+
             subbuild src/lib/TerminalWx   --no-banner clean
+
+	    export CFLAGS="$OCFLAGS"
+	    export CPPFLAGS="$OCPPFLAGS"
+	    export CXXFLAGS="$OCXXFLAGS"
+	    unset  OWARNINGS OCFLAGS OCPPFLAGS OCXXFLAGS
+
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
             rm -rf bin/${SOFTWARE}.app bin/lisaem bin/${MACOSX_MAJOR_VER}/*.dSYM # for macos x - this is a dir so CLEANARTIFACTS will not handle it properly
@@ -286,6 +299,9 @@ for j in $@; do
             rm -f  $PREFIX/rraw-to-dc42
             rm -f  $PREFIX/uniplus-bootloader-deserialize
             rm -f  $PREFIX/uniplus-set-profile-size
+            rm -f  $PREFIX/dc42-add-tags
+            rm -f  $PREFIX/dc42-diff
+            rm -f  $PREFIX/dc42-copy-selected-sectors
             exit 0
 
     ;;
@@ -349,7 +365,7 @@ for j in $@; do
             #WITHDEBUG="$WITHDEBUG -g -DIPC_COMMENTS"
             export LIBGENOPTS="$LIBGENOPTS --with-debug"             ;;
 
- --debug|debuggery|bugger*)
+ --debug|debuggery|bugger*|bug*)
             export WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG"
             export WITHDEBUG="$WITHDEBUG -g -DDEBUG"
             export WITHOUTSTRIP="nostrip"
@@ -618,9 +634,12 @@ ESTPHASE2COUNT=$( INEXT=${PHASE2INEXT} OUTEXT=${PHASE2OUTEXT} OBJDIR=${PHASE2OBJ
 
 # multiply estimates when using UPX as UPX is very slow
 if [[ -z "$WITHOUTUPX" ]] && [[ -n "$UPXCMD" ]]; then
-   ESTTOOLSCOUNT=$((  $ESTTOOLSCOUNT  * 10 ));
-   ESTPHASE2COUNT=$(( $ESTPHASE2COUNT *  5 ));
+   ESTTOOLSCOUNT=$((  $ESTTOOLSCOUNT  * 10 ))
+   ESTPHASE2COUNT=$(( $ESTPHASE2COUNT *  5 ))
 fi
+
+# package making times are wildly different, worst case I've seen so far are snapcraft.
+[[ -n "$WITHPKG" ]] && ESTPHASE2COUNT=$(( $ESTPHASE2COUNT *  2 ))
 
 ESTIMATETOTALS=$(( $ESTLIBGENCOUNT + $ESTLIBDC42COUNT + $ESTTOOLSCOUNT + $ESTPHASE1COUNT + $ESTPHASE2COUNT + 5 ))
 
@@ -699,6 +718,7 @@ if  [[ $ESTLIBTERMCOUNT -gt 0 ]]; then
 fi
 
 export WARNINGS="$OWARNINGS"
+unset OWARNINGS
 
 echo "* Building ${SOFTWARE}..."
 echo
@@ -762,7 +782,7 @@ echo "* wxWidgets C++ Code           (./wxui)"
 
 # save WARNINGS settings, add C++ extra warnings
 OWARNINGS="$WARNINGS"
-export WARNINGS="$WARNINGS -Weffc++ $NOIGNOREDQUALIFIERS $NODEPRECATED"
+export WARNINGS="$WARNINGS $NOIGNOREDQUALIFIERS $NODEPRECATED"
 
 # Compile C++
 cd "${TLD}"
@@ -777,7 +797,7 @@ waitqall
 
 
 # restore warnings
-[ -n "$OWARNINGS" ] && WARNINGS="$OWARNINGS"
+[ -n "$OWARNINGS" ] && export WARNINGS="$OWARNINGS"
 
 for i in `echo $LIST`; do WXLIST="$WXLIST `echo $i|grep -v lisaem_wx`"; done
 
@@ -934,9 +954,9 @@ if  [[ -f "$LISANAME" ]]; then
               # these are set in the bashbuild {OS}.sys file
               ACTION="Installing"
 
-              if [[ -n "$WITHPKG" ]]; then
-                 set_pkg_prefix
-                 ACTION="Packaging"
+              if  [[ -n "$WITHPKG" ]]; then
+                  set_pkg_prefix
+                  ACTION="Packaging"
               fi
 
               echo "* ${ACTION} skins in $PREFIXLIB/${SOFTWARE}"
@@ -946,7 +966,7 @@ if  [[ -f "$LISANAME" ]]; then
               mkdir "${PREFIX}/bin"
               cp "${XTLD}/bin/"*.exe "${PREFIX}/bin"
               mv "${PREFIX}/bin/lisaem.exe" "$PREFIX"
-              echo -n "  Done ${ACTION}."
+              echo -n "  Done ${ACTION} to ${PREFIX}"
 
               create_packages_for_os
 
@@ -955,10 +975,10 @@ if  [[ -f "$LISANAME" ]]; then
 
               ACTION="Installing"
 
-              if [[ -n "$WITHPKG" ]]; then
-                 export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIX"
-                 export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIXLIB"
-                 ACTION="Packaging"
+              if  [[ -n "$WITHPKG" ]]; then
+                  export PREFIX="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIX"
+                  export PREFIXLIB="${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/$PREFIXLIB"
+                  ACTION="Packaging"
               fi
 
               # PREFIX="/usr/local/bin" PREFIXLIB="/usr/local/share/" - these are set in bashbuild/${OS}.sys file

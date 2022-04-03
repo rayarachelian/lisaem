@@ -1,6 +1,6 @@
 ![LisaEm Logo](resources/lisaem-banner.png)
 
-### Copyright © MMXX by Ray Arachelian, All Rights Reserved.
+### Copyright © 2022 by Ray Arachelian, All Rights Reserved.
 ### Released under the terms of the GNU Public License v3.
 
 ------------------------------------------------------------------------------
@@ -31,6 +31,25 @@ The "Em" at the end of LisaEm is short for emulator, so therefore you say "Lisa"
 so: lee·suh·em,  \ ˈlē·sə·em \
 
 Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
+
+## Command Line Options
+
+LisaEm accepts the following command line options which can be used to customize it in various situations such as running in a Kiosk mode on a Raspberry Pi inside a 3D printed Apple Lisa case, or for an automation pipeline:
+
+```
+Usage: lisaem [-h] [-p] [-q] [-f <str>] [-d] [-F[-]] [-z <double>] [-s[-]] [-c <str>] [-k] [-o[-]]
+  -h, --help            show this help message
+  -p, --power           power on as soon as LisaEm is launched
+  -q, --quit            quit after Lisa shuts down
+  -f, --floppy=<str>    boot from which floppy image ROMless only
+  -d, --drive           boot from motherboard ProFile/Widget ROMless only
+  -F, --fullscreen      fullscreen mode (-F- to turn off)
+  -z, --zoom=<double>   set zoom level (0.50, 0.75, 1.0, 1.25,... 3.0)
+  -s, --skin            turn on skin (-s- or --skin-- to turn off)
+  -c, --config=<str>    Open which lisaem config file
+  -k, --kiosk           kiosk mode (suitable for RPi Lisa case)
+  -o, --originctr       skinless mode: center video(-o) vs topleft(-o-)
+```
 
 ## 2021.01.15
 

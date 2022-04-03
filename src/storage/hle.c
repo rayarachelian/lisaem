@@ -3,7 +3,7 @@
 *              The Lisa Emulator Project  V1.2.7      DEV 2021.03.26                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2021 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -41,6 +41,7 @@
 #include <vars.h>
 
 extern int get_vianum_from_addr(long addr);
+extern void lisa_console_output(uint8 c);
 
 #define D0  reg68k_regs[0  ]
 #define D1  reg68k_regs[1  ]
@@ -177,18 +178,18 @@ void hle_los31_write(void) {
      RTS;
 }
 
-void hle_los31_write_00c08d0a(void) {
-     ProFileType *P=NULL;
-     int vianum=get_vianum_from_addr( A2 ); 
-     if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
+void  hle_los31_write_00c08d0a(void) {
+      ProFileType *P=NULL;
+      int vianum=get_vianum_from_addr( A2 ); 
+      if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
 
-     A1++;  // a1 ++
-     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;  // fetchbyte(A1++) should but does not work right because we want to pass A1 before incrementing it
-     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
-     P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
+      A1++;  // a1 ++
+      P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;  // fetchbyte(A1++) should but does not work right because we want to pass A1 before incrementing it
+      P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
+      P->DataBlock[P->indexwrite++]=fetchbyte(A1); A1++;
 
-     RTS;
-     cpu68k_clocks+=(8+12+4+12+4+20);
+      RTS;
+      cpu68k_clocks+=(8+12+4+12+4+20);
 }
 
 
@@ -224,8 +225,7 @@ void hle_macws_read(uint32 count) {
              PC, A0, D1 );
 }
 
-
-void hle_macws_write(int count) {
+void hle_macws_write(void) {
      ProFileType *P=NULL;
      int vianum=get_vianum_from_addr( A0 );
      if (vianum>1 && vianum<9) P=via[vianum].ProFile;
@@ -256,7 +256,7 @@ void hle_macws_write(int count) {
 
 void hle_mw30_intercept(void) {
   if ( PC == 0x00163946) { hle_macws_read( (D2+1) *8 ); return; }  // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
-  if ( PC == 0x00163ade) { hle_macws_write((D2+1) *8 ); return; }  // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
+  if ( PC == 0x00163ade) { hle_macws_write();           return; }  // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
   ALERT_LOG(0,"Unhandled MW intercept at %08x",PC);
 }
 
@@ -282,12 +282,14 @@ void apply_mw30_hacks(void) {
   macworks_hle=0;
 }
 
+
+
 void hle_los_intercept(void) {
 
-   if ( PC == 0x00c08a86) { hle_los31_read( 511      ); return; }
-   if ( PC == 0x00c08a2e) { hle_los31_read( D2       ); return; }
-   if ( PC == 0x00c08d0a) { hle_los31_write_00c08d0a(); return; }
-   if ( PC == 0x00c08c86) { hle_los31_write         (); return; }
+   if ( PC == 0x00c08a86) { ALERT_LOG(0,"511");    hle_los31_read( 511      ); return; }
+   if ( PC == 0x00c08a2e) { ALERT_LOG(0,"D2");     hle_los31_read( D2       ); return; }
+   if ( PC == 0x00c08d0a) { ALERT_LOG(0,"c08d0a"); hle_los31_write_00c08d0a(); return; }
+   if ( PC == 0x00c08c86) { ALERT_LOG(0,"write");  hle_los31_write         (); return; }
 
    ALERT_LOG(0,"UNHANDLED LOS31 HLE at %d/%08x",context,PC);
 }
@@ -315,9 +317,159 @@ void apply_los31_hacks(void) {
   los31_hle=0;
 }
 
+// also in z8530-terminal.cpp and reg68k.c
+#define CONSOLETERM 2
+extern void init_terminal_serial_port(int port); // create console terminalwx window in src/host/wxui/z8530-terminal.cpp
+extern void lisa_console_output(uint8 c);        // single char output directly as VT100 in src/host/wxui/z8530-terminal.cpp
+extern void lpw_console_output(char *text);      // output a whole string and translate SOROC->vt100 of whole string in src/host/wxui/z8530-terminal.cpp
+extern void  lpw_console_output_c(char c);       // output with SOROC->vt100 of a single char rather than string in src/host/wxui/z8530-terminal.cpp
+
+void hle_monitor_intercept(void) {
+    switch(PC) {
+        case  0x0f161854: {
+              uint8 c=lisa_rb_ram(A3);  //ADD.B      #1,(A3)
+              lisa_wb_ram(A3,c+1);
+              regs.pc=0x0F161856; pc24=0x0F161856; reg68k_pc=0x0F161856;
+              cpu68k_clocks+=8;
+              lisa_console_output(13); lisa_console_output(13);
+              ALERT_LOG(0,"Newline");
+              return;
+        }
+        case  0x0f1618a4: {
+              lisa_ww_ram((A3),0x0101);  // 740486-1/0f1618a4 (0 0/0/0) : 36bc 0101                  : 6...     :  516 : MOVE.W     #$0101,(A3)  SRC:clk:000000000cd54bf2 +12 clks
+              regs.pc=0x0f1618a6; pc24=0x0f1618a6; reg68k_pc=0x0f1618a6;
+              cpu68k_clocks+=12;
+              reg68k_sr.sr_struct.z=0; reg68k_sr.sr_struct.n=0; reg68k_sr.sr_struct.c=0; reg68k_sr.sr_struct.x=0;
+              lisa_console_output(27);  // ESC
+              lisa_console_output('['); // [
+              lisa_console_output('H'); // H
+              ALERT_LOG(0,"Home");
+              return;
+        }
+        case  0x0f16172c: {
+              uint8 c=lisa_rb_ram(A2);  // 1/0f16172c (0 0/0/0) : 101a                       : ..       :  247 : MOVE.B     (A2)+,D0  SRC:clk:0000000004af1a07 +8 clks
+              D0=(D0 & 0xffffff00)|c;
+              A2=(A2)+1;
+              reg68k_sr.sr_struct.z=(c==0); reg68k_sr.sr_struct.n=(c>127); reg68k_sr.sr_struct.c=0; reg68k_sr.sr_struct.x=0;
+              regs.pc=0x0f16172e; pc24=0x0f16172e; reg68k_pc=0x0f16172e;
+              cpu68k_clocks+=8;
+              lpw_console_output_c(c);  // character out
+              ALERT_LOG(0,"Sending to TerminalWx Console: %c (%02x)",c,c)
+              return;
+        }
+        default:
+              ALERT_LOG(0,"Unimplemented HLE patch Monitor OS 12.x at %d/%08x",context, PC);
+    }
+}
+
+
+void  apply_monitor_hle_patches(void) {
+      monitor_patch=0; // flag done so we don't keep doing it repeatedly
+
+      ALERT_LOG(0,"#  # #    #### Patching for Monitor OS 12.x");
+      ALERT_LOG(0,"#  # #    #    Patching for Monitor OS 12.x");
+      ALERT_LOG(0,"#### #    #### Patching for Monitor OS 12.x");
+      ALERT_LOG(0,"#  # #    #    Patching for Monitor OS 12.x");
+      ALERT_LOG(0,"#  # #### #### Patching for Monitor OS 12.x");
+
+      ALERT_LOG(0,"consoletermwindow=%d",consoletermwindow);
+
+      if  (consoletermwindow) {
+            if  (lisa_rw_ram(0x0f161854)!=0x5213) { //33620868-1/0f161854 (0 0/0/0) : 5213                       : R.       :  785 : ADD.B      #1,(A3)  SRC:clk:000000000845b32d +8 clks
+                ALERT_LOG(0,"Cannot patch, address 0x0f161854 does not contain 0x5213");
+                ALERT_LOG(0,"Cannot patch, address 0x0f161854 does not contain 0x5213");
+                ALERT_LOG(0,"Cannot patch, address 0x0f161854 does not contain 0x5213");
+                return; 
+            }
+            if  (lisa_rl_ram(0x0f1618a4)!=0x36bc0101) {
+                ALERT_LOG(0,"Cannot patch, address 0x0f1618a4 does not contain 0x36bc0101");
+                ALERT_LOG(0,"Cannot patch, address 0x0f1618a4 does not contain 0x36bc0101");
+                ALERT_LOG(0,"Cannot patch, address 0x0f1618a4 does not contain 0x36bc0101");
+                return; 
+            }
+            if  (lisa_rw_ram(0x0f16172c)!=0x101a) {
+                ALERT_LOG(0,"Cannot patch, address 0x0f16172c does not contain 0x101a");
+                ALERT_LOG(0,"Cannot patch, address 0x0f16172c does not contain 0x101a");
+                ALERT_LOG(0,"Cannot patch, address 0x0f16172c does not contain 0x101a");
+                return; 
+            }
+
+            abort_opcode=0;
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+
+            init_terminal_serial_port(CONSOLETERM);  // open terminal window for console
+
+            // since we don't detect MonitorOS until after it started, we lose the first menu prompt
+            static char *mon="\fMonitor: E(dit, C(ompile, F(ile, L(ink, X(ecute, A(ssemble, S(ysmgr, ? [0.12.3]";
+            lpw_console_output(mon);
+
+            // patch with F-Line HLE traps
+            lisa_ww_ram(0x0f161854,0xf33d);          //  854277-1/0f161854 (0 0/0/0) : 5213                       : R.       :  785 : ADD.B      #1,(A3)  SRC:clk:000000000cd9ddb2 +8 clks
+            lisa_ww_ram(0x0f1618a4,0xf33d);          //  740486-1/0f1618a4 (0 0/0/0) : 36bc 0101                  : 6...     :  516 : MOVE.W     #$0101,(A3)  SRC:clk:000000000cd54bf2 +12 clks
+            lisa_ww_ram(0x0f16172c,0xf33d);          // 7404839-1/0f16172c (0 0/0/0) : 101a                       : ..       :  247 : MOVE.B     (A2)+,D0  SRC:clk:0000000004af1a07 +8 clks
+      }
+}
+
+
+
+void  apply_xenix_hle_patches(void) {
+      
+      if (context != 1) return; // can only apply in context 1 (supervisor mode)
+      //xenix_patch=0;            // flag done so we don't keep patching repeatedly
+
+      ALERT_LOG(0,"#  # #    #### Patching for Xenix");
+      ALERT_LOG(0,"#  # #    #    Patching for Xenix");
+      ALERT_LOG(0,"#### #    #### Patching for Xenix");
+      ALERT_LOG(0,"#  # #    #    Patching for Xenix");
+      ALERT_LOG(0,"#  # #### #### Patching for Xenix");
+
+      ALERT_LOG(0,"consoletermwindow=%d",consoletermwindow);
+      // insert ProFile patches for Xenix here, not below.
+
+      if   (consoletermwindow) {
+            abort_opcode=0;
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+
+            init_terminal_serial_port(CONSOLETERM);  // open terminal window for console
+
+            lisa_ww_ram(0x0000e180,0xf33d);          // 1e2e 000b                  : ....     :  263 : MOVE.B     $000b(A6),D7  PC:0000e184 SRC:
+
+            ALERT_LOG(0,"abort_opcode:%d",abort_opcode);
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+            ALERT_LOG(0,"Enabling TerminalWx console window");
+
+      }
+      else  {
+              ALERT_LOG(0,"TerminalWx NOT enabled because consoletermwindow=%d not enabling terminal",consoletermwindow);
+            }
+}
+
+
+// 2022.03.06 added console terminal wx to Xenix because I'm on a roll, and why not.
+void hle_xenix_intercept(void) {
+  switch(PC) {
+    case 0x0000e180:    {
+                          D7=(D7 & 0xffffff00) | lisa_rb_ram(0x000b+(A6));  
+                          // putchar  1e2e 000b   : ....     :  263 : MOVE.B     $000b(A6),D7  PC:0000e184
+                          regs.pc=0x0000e184; pc24=0x0000e184; reg68k_pc=0x0000e184;
+                          reg68k_sr.sr_struct.z=(D7==0);
+                          lisa_console_output((uint8) (D7 & 0xff) );
+                          ALERT_LOG(0,"%c",D7 & 0xff)
+                          return;
+                        }
+   default:
+                        ALERT_LOG(0,"Unhandled HLE intercept for Xenix at %d/%08x",context,PC);
+  }
+}
+
 
 void  hle_intercept(void) {
-      ALERT_LOG(0,".");
+      DEBUG_LOG(0,".");
       check_running_lisa_os();
 
       ProFileType *P=NULL;
@@ -325,20 +477,36 @@ void  hle_intercept(void) {
       uint32 a5=A5;
       long size=0;
 
+      DEBUG_LOG(0,"running os: %d, want:%d pc:%08x a4:%08x, a5:%08x, d7:%08x",running_lisa_os,LISA_UNIPLUS_RUNNING,PC,a4,a5,D7);
+
       if  ( PC == 0x00fe0090 || PC == rom_profile_read_entry)
-          {ALERT_LOG(0,"profile.c:state:hle - boot rom read pc:%08x",PC); romless_entry(); return;} // Boot ROM ProFile Read HLE
+          {DEBUG_LOG(0,"profile.c:state:hle - boot rom read pc:%08x",PC); romless_entry(); return;} // Boot ROM ProFile Read HLE
 
-      if (running_lisa_os == LISA_OFFICE_RUNNING )   {hle_los_intercept();  return;}
-      if (running_lisa_os == LISA_MACWORKS_RUNNING ) {hle_mw30_intercept(); return;}
+      switch(running_lisa_os) {
+        case LISA_XENIX_RUNNING:     hle_xenix_intercept();   return;
+        case LISA_MONITOR_RUNNING:   hle_monitor_intercept(); return;
+        case LISA_OFFICE_RUNNING:    hle_los_intercept();     return;
+        case LISA_MACWORKS_RUNNING:  hle_mw30_intercept();    return;
+      }
 
-      ALERT_LOG(0,"running os: %d, want:%d pc:%08x a4:%08x, a5:%08x",running_lisa_os,LISA_UNIPLUS_RUNNING,PC,a4,a5);
-      if (running_lisa_os==LISA_UNIPLUS_RUNNING) {
+      // console kernel putchar intercept - first few calls go to this before running OS is detectable since the kernel
+      // hasn't yet initialized the vector tables, but still calls putchar
+      if  (reg68k_pc==0x000236c6 && (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os==0) ) {
+          D7=(D7 & 0xffffff00) | fetchbyte(0x0b+(A6));
+          lisa_console_output((uint8) (D7 & 0x7f));
+          ALERT_LOG(0,"uniplus putchar: %02x %c",(uint8)(D0 & 0x7f), (uint8)(D0 & 0x7f) );
+          regs.pc=0x000236ca; pc24=0x000236ca; reg68k_pc=0x000236ca;
+      }
+
+
+      if  (running_lisa_os==LISA_UNIPLUS_RUNNING) {
           int vianum=get_vianum_from_addr(a5);
           if (vianum>1 && vianum<9) P=via[vianum].ProFile;
 
-          ALERT_LOG(0,"running os: %d pc:%08x a4:%08x, a5:%08x via:%d profile :%p",running_lisa_os,PC,a4,a5,vianum,P);
+          DEBUG_LOG(0,"running os: %d pc:%08x a4:%08x, a5:%08x via:%d profile :%p",running_lisa_os,PC,a4,a5,vianum,P);
 
-          if (P)
+          // profile related intercepts
+          if  (P)
           {
              switch(reg68k_pc) {
                // uniplus lock speedup by pushing to next frame, and hopefully the next IRQ or timer event
@@ -359,20 +527,20 @@ void  hle_intercept(void) {
                                           P->StateMachineStep=12;
                                           break; // read 4 status bytes into A4, increase a4+=4, PC=00020c74
   
-               case 0x00020d1e: size= 20; regs.pc=pc24=reg68k_pc=0x00020d26; ALERT_LOG(0,"profile.c:state:hle:read tags");   break; // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26
-               case 0x00020d3e: size=512; regs.pc=pc24=reg68k_pc=0x00020d72; ALERT_LOG(0,"profile.c:state:hle:read sector"); break; // read 512 bytes of data into *a4, a4+=512 D5=0x0000ffff PC=0x00020d72
+               case 0x00020d1e: size= 20; regs.pc=pc24=reg68k_pc=0x00020d26; DEBUG_LOG(0,"profile.c:state:hle:read tags");   break; // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26
+               case 0x00020d3e: size=512; regs.pc=pc24=reg68k_pc=0x00020d72; DEBUG_LOG(0,"profile.c:state:hle:read sector"); break; // read 512 bytes of data into *a4, a4+=512 D5=0x0000ffff PC=0x00020d72
     
                // write tag/sector specific
-               case 0x00020ebc:           regs.pc=pc24=reg68k_pc=0x00020ef0; ALERT_LOG(0,"profile.c:state:hle:write sector+tags");  // write tags and data in one shot, then return to 0x00020ef0
+               case 0x00020ebc:           regs.pc=pc24=reg68k_pc=0x00020ef0; DEBUG_LOG(0,"profile.c:state:hle:write sector+tags");  // write tags and data in one shot, then return to 0x00020ef0
                                 size=D0; // d5
                                 a4=A4;
                                 while(size--) {
-                                                 if (P->indexwrite>542) {ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;}
-                                                 P->DataBlock[P->indexwrite++]=fetchbyte(a4++);
+                                                if (P->indexwrite>542) {    ALERT_LOG(0,"ProFile buffer overrun!"); P->indexwrite=4;}
+                                                P->DataBlock[P->indexwrite++]=fetchbyte(a4++);
                                               }
     
                                 return; // we're done, so return.
-    
+                   
                default: ALERT_LOG(0,"Unknown F-Line error: PC:%08x",PC); 
                         return;
              }
@@ -424,7 +592,7 @@ void apply_uniplus_hacks(void)
        ALERT_LOG(0,"**** UniPlus bootstrap - MOVEC detected, r=%02x running_lisa_os =%d ****",r,running_lisa_os);
 
            #ifdef DEBUG
-           debug_on("uniplus");
+           //debug_on("uniplus");
            //find_uniplus_partition_table();
            #endif
 
@@ -434,8 +602,6 @@ void apply_uniplus_hacks(void)
       if (r==0x60)
       {
           ALERT_LOG(0,"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-          ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
-          ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
           ALERT_LOG(0,"Patching for UniPlus v1.1 sunix");
           ALERT_LOG(0,"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 
@@ -449,8 +615,6 @@ void apply_uniplus_hacks(void)
       // v1.4 /unix patch
        if (r==0x67) { // v1.4 this checks to ensure that the pro.c driver is loaded before we modify it. Likely not necessary.
            ALERT_LOG(0,"====================================================================");
-           ALERT_LOG(0,"Patching for UNIPLUS v1.4");
-           ALERT_LOG(0,"Patching for UNIPLUS v1.4");
            ALERT_LOG(0,"Patching for UNIPLUS v1.4");
            ALERT_LOG(0,"====================================================================");
 
@@ -467,10 +631,17 @@ void apply_uniplus_hacks(void)
                ALERT_LOG(0,"#  # #    #    Patching for UNIPLUS v1.4 HLE");
                ALERT_LOG(0,"#  # #### #### Patching for UNIPLUS v1.4 HLE");
 
+               // profile HLE patches
                lisa_ww_ram(0x00020c64,0xf33d); // read 4 status bytes into A4, increase a4+=4, PC=00020c74
                lisa_ww_ram(0x00020d1e,0xf33d); // read 20 bytes of tags into *a4, increase a4+=20, D5= 0x0000ffff PC=00020d26
                lisa_ww_ram(0x00020d3e,0xf33d); // read 512 bytes of data into *a4, a4+=512 D5=0x0000ffff PC=0x00020d72
                lisa_ww_ram(0x00020ebc,0xf33d); // wrtite 512+20 bytes of data+tags in one shot. into *a4, a4+=512 D5=0x0000ffff PC=0x00020ef0
+
+               // putchar intercept for terminal
+               if  (consoletermwindow) {
+                   lisa_ww_ram(0x000236c6,0xf33d);
+                   init_terminal_serial_port(CONSOLETERM); // open terminal window for console
+               }
            }
            uniplus_hacks=0; // turn off short-circuit logic-AND flag
        }

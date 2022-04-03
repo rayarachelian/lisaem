@@ -51,6 +51,7 @@ extern "C" {
   extern int double_sided_floppy;
   extern void save_configs(void);
   extern uint8 floppy_iorom;
+  extern int consoletermwindow;
 };
 
 extern wxString get_config_filename(void);
@@ -362,6 +363,7 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  my_lisaconfig->serial1xon=serialaxon->GetValue() ? "1":"0";
  my_lisaconfig->serial2xon=serialbxon->GetValue() ? "1":"0";
  
+consoletermwindow = console_term->GetValue() ? 1:0;
  /*
  fprintf(stderr,"myserial number:%s\n",my_lisaconfig->myserial.c_str());
  fprintf(stderr,"rompath        :%s\n",my_lisaconfig->rompath.c_str());
@@ -381,7 +383,7 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  cheat_ram_test=cheats->GetValue() ?1:0;
 
  hle=hle_cheats->GetValue() ?1:0;
- macworks4mb=macwx4mb->GetValue() ? 1:0;
+ macworks4mb=0; // doesn't work yet // macwx4mb->GetValue() ? 1:0;
 
  sound_effects_on = soundeffects->GetValue()?1:0;
  double_sided_floppy=doublesided->GetValue() ?1:0;
@@ -556,8 +558,9 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
      default:    cpurambox->SetSelection(2); 
     }
 
-   macwx4mb = new wxCheckBox(panel, wxID_ANY, wxT("4MB RAM MacWorks"), wxPoint(320 * HIDPISCALE,y+(ya/4)), wxDefaultSize,wxCHK_2STATE);
-   macwx4mb->SetValue( (bool)(macworks4mb) );
+   // doesn't work yet
+   //macwx4mb = new wxCheckBox(panel, wxID_ANY, wxT("4MB RAM MacWorks"), wxPoint(320 * HIDPISCALE,y+(ya/4)), wxDefaultSize,wxCHK_2STATE);
+   //macwx4mb->SetValue( (bool)(macworks4mb) );
 
    y+=ya; y+=ya/2;
 
@@ -616,8 +619,11 @@ wxPanel *LisaConfigFrame::CreateMainConfigPage(wxNotebook *parent)
     cheats = new wxCheckBox(panel, wxID_ANY, wxT("Boot ROM speedup hacks"), wxPoint(10 * HIDPISCALE,y), wxDefaultSize,wxCHK_2STATE);
     cheats->SetValue( (bool)(cheat_ram_test) );
 
-    hle_cheats = new wxCheckBox(panel, wxID_ANY, wxT("Hard Drive Acceleration"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
-    hle_cheats->SetValue( (bool)(hle) );
+    hle_cheats  = new wxCheckBox(panel, wxID_ANY, wxT("Hard Drive Acceleration"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
+    hle_cheats->SetValue( (bool)(hle) );   y+=ya/2;
+
+    console_term = new wxCheckBox(panel, wxID_ANY, wxT("Console Terminal"), wxPoint(10 * HIDPISCALE,y+ya/2), wxDefaultSize,wxCHK_2STATE);
+    console_term->SetValue( (bool) consoletermwindow );
 
     applypoint=wxPoint(420 * HIDPISCALE,  yz+ya);
     (void) new wxButton( panel, ID_APPLY, wxT("Apply"), applypoint, wxDefaultSize );

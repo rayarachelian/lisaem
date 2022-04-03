@@ -69,6 +69,8 @@ static int loopy_vector=0;                  // prevent fetch from calling this a
 
 
 /*** forward references ***/
+extern void lisa_console_output(uint8 c);
+
 #ifdef DEBUG
 
 void dumpmmu(uint8 c, FILE *out);
@@ -1379,12 +1381,14 @@ void trap_opcode(uint32 n) {
 #endif
 }
 
-void a_line(void) {
-#ifdef DEBUG
-    #ifdef __WXMSW__ // windows app is compiled as GUI only so has no stdout
-    return;
-    #else
-    if (!debug_log_enabled) return;
+
+extern void  lpw_console_output(char *text);
+
+extern void init_terminal_serial_port(int port); // in src/host/wxui/z8530-terminal.cpp
+
+void a_line(void) {  // this is invoked from cpu68k-a.c before the vector is taken
+                     // reg68k_pc is the address of the the trap opcode where it was invoked, 
+                     // not the vector address as this is before vector processing.
 
     if (running_lisa_os!=LISA_OFFICE_RUNNING) return;
 
@@ -1394,77 +1398,95 @@ void a_line(void) {
 
     switch (alineopcode)
     {
-      // maybe 3/a0c60100 or possibly: 3/a02201c8
-      case 0xa022024c: //CKOUTRED :TODO:: this is used for other stuff too, not just console writes.
+      // maybe 3/a0c60100 or possibly: 3/a02201c8 - this is really a memcpy equivalent, but it is used for displaying in console in quickdraw I think
+      // idea check stack frame for call from 3/a0c02584 as a filter for this that's cleaner and won't need patching, except that context switch will
+      // also change A7.
+
+      case 0xa022024c: //called from CKOUTRED trap a022024c goes to PC=a022024c. trap lives at 3/a0c02584 within CKOUTRED
       /*26842886 +6  push address 00f7bd6b - this is the text to print!
-        26842887 +2  push address 00f7bc3d - buffer to copy into for whatever reason.
-        26842888 +0  word 2a=42   size*/
+        26842887 +2  push address 00f7bc3d - buffer to copy into
+        26842888 +0  word 2a=42   size of buffer */
             {
               uint32 straddrp = reg68k_regs[8+7]+6; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               if (straddr==0xaf) {return;}
 
+              if (reg68k_pc!=0xa0c02584) return; // filter out memcpy equivalent calls to only ones from CKOUTRED
+
               uint32 sizeaddr = reg68k_regs[8+7];  // that the wrapper library stripped out on the A-Line call
               uint16 size     = lisa_ram_safe_getword(context,sizeaddr); 
               if (size==0xaf) {return;}
 
+              static char text[132*50];  // 80x25=20000 don't expect things being printed more than 1 screen at a time
+              text[0]=0;
+
+              #ifdef DEBUG
               fflush(buglog);
               // this is a first pass at this, so this is not efficient
-              fprintf(buglog,"LISACONSOLE: at (%d,%d) clk:%016llx: str@%08x size:%04x text:", lisa_ram_safe_getbyte(1,0x1f9),lisa_ram_safe_getbyte(1,0x1f8),
+              fprintf(buglog,"LISACONSOLE: PC:%d/%08x at (%d,%d) clk:%016llx: str@%08x size:%04x text:", context, reg68k_pc, lisa_ram_safe_getbyte(1,0x1f9),lisa_ram_safe_getbyte(1,0x1f8),
               (long long)cpu68k_clocks,straddr,size);
+              #endif
+
               last_display_str=lisa_ram_safe_getlong(context,reg68k_regs[8+7]+2);
-              for (int i=0; i<size; i++) {
+
+              //:                   Workshop
+              // 0123456789012345678901234567
+              //           1         2      size:  2e=46
+              // size:004f text:{V3.9} WORKSHOP: FILE-MGR, SYSTEM-MGR, Edit, Run, Debug, Pascal, Basic, Quit, ? |
+              //                01234567890123456789012345678901234567890123456789012345678901234567890123456789|
+              //                          1         2         3         4         5         6         7         8
+              // size 4f=79
+              for (int i=0, j=0; i<size; j++, i++) {
                 uint8 c=lisa_ram_safe_getbyte(context,straddr+i); //if (abort_opcode) {fprintf(buglog,"[abort-opcode on read]\n"); abort_opcode=0; return;}
+
+                #ifdef DEBUG
                 switch (c) {
-                  case 13: fprintf(buglog,"⌤"); break;
-                  case 10: fprintf(buglog,"〷"); break;
-                  case ('L'-'@'): fprintf(buglog,"␌"); break;
-                  default:  if (c>31 && c<128) fprintf(buglog,"%c",c);
+                  case 13: fprintf(buglog,"[CR]");                         break;
+                  case 10: fprintf(buglog,"[LF]");                         break;
+                  case 27: fprintf(buglog,"[ESC]");                        break;
+                  case ('L'-'@'): fprintf(buglog,"[FF]");                  break;
+
+                  default:  if (c>31 && c<128) { fprintf(buglog,"%c",c);        }
+                            else if (c<32 )    { fprintf(buglog,"[^%c]",c+'@'); }
+                            else if (c>126)    { fprintf(buglog,"[0x%02x]",c);  }
                 }
+                #endif
+
+                if (j<64) {  text[j]=c; text[j+1]=0; }
               }
 
-              fprintf(buglog,"\n");
-              fflush(buglog);
-            }
-            break;
-      /*
-      case 0xa0c00080: //WRITEDATA :TODO:: this is used for other stuff too, not just console writes.
-            {
-              uint32 straddrp = reg68k_regs[8+7]+0; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
-              uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
-              uint8 size=lisa_ram_safe_getbyte(context,straddr); if (size==0xaf) return;
-              fprintf(buglog,"LISACONSOLE(writedata):%016llx: str@%08x size:%04x text:",(long long)cpu68k_clocks,straddrp,size);
-
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 0, lisa_ram_safe_getlong(context,straddrp+ 0));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 4, lisa_ram_safe_getlong(context,straddrp+ 4));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+ 8, lisa_ram_safe_getlong(context,straddrp+ 8));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+12, lisa_ram_safe_getlong(context,straddrp+12));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+16, lisa_ram_safe_getlong(context,straddrp+16));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+20, lisa_ram_safe_getlong(context,straddrp+20));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+24, lisa_ram_safe_getlong(context,straddrp+24));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+28, lisa_ram_safe_getlong(context,straddrp+28));
-              fprintf(buglog,"val[@%08x]=%08x\n",straddrp+32, lisa_ram_safe_getlong(context,straddrp+32));
-
-              for (int i=1; i<size; i++) {
-                uint8 c=lisa_ram_safe_getbyte(context,straddr+i); //if (abort_opcode) {fprintf(buglog,"[abort-opcode on read]\n"); abort_opcode=0; return;}
-                switch (c) {
-                  case 13: fprintf(buglog,"⌤"); break;
-                  case 10: fprintf(buglog,"〷"); break;
-                  case ('L'-'@'): fprintf(buglog,"␌"); break;
-                  default:  if (c>31 && c<128) fprintf(buglog,"%c",c);
-                }
+              // don't open terminalwx window until we see the Workshop header since we can't tell LOS apart from LPW
+              // don't mess with the number of spaces below, they match LPW output exactly
+              if  (consoletermwindow) {
+                                  //:                   Workshop
+                                  // 0123456789012345678901234567
+                  if  (strncmp(text,"                   Workshop",27)==0) {
+                      #define CONSOLETERM 2
+                      init_terminal_serial_port(CONSOLETERM); // open terminal window for console
+                      lpw_console_output("\e=-0");
+                  }
+                  lpw_console_output(text);
               }
 
+              #ifdef DEBUG
               fprintf(buglog,"\n");
               fflush(buglog);
+              #endif
             }
             break;
-            */
-      case 0xa0c00050: fprintf(buglog,"LISACONSOLE: CLS\n"); break; //CLEARTHE
+
+      // might not need this, not sure.
+      case 0xa0c00050: 
+                       #ifdef DEBUG
+                       fprintf(buglog,"LISACONSOLE: CLS\n"); 
+                       #endif
+                       //if (consoletermwindow) lisa_console_output('L'-'@');
+                       break; //CLEARTHE screen - 0x0c = ^L (FormFeed char)
 
       default:
-    
             {
+              #ifdef DEBUG
+              #ifndef __MSVCRT__
               uint32 straddrp = reg68k_regs[8+7]+0; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               uint8 size=lisa_ram_safe_getbyte(context,straddr); if (size==0xaf) return;
@@ -1484,11 +1506,11 @@ void a_line(void) {
                       fprintf(buglog,"val[@%08x]=%08x\n",straddrp+32, lisa_ram_safe_getlong(context,straddrp+32));
                       fprintf(buglog,"\n\n");
                   }
-       return;
-             }
-    }
-    #endif
-#endif
+              return;
+              #endif
+              #endif
+            }
+  }
 }
 
 XTIMER entry;
@@ -2113,7 +2135,7 @@ void disable_4MB_macworks(void) {
 extern void refresh_vidram_fns(void);
 
 void enable_4MB_macworks(void) {
-
+  return; // broken, do not use yet
   ALERT_LOG(0,"\n\n\n\n\n\n");
   ALERT_LOG(0," **** Enabling 4MB RAM for MacWorks ****");
   ALERT_LOG(0," **** Enabling 4MB RAM for MacWorks ****");

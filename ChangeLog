@@ -1,12 +1,36 @@
 ------------------------------------------------------------------------------
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
-TBA 1.2.7  - Release on 2021.XX.YY (TBA) (Major release for all platforms)
 
-TODO: fix clean build pkg RPM bug (libdc42 or tools tries to install but doesn't have root so it fails.)
-need to pass PREFIX to it when PKG is set.
+2022.04.01 - RC4
 
-2021.11.07 - fixed wx3.1.2+ display issue for macos
+2022.03.31 - add alt-icons from Andrew Yaros posted here: 
+             https://lisalist2.com/index.php/topic,52.msg1909.html#msg1909
+           - added GNU readline/history support for lisafsh-tool on systems
+	           where the library is pre-installed in /usr/local and is static
+
+2022.03.30 - windows build fixes
+
+2022.03.18 - Xenix console -> TerminalWx fixed.
+
+2022.03.12 - Monitor OS 0.12.3 work now
+
+2022.03.06 - Work on getting TerminalWx window for Monitor OS 0.12.3             
+           - TerminalWx window for Xenix but not quite right, 
+             (Xenix doesn't boot yet, this is for the future)
+
+2022.03.03 - TerminalWx Window for LPW via SOROC->VT100 translation
+
+2022.02.28 - Hide TerminalWx windows instead of close to avoid segfault
+           - Quit LisaEm when main LisaEm window is closed to avoid segfault
+
+2022.02.22 - TerminalWx window for UniPlus
+
+2022.01.15 - Multiple TerminalWx fixups + feature adds
+
+2021.12.23 - fixed copy + Edit: Select all in TerminalWx code
+
+2021.11.01 - profile.c cleanup/debugging
 
 2021.10.30 - added package creation for OpenBSD 7 - end of Packagetober
              but it doesn't quite work correctly yet, so disabled for now

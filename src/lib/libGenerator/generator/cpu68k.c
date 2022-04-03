@@ -169,6 +169,7 @@ void seed_iib_check(void)
   long i;
 
   return;  // disabled for speed
+  /*
   for ( i=0; i<65536; i++)
   {
     iib_table_ptr[i]=cpu68k_iibtable[i];
@@ -177,15 +178,16 @@ void seed_iib_check(void)
   }
 
   iib_checks_enabled=1;
+  */
 }
 
 void my_check_iib(char *filename, char *function, long line)
 {
   t_iib *myiib;
 
-  long i;
-
   return; // disabled
+/*
+  long i;
   myiib=cpu68k_iibtable[0x6602];
   if (!myiib->funcnum)
   {  EXIT(171,0,"IIB for 6602 got clobbered above this! %s:%s:%ld",filename,function,line);  }
@@ -193,7 +195,6 @@ void my_check_iib(char *filename, char *function, long line)
   myiib=cpu68k_iibtable[0x4841];
   if (!myiib || !myiib->funcnum)
   {   EXIT(409,0,"IIB for 4841 got clobbered above this! %s:%s:%ld",filename,function,line); }
-
       return;                             // disable the full check to get some speed
 
       if ( !iib_checks_enabled) {seed_iib_check();iib_checks_enabled=1; return;  }
@@ -216,7 +217,7 @@ void my_check_iib(char *filename, char *function, long line)
               }
           }
       }//////////////////////////////////////////
-
+*/
 }
 
 

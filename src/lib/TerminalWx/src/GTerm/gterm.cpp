@@ -57,7 +57,7 @@ void GTerm::Reset()
 
 void GTerm::ExposeArea(int x, int y, int w, int h)
 {
-	int i;
+	int i;    
 	for (i=0; i<h; i++) changed_line(i+y, x, x+w-1);
 	if (!(mode_flags & DEFERUPDATE)) update_changes();
 }
@@ -156,6 +156,3 @@ GTerm::GetChar(int x, int y)
 
   return 0;
 }
-
-
-

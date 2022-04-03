@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2020.12.22                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2022.04.01                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2020 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -26,7 +26,6 @@
 *   Z8530 SCC terminal window (wxterm) interface functions for Lisa serial ports       *
 *                                                                                      *
 \**************************************************************************************/
-
 
 #include <wx/wx.h>
 #include <wx/scrolwin.h>
@@ -71,6 +70,8 @@ extern "C" {
     int  read_serial_port_tty(int port);
     int  write_serial_port_tty(int port, uint8 data);
     void close_tty(int port);
+    // vars.h:
+    extern int consoletermwindow;
 }
 
 
@@ -80,13 +81,11 @@ extern "C" {
 #include <wxterm.h>
 
 extern "C" FLIFLO_QUEUE_t SCC_READ[16], SCC_WRITE[16]; //// if changing this also change in z8530.c!
+extern "C" void keystroke_cops(unsigned char c);
+
 
 #define CSTR(x) ((char *)(x.char_str()))
 #define cSTR(x) ((char *)(x->char_str()))
-
-// 2 motherboard serial ports, 3 slots x 4 port serial card, 1 for BLU, 1 spare
-TerminalWx  *Terminal[16];
-TerminalWxFrame *TerminalFrame[16];
 
 #define SOH 0x01
 #define STX 0x02
@@ -96,9 +95,12 @@ TerminalWxFrame *TerminalFrame[16];
 #define ETB 0x17
 #define CAN 0x18
 #define SUB 0x1A
+#define ESC 0x1B
 #define CRC 0x43
+#define CR  0x0D
+#define LF  0x0A
 
-
+// Instructions for BLU loader for when floppy isn't available.
 const char *BLULOADER="Lisa Simple Serial Loader\n"
 "To bootstrap BLU on a Lisa if you don't have a floppy, do the following:\n"
 "Usage:\n"
@@ -136,45 +138,136 @@ Using BLU may cause loss of data and have undesirable and undocumented effects. 
 BLU is copyright 2013 by James MacPhail, portions copyright by Ray Arachelian. All rights are reserved.
 */
 
+// ::TODO:: add timer for xmodem xfers
 //    EVT_TIMER(ID_EMULATION_TIMER,LisaEmFrame::OnEmulationTimer)
 
 
-const long TerminalWxFrame::ID_TERM         = wxNewId();
-const long TerminalWxFrame::idMenuQuit      = wxNewId();
-const long TerminalWxFrame::ID_STATUSBAR1   = wxNewId();
-const long TerminalWxFrame::ID_FileCapture  = wxNewId();
-const long TerminalWxFrame::ID_TextUpload   = wxNewId();
-const long TerminalWxFrame::ID_XMODEM_UP    = wxNewId();
-const long TerminalWxFrame::ID_XMODEM_DN    = wxNewId();
-
+// these are somewhat like protos, we'll add 100, 200, ... 1500 to them
+// this way we don't need to do dynamic event ids, so we can keep the code simpler
+enum
+{
+    ID_TERM = 85300,
+    ID_MENU_QUIT,
+    ID_STATUSBAR1,
+    ID_FileCapture,
+    ID_TextUpload,
+    ID_XMODEM_UP,
+    ID_XMODEM_DN
+};
 
 wxString getportname(int port)
 {
-    static char *name="unknown";
+    wxString name="unknown";
     switch(port) {
-        case 0:  name="Serial B";         break;
-        case 1:  name="Serial A";         break;    
-        case 2:  name="slot 1 - port a";  break;
-        case 3:  name="slot 1 - port b";  break;
-        case 4:  name="slot 1 - port c";  break;
-        case 5:  name="slot 1 - port d";  break;
-        case 6:  name="slot 2 - port a";  break;
-        case 7:  name="slot 2 - port b";  break;
-        case 8:  name="slot 2 - port c";  break;
-        case 9:  name="slot 2 - port d";  break;
-        case 10: name="slot 3 - port a";  break;
-        case 11: name="slot 3 - port b";  break;
-        case 12: name="slot 3 - port c";  break;
-        case 13: name="slot 3 - port d";  break;
-        case 14: name="spare";            break;
-        case 15: name="Terminal for BLU"; break;
+        // motherboard serial ports Z8530
+        case  0:  name="Motherboard Serial B";         break;
+        case  1:  name="Motherboard Serial A";         break;
+        // future: console for LPW/Xenix/UniPlus
+        case  2: name="Console";          break;
+        // In progress: connect to physical Lisa via serial port and bootstrap BLU and then transfer profiles, etc. over xmodem
+        case  3: name="Terminal for BLU"; break;
+/*
+        // Tecmar PC16550D UART Quad Port Serial for Xenix/UniPlus - future.
+        case  4:  name="Tecmar Quad Port Slot 1 - Port A";  break;
+        case  5:  name="Tecmar Quad Port Slot 1 - Port B";  break;
+        case  6:  name="Tecmar Quad Port Slot 1 - Port C";  break;
+        case  7:  name="Tecmar Quad Port Slot 1 - Port D";  break;
+
+        case  8:  name="Tecmar Quad Port Slot 2 - Port A";  break;
+        case  9:  name="Tecmar Quad Port Slot 2 - Port B";  break;
+        case 10:  name="Tecmar Quad Port Slot 2 - Port C";  break;
+        case 11:  name="Tecmar Quad Port Slot 2 - Port D";  break;
+
+        case 12:  name="Tecmar Quad Port Slot 3 - Port A";  break;
+        case 13:  name="Tecmar Quad Port Slot 3 - Port B";  break;
+        case 14:  name="Tecmar Quad Port Slot 3 - Port C";  break;
+        case 15:  name="Tecmar Quad Port Slot 3 - Port D";  break;
+*/
     }
+
     return name;
 }
+
+// 2 motherboard serial ports, (3 slots x 4 port serial card - future with intel UART, not z8530), 1 for BLU, 1 console
+
+// bump this to 16 after Tecmac card
+#define MAXTERMS 4
+// ID of the console terminal
+// also in hle.c, reg68k.c if below line changes, edit there too.
+#define CONSOLETERM 2
+// ID of the Terminal for BLU
+#define SERIALTERM  3
+TerminalWx      *Terminal[MAXTERMS];
+TerminalWxFrame *TerminalFrame[MAXTERMS];
+
+
+// ::TODO:: √1. get rid of these macros, replace with C functions below
+//          √2. implement console fn's
+//           3. add code to check if xmodem xfer is in progress and ignore keypresses, don't return terminal output; except user pressed ESC/^C to abort the transfer
+//           4. add xmodem xfer status to status bar
+//          √5. for CONSOLE capture all keypress/release events and send to console
+//              √add OnKeyUp/Down/Char event handlers, if (portnum==CONSOLETERM) -> fwd my_lisawin
+
+#define XREADPORT()        ( (portnum==3) ? read_serial_port_tty(portnum)       : fliflo_buff_get(&SCC_READ[portnum])      )
+#define XWRITEPORT(data)   ( (portnum==3) ? write_serial_port_tty(portnum,data) : fliflo_buff_add(&SCC_WRITE[portnum],data))
+// &SCC_READ[portnum]  - is used to write to the SCC from TerminalWx
+// &SCC_WRITE[portnum] - is used to read from the SCC and write to the TerminalWx display
+
+
+uint8 xreadport(int port) {
+    if (port==SERIALTERM)  return read_serial_port_tty(port);    // tty from perspective of Z8530
+    return fliflo_buff_get(&SCC_WRITE[port]);
+}
+
+void xwriteport(uint8 data, int port) {
+    if (port==SERIALTERM)  {write_serial_port_tty(port,data); return;} // does an actual write to tty from perspective of Z8530
+    fliflo_buff_add(&SCC_READ[port],data);
+}
+
+
+extern "C" void write_serial_port_terminal(int portnum, uint8 data);
+
+
+// interface for console output from uniplus, Xenix (future), LPW (future)
+extern "C" void lisa_console_output(uint8 c) {
+    // if the window isn't opened, or shutting down, ignore, else segfault
+    if (!Terminal[CONSOLETERM]) return;
+    if (!TerminalFrame[CONSOLETERM]) return;
+
+    // UniPlus putchar (and I suspect Xenix) only puts out LF without CR, because this is before
+    // the terminal driver interface and comes in cooked mode, etc.
+    // if there's no XModem transfer, insert a CR before it so the terminal works.
+    if  (c==LF && TerminalFrame[CONSOLETERM]->xferproto==0) {
+        write_serial_port_terminal(CONSOLETERM,CR); }
+
+    write_serial_port_terminal(CONSOLETERM,c);
+//    if  (c==LF && TerminalFrame[CONSOLETERM]->xferproto==0) {
+//        fliflo_buff_add(&SCC_WRITE[CONSOLETERM],CR);
+//    }
+//    fliflo_buff_add(&SCC_WRITE[CONSOLETERM],c);
+}
+
+
+extern void lisawin_onchar   (wxKeyEvent& event);
+extern void lisawin_onkeyup  (wxKeyEvent& event);
+extern void lisawin_onkeydown(wxKeyEvent& event);
+
+// these can't work due to EVT_table issues, need to do something else.
+//void TerminalWx::OnChar      (wxKeyEvent& event) {    if (portnum==CONSOLETERM) { lisawin_onchar   (event); event.Skip();}  }
+//void TerminalWx::OnKeyUp     (wxKeyEvent& event) {    if (portnum==CONSOLETERM) { lisawin_onkeyup  (event); event.Skip();}  }
+//void TerminalWx::OnKeyDown   (wxKeyEvent& event) {    if (portnum==CONSOLETERM) { lisawin_onkeydown(event); event.Skip();}  }
 
 
 TerminalWxFrame::TerminalWxFrame(wxWindow* parent,wxWindowID id, int port)
 {
+
+    capture=NULL;
+    upload=NULL;
+    download=NULL;
+    xferproto=0;
+    xferbytes=0;
+    portnum=port;
+
     //(*Initialize(TerminalWxFrame)
     FileMenu    = new wxMenu();
     editMenu    = new wxMenu;
@@ -193,11 +286,11 @@ TerminalWxFrame::TerminalWxFrame(wxWindow* parent,wxWindowID id, int port)
 
 
     //MenuItem1 = new wxMenuItem(Menu1, idMenuQuit, _("Quit\tAlt-F4"), _("Quit the application"), wxITEM_NORMAL);
-    FileMenu->AppendCheckItem(ID_FileCapture, _("Capture"), _("Capture Terminal output to a file") ) ;
-    FileMenu->Append(ID_TextUpload, _("Upload Text"), _("Upload a text/ascii file") ) ;
+    FileMenu->AppendCheckItem(ID_FileCapture+(port*100), _("Capture"), _("Capture Terminal output to a file") ) ;
+    FileMenu->Append(ID_TextUpload+(port*100), _("Upload Text"), _("Upload a text/ascii file") ) ;
     FileMenu->AppendSeparator();
-    FileMenu->Append(ID_XMODEM_UP, _("Upload XModem"), _("Upload a file using XModem Protocol") );
-    FileMenu->Append(ID_XMODEM_DN, _("Download XModem"), _("Download a file using XModem Protocol") );
+//  FileMenu->Append(ID_XMODEM_UP+(port*100), _("Upload XModem"), _("Upload a file using XModem Protocol") );
+//  FileMenu->Append(ID_XMODEM_DN+(port*100), _("Download XModem"), _("Download a file using XModem Protocol") );
 
     MenuBar1->Append(FileMenu,  _("&File"));
     MenuBar1->Append(editMenu,  _("&Edit"));
@@ -206,38 +299,64 @@ TerminalWxFrame::TerminalWxFrame(wxWindow* parent,wxWindowID id, int port)
     //Menu2 = new wxMenu();
     //MenuBar1->Append(Menu2, _("Help"));
     SetMenuBar(MenuBar1);
-    StatusBar1 = new wxStatusBar(this, ID_STATUSBAR1, 0, _T("ID_STATUSBAR1"));
+    StatusBar1 = new wxStatusBar(this, ID_STATUSBAR1+(portnum*100), 0, _T("ID_STATUSBAR1"));
     int __wxStatusBarWidths_1[1] = { -1 };
     int __wxStatusBarStyles_1[1] = { wxSB_NORMAL };
     StatusBar1->SetFieldsCount(1,__wxStatusBarWidths_1);
     StatusBar1->SetStatusStyles(1,__wxStatusBarStyles_1);
     SetStatusBar(StatusBar1);
-
-    //Connect(idMenuQuit,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&TerminalWxFrame::OnQuit);
-    // should change this with minimize instead::
-    Connect(wxID_ANY,wxEVT_CLOSE_WINDOW,(wxObjectEventFunction)&TerminalWxFrame::OnClose);
-    //*)
 }
 
 TerminalWxFrame::~TerminalWxFrame()
 {
     //(*Destroy(TerminalWxFrame)
     //*)
+
+    //this->portnum=0xdeadbeef;
+    Show(FALSE);
+    #ifdef DEBUG
+    fprintf(stderr,"%s:%s:%d OnClose portnum:%d %08x\n",__FILE__,__FUNCTION__,__LINE__, portnum, portnum);
+    #endif
+    // how do we abort this destructor? event.Veto did not actually work from OnClose for TerminalWx
 }
 
 void TerminalWxFrame::OnQuit(wxCommandEvent& event)
 {
+    if (Terminal[portnum]) {Terminal[portnum]->Destroy(); Terminal[portnum]=NULL;}
     Close();
+    TerminalFrame[portnum]=NULL;
+    #ifdef DEBUG
+    fprintf(stderr,"%s:%s:%d OnQuit portnum:%d\n",__FILE__,__FUNCTION__,__LINE__, portnum);
+    #endif
+}
+
+extern "C" void close_all_terminals(void) {
+   for (int i=0; i<MAXTERMS; i++) {
+       if (Terminal[i]) {Terminal[i]->Destroy(); Terminal[i]=NULL;}
+       if (TerminalFrame[i]) {TerminalFrame[i]->Destroy(); TerminalFrame[i]=NULL;}
+   }
+
 }
 
 // maybe replace this with minimize instead incase the user closes the window by accident.
+// also closing will sometimes cause segfaults. So only close on quit.
 void TerminalWxFrame::OnClose(wxCloseEvent& event)
 {
-    int port=this->portnum;
-    if (Terminal[port]) {Terminal[port]->Destroy(); Terminal[port]=NULL;}
+    //int port=this->portnum;
+    //if (Terminal[port]) {Terminal[port]->Destroy(); Terminal[port]=NULL;}
+    //
+    //TerminalFrame[port]=NULL;
+    //Destroy();
 
-    TerminalFrame[port]=NULL;
-    Destroy();
+    #ifdef DEBUG
+    fprintf(stderr,"%s:%s:%d OnClose portnum:%d (%08x)\n",__FILE__,__FUNCTION__,__LINE__, portnum,portnum);
+    if (event.CanVeto())   fprintf(stderr,"%s:%s:%d OnClose portnum:%d can veto\n",__FILE__,__FUNCTION__,__LINE__, portnum);
+    else                   fprintf(stderr,"%s:%s:%d OnClose portnum:%d CANNOT VETO!\n",__FILE__,__FUNCTION__,__LINE__, portnum);
+    #endif
+
+    this->Show(FALSE); // hide window instead of closing
+    event.Veto(); // suppress close event as this will cause segfault
+    //event.Skip();
 }
 
 
@@ -246,44 +365,38 @@ void TerminalWxFrame::OnClose(wxCloseEvent& event)
 
 
 TerminalWx::TerminalWx(wxWindow* parent, wxWindowID id, int port,
-                                const wxPoint& pos, int width, int height,
-                                const wxString& name):  wxTerm(parent,id,pos,width,height,name) {
+                                const wxPoint& pos, int width, int height, 
+                                const wxString& name, int fontsize, char *fontname):  wxTerm(parent,id,pos,width,height,name) {
     portnum=port;
+
+    // meh when it opens on my machine (wxGTK linux) it shows only 50 cols x 10 lines though I've asked for 80x25 :(
+    ResizeTerminal(width, height);
+    SetInitialSize( wxSize(width*m_charWidth, height*m_charHeight) );
+    SetClientSize(width*m_charWidth, height*m_charHeight);
+    TerminalFrame[port]->SetClientSize((width+2)*m_charWidth, (height+3)*m_charHeight);
+    fprintf(stderr,"%s:%s:%d Set Term size (%d,%d) window size:(%d,%d)",__FILE__,__FUNCTION__,__LINE__, width,height,width*m_charWidth, height*m_charHeight);
 }
 
 
-extern "C" void init_terminal_serial_port(int port) {
-    wxString name="";
-    name << getportname(port);
+extern "C" void init_terminal_serial_port(int port);
+extern "C" void rx_char_available(int port);
+extern "C" void lpw_console_output(char *text);
 
-    if  (port<2) {
-        scc_r[port].s.rr0.r.tx_buffer_empty=1;
-        scc_r[port].s.rr0.r.dcd=1;
-        scc_r[port].s.rr0.r.cts=1;
-    }
-    #ifdef DEBUG
-    fprintf(stderr,"\n\n\n\n********* init_terminal_serial_port: %d ***********\n\n\n\n",port);
-    #endif
+static char lpw_console_str[88*34];
+static int  lpw_console_i=0;
 
-    if  (!TerminalFrame[port])
-        {
-            TerminalFrame[port]=new TerminalWxFrame(NULL,wxID_ANY, port);
-            #ifdef DEBUG
-            fprintf(stderr,"Created new TerminalWxFrame for port %d\n",port);
-            #endif
+// build a string and then pass it to extern "C" void  lpw_console_output(char *text) incase there's ESC chars.
+extern "C" void  lpw_console_output_c(char c) {
+        lpw_console_str[lpw_console_i++]=c; lpw_console_str[lpw_console_i]=0;
+
+        // if new line or other terminating char sent, then we can print the whole string
+        if  (c==10 || c==']' || c=='?' ||c==0 || lpw_console_i>88*33) {
+            lpw_console_output(lpw_console_str);  
+            lpw_console_i=0; lpw_console_str[0]=0; lpw_console_str[1]=0; 
+            return;
         }
-
-    if  (!Terminal[port])
-        {
-            Terminal[port]=new TerminalWx(TerminalFrame[port], wxID_ANY, port, wxDefaultPosition, 80, 25, (const wxString) name);
-            #ifdef DEBUG
-            fprintf(stderr,"Created new TerminalWindow for port %d\n",port);
-            #endif
-        }
-
-        TerminalFrame[port]->Show();
-        //SetTopWindow(TerminalFrame[port]);
 }
+
 
 /**    Called whenever the user has input - this resulted in sending garbage to the port, use SendBack instead */
 //void TerminalWx::OnUserInput(wxString input) {
@@ -299,76 +412,127 @@ extern "C" void init_terminal_serial_port(int port) {
     //        c++; }
 //}
 
-extern "C" void rx_char_available(int port);
 
 void TerminalWx::SendBack(int len, char* data) { 
 
     #ifdef DEBUG
     fprintf(stderr,"\nSendBackLength: %d\n",len);
     #endif
-
+    // use this for to send terminalwx console input back to the main my_lisawin keyboard input.
     for (int i=0; i<len; i++)
-        if (data[i] && !fliflo_buff_is_full(&SCC_READ[this->portnum]))
-        {
-            fliflo_buff_add(&SCC_READ[this->portnum], data[i]);
-            rx_char_available(this->portnum);
-            #ifdef DEBUG
-            fprintf(stderr,"SendBack: added i=%d character:%c (%d %02x) to fliflo for port:%d\n\n",i, data[i], data[i], data[i], this->portnum);
-            #endif
+        if  (data[i]) {
+            if  (portnum==CONSOLETERM) {
+                keystroke_cops( data[i] );
+            }
+            else if  (!fliflo_buff_is_full(&SCC_READ[this->portnum])) {
+                // send bytes from TerminalWx to the z8530 so the Lisa can read it. If i'ts the terminal console
+                // push to the my_lisawin keyboard events
+                    fliflo_buff_add(&SCC_READ[this->portnum], data[i]);
+                    rx_char_available(this->portnum);
+                #ifdef DEBUG
+                fprintf(stderr,"SendBack: added i=%d character:%c (%d %02x) to fliflo for port:%d\n\n",i, data[i], data[i], data[i], this->portnum);
+                #endif
+            }
         }
-
-        #ifdef DEBUG
-        if (!fliflo_buff_has_data(&SCC_READ[this->portnum]))
-            fprintf(stderr,"*** FLIFLO BUFF HAS NO DATA FOR PORT %d WTF!\n",this->portnum);
-        if (fliflo_buff_is_full(&SCC_READ[this->portnum]))
-            fprintf(stderr,"*** FLIFLO BUFF IS FULL FOR PORT %d WTF!\n",this->portnum);
-        #endif
+    lpw_console_output_c(0); // flush anything pending
 }
 
 void TerminalWx::SendBack(char* data) { 
     for (int i=0; data[i]!=0; i++)
-        if (data[i] && !fliflo_buff_is_full(&SCC_READ[this->portnum]))
+        if (data[i]) {
+            if  (portnum==CONSOLETERM) {
+                keystroke_cops( data[i] );
+            }
+            else if  (!fliflo_buff_is_full(&SCC_READ[this->portnum]))  {
+                fprintf(stderr,"\nSendBack: char\n");
+                fliflo_buff_add(&SCC_READ[this->portnum], data[i]);
+                rx_char_available(this->portnum);
+                #ifdef DEBUG
+                fprintf(stderr,"SendBack: added i=%d character:%c (%d %02x) to fliflo for port:%d\n\n",i, data[i], data[i], data[i], this->portnum);
+                #endif
+            }
+       }
+}
+
+void TerminalWxFrame::OnCopy(wxCommandEvent& event) {
+
+    #ifdef DEBUG
+    fprintf(stderr,"%s:%s:%d OnCopy portnum=%d\n",__FILE__,__FUNCTION__,__LINE__,portnum);
+    #endif
+
+    if (portnum<0 || portnum>15) return; // portnum error.
+    
+    if (Terminal[portnum]->HasSelection()) {
+
+        wxString Selection = Terminal[portnum]->GetSelection();
+        if (wxTheClipboard->Open())
         {
-            fprintf(stderr,"\nSendBack: char\n");
-            fliflo_buff_add(&SCC_READ[this->portnum], data[i]);
-            rx_char_available(this->portnum);
+            wxTheClipboard->SetData( new wxTextDataObject(Selection) );
+            wxTheClipboard->Flush();
+            wxTheClipboard->Close();
             #ifdef DEBUG
-            fprintf(stderr,"SendBack: added i=%d character:%c (%d %02x) to fliflo for port:%d\n\n",i, data[i], data[i], data[i], this->portnum);
+            fprintf(stderr,"%s:%s:%d Copied selection to clipboard\n",__FILE__,__FUNCTION__,__LINE__);
             #endif
         }
-
         #ifdef DEBUG
-        if (!fliflo_buff_has_data(&SCC_READ[this->portnum]))
-            fprintf(stderr,"*** FLIFLO BUFF HAS NO DATA FOR PORT %d WTF!\n",this->portnum);
-        if (fliflo_buff_is_full(&SCC_READ[this->portnum]))
-            fprintf(stderr,"*** FLIFLO BUFF IS FULL FOR PORT %d WTF!\n",this->portnum);
+        else { fprintf(stderr,"%s:%s:%d Could not open the clipboard\n",__FILE__,__FUNCTION__,__LINE__);}
         #endif
     }
+    #ifdef DEBUG
+    else { fprintf(stderr,"%s:%s:%d No selection is available\n",__FILE__,__FUNCTION__,__LINE__);}
+    #endif
+
+    event.Skip();
+
+    #ifdef DEBUG
+    fprintf(stderr,"%s:%s:%d OnCopy portnum=%d completed\n",__FILE__,__FUNCTION__,__LINE__,portnum);
+    #endif
+}
+
+void TerminalWxFrame::OnSelectAll(wxCommandEvent& WXUNUSED(event)) { if (portnum>-1 && portnum<MAXTERMS) Terminal[portnum]->SelectAll(); }
+
 
 void TerminalWxFrame::OnPaste(wxCommandEvent& WXUNUSED(event))
 {
-    wxTextDataObject data;
     if  (xferproto) {wxMessageBox(_("Cannot paste as file transfer operation is in progress"),_T("Cannot Paste"), wxICON_INFORMATION | wxOK); return;}
 
     if  (wxTheClipboard->Open()) 
         {
-            if (wxTheClipboard->IsSupported(wxDF_TEXT))  wxTheClipboard->GetData(data);
-            wxTheClipboard->Close();
-            wxTheClipboard->UsePrimarySelection();
+            wxTextDataObject data;
+          //wxTheClipboard->UsePrimarySelection();
+
             if (wxTheClipboard->IsSupported(wxDF_TEXT)) 
             {
-                wxString wspaste_to_terminal;
+                #ifdef DEBUG
+                fprintf(stderr,"%s:%s:%d pasting clipboard to fliflo READ queue for port %d\n",__FILE__,__FUNCTION__,__LINE__,this->portnum);
+                #endif
+
+                wxTheClipboard->GetData( data );
+
                 int len;
                 char *d;
-                wspaste_to_terminal = (wxString)(data.GetText());
-                d=CSTR(wspaste_to_terminal);
-                for (int i=0; d[i]!=0; i++)
-                    if  (d[i] && !fliflo_buff_is_full(&SCC_READ[this->portnum]))
-                        { fliflo_buff_add(&SCC_READ[this->portnum], d[i]);     }
 
+                wxString wspaste_to_lisaserialport;
+                wspaste_to_lisaserialport.Append(data.GetText());
+
+                wxString::const_iterator i;
+                for (i = wspaste_to_lisaserialport.begin(); i != wspaste_to_lisaserialport.end(); ++i)
+                {
+                    wxUniChar uni_ch = *i;
+                    // from the point of view of TerminalWx, read and write are reversed, they're correct from the PoV of the SCC
+                    if (uni_ch.IsAscii() ) {
+                        if  (portnum==CONSOLETERM) {
+                            keystroke_cops( (uint8)uni_ch);
+                        } else if   (!fliflo_buff_is_full(&SCC_READ[this->portnum])) 
+                                    {fliflo_buff_add(&SCC_READ[this->portnum], (uint8) uni_ch);}
+                    }
+                }
                 rx_char_available(this->portnum);
             }
+            else {wxTheClipboard->Close(); wxMessageBox(_("Cannot paste as clipboard does not contain text."),_T("Cannot Paste"), wxICON_INFORMATION | wxOK); return;}
+            wxTheClipboard->Close();
         }
+        else {wxMessageBox(_("Cannot paste as clipboard is empty."),_T("Cannot Paste"), wxICON_INFORMATION | wxOK); return;}
 }
 
 /* CRC used in BLU
@@ -486,11 +650,6 @@ long int xferMode2;
 //SOH|STX/BLK/!BLK/[128data]CRC CRC
 
 
-// Macros for use with XModem - port 15 is really a USB/Serial port (real tty) for BLU, otherwise, we use fliflo to enqueue data
-// to emulated ports on LisaEm.
-#define XREADPORT()        ( (portnum==15) ? read_serial_port_tty(portnum)       : fliflo_buff_get(&SCC_READ[portnum])      )
-#define XWRITEPORT(data)   ( (portnum==15) ? write_serial_port_tty(portnum,data) : fliflo_buff_add(&SCC_WRITE[portnum],data))
-
 void TerminalWxFrame::XModemReceiveBlock(void)
 {
     size_t count, size;
@@ -509,7 +668,7 @@ void TerminalWxFrame::XModemReceiveBlock(void)
 
     xferMode2=0;
     for (int i=0; i<buff_size; i++) {
-        int c=XREADPORT();
+        int c=xreadport(portnum);
         if (c>-1) buffer[i]=c;
         else { XWRITEPORT(NAK); 
         
@@ -521,7 +680,7 @@ void TerminalWxFrame::XModemReceiveBlock(void)
         
         }
     }
-    if (buffer[0]!=(255-buffer[1]) || buffer[0]!=xferBlockNum) {XWRITEPORT(NAK); return;}
+    if (buffer[0]!=(255-buffer[1]) || buffer[0]!=xferBlockNum) {xwriteport(NAK,portnum); return;}
 
     crc=xmcrc16(&buffer[2],xferWindowSize);
     chksum=xmchksum((uint8 *)&buffer[2],xferWindowSize);
@@ -532,10 +691,10 @@ void TerminalWxFrame::XModemReceiveBlock(void)
         fseek(download,xferPosition,SEEK_SET);
         fwrite(&buffer[2],xferWindowSize,1,download);
         xferPosition+=xferWindowSize;
-        XWRITEPORT(ACK);
+        xwriteport(ACK,portnum);
         return;
     }    
-    XWRITEPORT(NAK);
+    xwriteport(NAK,portnum);
 }
 
 
@@ -548,8 +707,8 @@ void TerminalWxFrame::XModemSendBlock(void)
     int c;
 
     if (!upload || feof(upload)) {
-        if (xferMode1!=2) XWRITEPORT(EOT);
-        else {XWRITEPORT(13); XWRITEPORT(10);}// end is sending one EOT, then ACK, then EOB // EOB=13,10
+        if (xferMode1!=2) xwriteport(EOT,portnum);
+        else {xwriteport(CR,portnum); xwriteport(LF,portnum);}// end is sending one EOT, then ACK, then EOB // EOB=13,10
         
         if (xferMode1<2) xferMode1=2;
         size=1;
@@ -564,7 +723,7 @@ void TerminalWxFrame::XModemSendBlock(void)
         count=fread(data,xferWindowSize,1,upload);
         size=3+xferWindowSize;
         
-        c=XREADPORT(); if (c=='C') xferMode1=1;
+        c=xreadport(portnum); if (c=='C') xferMode1=1;
         
         if  (xferMode1) 
             {
@@ -578,7 +737,7 @@ void TerminalWxFrame::XModemSendBlock(void)
                 data[xferWindowSize]=(uint8)((checksum & 0xff)   );
             }
     }
-    for (int i=0; i<size; i++) XWRITEPORT(buffer[i]);
+    for (int i=0; i<size; i++) xwriteport(buffer[i],portnum);
 }
 
 
@@ -589,7 +748,21 @@ void TerminalWxFrame::OnTimer(wxTimerEvent& WXUNUSED(event))
     switch(xferproto & 15) {
 //      case 0: ; break; // normal terminal - disable timer - fall through to default
 
-        case 1: ; break; // ascii upload
+        case 1: // ascii upload
+                // send chars until fliflo is full, or we the file ends
+                while (!feof(upload) && !fliflo_buff_is_full(&SCC_READ[this->portnum])) {
+                    uint8 c=fgetc(upload);
+                    fliflo_buff_add(&SCC_READ[this->portnum],c);
+                }
+
+                // did we finish? if so, close the file handle and stop the timer
+                if (feof(upload)) {
+                    fclose(upload); upload=NULL;
+                    xferproto=0;
+                    XferTimer->Stop(); delete XferTimer; XferTimer=NULL;
+                    return;
+                }
+                break; 
 
         case 2: ; break; // xmodem download
 
@@ -668,10 +841,9 @@ void TerminalWxFrame::OnXmodemUpload(wxCommandEvent& event)
 
 void TerminalWxFrame::OnFileCapture(wxCommandEvent& WXUNUSED(event))
 {
-
     if (capture) {
         fclose(capture);
-        FileMenu->Check(ID_FileCapture, false);
+        FileMenu->Check(ID_FileCapture+(portnum*100), false);
         return;
     }
 
@@ -687,23 +859,9 @@ void TerminalWxFrame::OnFileCapture(wxCommandEvent& WXUNUSED(event))
             _T("Error creating/opening file"), wxICON_INFORMATION | wxOK);
         }
         else
-            FileMenu->Check(ID_FileCapture, true);
+            FileMenu->Check(ID_FileCapture+(portnum*100), true);
     }
 }
-
-void TerminalWxFrame::OnCopy(wxCommandEvent& event)
-{
-    wxString text=Terminal[portnum]->GetSelection();
-    if(wxTheClipboard->Open())
-	{
-		wxTheClipboard->Clear();
-		wxTheClipboard->SetData( new wxTextDataObject( text ) );
-		wxTheClipboard->Flush();
-		wxTheClipboard->Close();      
-	}
-    event.Skip();
-}
-
 
 
 // Processes characters sent from the backend This function is thread safe and can be called from any thread at any time
@@ -712,19 +870,31 @@ void TerminalWx::DisplayChars(const wxString& str) {this->QueueEvent(new Termina
 // Processes characters sent from the backend This function is not thread safe and can *only* safely be called from the main event loop
 void TerminalWx::DisplayCharsUnsafe(const wxString& str) 
 {
-    #ifdef DEBUG
-    fprintf(stderr,"Received from Lisa :::: %s :::\n",CSTR(str)); 
+    #ifdef XXXDEBUG
+    fprintf(stderr,"Received from Lisa ::::"); // %s :::\n",CSTR(str));
+    wxString s=str;
+    char *c=CSTR(s);
+    for (int i=0; c[i]!=0; i++) {
+       if   (c[i]<32) fprintf(stderr,"[^%c]",c[i]+'@');
+       else           fputc(c[i],stderr);
+    }
+    fprintf(stderr," :::\n");
     #endif
     ProcessInput(str.length(),(unsigned char*)const_cast<char*>((const char*)str.mb_str()));  
 }
 
 void TerminalWx::OnTerminalInput(TerminalInputEvent& evt) { DisplayCharsUnsafe(evt.GetString()); }
 
-
+// interface function called by LisaEm main z8530, must be C call
 extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
     wxString s=_("");
 
     char *lastchars=TerminalFrame[portnum]->lastchars;
+
+    if (!Terminal[portnum]) return;
+    if (!TerminalFrame[portnum]) return;
+    //if (Terminal[portnum]->portnum!=portnum) return;
+    //if (TerminalFrame[portnum]->portnum!=portnum) return;
 
     if (data==19 || data==17) return; // avoid sending xon/xoff to display or capture
 
@@ -745,7 +915,7 @@ extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
         }
         lastchars[0]=0;
         #ifdef __MSVCRT__
-	// on windows we want CRLF line terminators in files.
+        // on windows we want CRLF line terminators in files.
         fputc(data,TerminalFrame[portnum]->capture);
         if (data=13) fputc(10,TerminalFrame[portnum]->capture);
         #else
@@ -755,47 +925,186 @@ extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
     }
 }
 
+// interface function called by LisaEm main z8530 must be C call
 extern "C" char read_serial_port_terminal(int port) {
     if  (fliflo_buff_has_data(&SCC_READ[port]))
         {
-            #ifdef DEBUG
-            fprintf(stderr,"read_serial_port_terminal port:%d has data, returning character\n");
-            #endif
             rx_char_available(port); 
             return (int)fliflo_buff_get(&SCC_READ[port]);
-         }
+        }
     return -1;
 }
 
 extern "C" void close_terminalwx(int port) {
-    if (port<0 || port>16)         return;
-    if (Terminal[port]!=NULL)      {Terminal[port]->Destroy();  Terminal[port]=NULL; }
-    if (TerminalFrame[port]!=NULL) {TerminalFrame[port]->Destroy(); TerminalFrame[port]=NULL; }
+    if (port<0 || port>16)    return;
+    if (Terminal[port]!=NULL)      { Terminal[port]->Close();        Terminal[port]=NULL;}
+    if (TerminalFrame[port]!=NULL) { TerminalFrame[port]->Destroy(); TerminalFrame[port]=NULL; }
 }
 
 // used at shutdown to prevent segfaults
-extern "C" void close_all_terminalwx(void) { for  (int i; i<16; i++) close_terminalwx(i); }
+extern "C" void close_all_terminalwx(void) { for  (int i; i<MAXTERMS; i++) close_terminalwx(i); }
+
+
+// LPW/QuickPort uses the SOROC terminal emulator by default, TerminalWx does vt100/ANSI, so we need to translate
+// luckily these are sent as whole strings so we don't need to remember previous output as whole SOROC sequences are
+// sent. So we translate some of the sequences here to VT100 equivalents.
+extern "C" void  lpw_console_output(char *text) {
+
+      if  (!consoletermwindow) return;
+      char c, v, h;         // current char, vertical offset, horizontal offset
+      static char move[16]; // buffer for ESC=yx -> ESC[y;xH conversion
+
+      for (int i=0; text[i]; i++) {
+        c=text[i];
+        if  (c==27) {
+             c=text[++i];
+            switch(c) {
+              case '+': // fallthrough - also clear screen
+              case '*':     lisa_console_output('L'-'@');                                                break;  // clear screen
+              case 'T':     lisa_console_output(27); lisa_console_output('['); lisa_console_output('K'); break;  // clear to eol
+
+              case '=':
+                            v=text[++i]-32;
+                            h=text[++i]-32;                                                                      // move cursor to location
+                            if (v<0)   v=0;                                                                      // sanity limits for v/h
+                            if (h<0)   h=0;
+                            if (v>132) v=132;
+                            if (h>132) h=132;
+                            snprintf(move,16,"\e[%d;%dH",v,h);                                                   // vt100 sequence is [ESC][v;hH
+                            for (int j=0; move[j] && j<16; j++) lisa_console_output(move[j]);                    // where v;h are numeric, i.e. 0;0
+                            break;
+              case 'Q'-'@': // ESC ^Q - 0x11 = blink/underline
+                            lisa_console_output('['); // [
+                            lisa_console_output('5'); // 7 blink
+                            lisa_console_output('m'); // m
+                            break;
+              case 'R'-'@': // ESC ^R - 0x12 = reverse/underline
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('7'); // 7 reverse
+                            lisa_console_output('m'); // m
+                            break;
+              case 'P'-'@': // ESC ^P - 0x10 = reverse/blink/underline fallthrough
+              case 'S'-'@': // ESC ^S - 0x13 = reverse/blink
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('7'); // 7 reverse
+                            lisa_console_output('m'); // m
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('5'); // 7 blink
+                            lisa_console_output('m'); // m
+
+                            break;
+              case 'T'-'@': // ESC ^T - 0x14 = blank
+                            break;
+              case 'U'-'@': // ESC ^U - 0x15 = underline
+                            break;
+              case 'V'-'@': // ESC ^V - 0x16 = blink
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('5'); // 5 blink
+                            lisa_console_output('m'); // m
+                            break;
+              case 'W'-'@': // ESC ^W - 0x17 = reverse
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('7'); // 7 reverse
+                            lisa_console_output('m'); // m
+                            break;
+              case 'D'-'@': // ESC ^D - 0x04 = all off
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('m'); // m
+                            break;
+              case '(':     // high intensity (bold)
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('1'); // 2
+                            lisa_console_output('m'); // 2
+                            break;
+              case ')':     // low intensity (non-bold?)
+                            lisa_console_output(27);  // ESC
+                            lisa_console_output('['); // [
+                            lisa_console_output('2'); // 2
+                            lisa_console_output('m'); // 2
+                            break;
+            }
+        } else {            // regular control chars + ASCII
+                            if        (text[i]==0x1e) {   // RS = home
+                                lisa_console_output(27);  // ESC
+                                lisa_console_output('['); // [
+                                lisa_console_output('H'); // H
+                            } else if (text[i]==0x1e) {   // US ->CR+LF
+                                lisa_console_output(13);
+                                lisa_console_output(10);
+                            } else if (text[i]==0x0b) {   // VT - cursor-up
+                                lisa_console_output(27);  // ESC
+                                lisa_console_output('['); // [
+                                lisa_console_output('A'); // A
+                            } else
+                                lisa_console_output(text[i]);
+                            if (text[i]==13) lisa_console_output(10); // LPW doesn't send line feeds, only CRs, so add them when we see a CR
+        }
+    }
+}
+
 
 
 TerminalWx::~TerminalWx()  { 
 //    //dtor 
+   portnum=0xdeadbeef;
 }
 
-/*
-wxBEGIN_EVENT_TABLE(TerminalWxFrame, wxTerm)
-EVT_TERMINAL_INPUT(TerminalWx::OnTerminalInput)
-EVT_MENU(wxID_CUT, wxTextCtrl::OnCut)
-EVT_MENU(wxID_COPY, wxTextCtrl::OnCopy)
-EVT_MENU(wxID_PASTE, OnPaste)
-EVT_MENU(wxID_SELECTALL, wxTerm::SelectAll)	
-EVT_MENU(ID_FileCapture,OnFileCapture)
-EVT_MENU(ID_TextUpload, OnTextUpload)
-EVT_MENU(ID_XMODEM_UP,OnXmodemUpload)
-EVT_MENU(ID_XMODEM_DN,OnXmodemDownload)
-EVT_TIMER(ID_Timer,OnTimer)
-wxEND_EVENT_TABLE()
-*/
-//BEGIN_EVENT_TABLE(TerminalWxFrame,wxFrame)
-    //(*EventTable(TerminalWxFrame)
-    //*)
+
+
+
+extern "C" void init_terminal_serial_port(int port) {
+    wxString name="";
+    name << getportname(port);
+
+    if  (port<2) {
+        scc_r[port].s.rr0.r.tx_buffer_empty=1;
+        scc_r[port].s.rr0.r.dcd=1;
+        scc_r[port].s.rr0.r.cts=1;
+    }
+
+    #ifdef DEBUG
+    fprintf(stderr,"\n\n\n\n********* init_terminal_serial_port: %d ***********\n\n\n\n",port);
+    #endif
+
+    if  (!TerminalFrame[port])
+        {
+            TerminalFrame[port]=new TerminalWxFrame(NULL,wxID_ANY, port);
+            #ifdef DEBUG
+            fprintf(stderr,"Created new TerminalWxFrame for port %d\n",port);
+            #endif
+        }
+    
+    if  (!Terminal[port])
+        {
+            Terminal[port]=new TerminalWx(TerminalFrame[port], wxID_ANY, port, wxDefaultPosition, 80, 25, (const wxString) name, 12, "Courier New");
+            #ifdef DEBUG
+            fprintf(stderr,"Created new TerminalWindow for port %d\n",port);
+            #endif
+        }
+
+        TerminalFrame[port]->Show();
+}
+
+BEGIN_EVENT_TABLE(                   TerminalWxFrame, wxFrame)
+    EVT_MENU(       ID_MENU_QUIT,    TerminalWxFrame::OnQuit)
+    EVT_MENU(       ID_FileCapture,  TerminalWxFrame::OnFileCapture)
+    EVT_MENU(       ID_TextUpload,   TerminalWxFrame::OnTextUpload)
+    EVT_MENU(       ID_XMODEM_UP,    TerminalWxFrame::OnXmodemUpload)
+    EVT_MENU(       ID_XMODEM_DN,    TerminalWxFrame::OnXModemDownload)
+    EVT_MENU(       wxID_COPY,       TerminalWxFrame::OnCopy)
+    EVT_MENU(       wxID_PASTE,      TerminalWxFrame::OnPaste)
+    EVT_MENU(       wxID_SELECTALL,  TerminalWxFrame::OnSelectAll)
+    EVT_CLOSE(                       TerminalWxFrame::OnClose)
+END_EVENT_TABLE()
+
+// this and other permutations fail, so can't use them.
+//BEGIN_EVENT_TABLE(TerminalWx, wxTerm)
+//EVT_TERMINAL_INPUT(TerminalWx::OnChar)
 //END_EVENT_TABLE()

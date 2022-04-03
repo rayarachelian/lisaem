@@ -70,8 +70,9 @@ public:
     wxRadioBox *cpurambox;         
 
     wxCheckBox *cheats;            // startup BOOT ROM cheats
-    wxCheckBox *hle_cheats;
-    wxCheckBox *macwx4mb;
+    wxCheckBox *hle_cheats;        // ProFile acceleration
+    wxCheckBox *console_term;      // Display TerminalWx for LPW + UniPlus (and eventually Xenix)
+  //wxCheckBox *macwx4mb;
     wxCheckBox *soundeffects;
     wxCheckBox *doublesided;
     wxCheckBox *skinson;

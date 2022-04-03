@@ -5,7 +5,7 @@
 # this standard block ends around line 45
 #------------------------------------------------------------------------------------------#
 
-set >/tmp/build-libgen.txt
+#set >/tmp/build-libgen.txt
 # ensure we're running from our directory and that we haven't been called from somewhere else
 cd "$(dirname $0)"
 [[ "$(basename $0)" != "build.sh" ]] && echo "$0 must be named build.sh" 1>&2 && exit 9
@@ -309,7 +309,7 @@ then
 
   cd ${XTLD}/obj
   waitqall
-  echo $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
+  #echo $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
   $CC $ZARCH $CLICMD -o def68k tab68k.o def68k.o
 
   cd ${XTLD}/cpu68k

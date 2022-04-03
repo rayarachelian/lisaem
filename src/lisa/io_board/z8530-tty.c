@@ -84,7 +84,7 @@ extern void disconnect_serial(int port);
 extern uint32 get_baud_rate(unsigned int port);
 
 
-void set_port_baud_tty(int port, int baud)
+void set_port_baud_tty(int port, uint32 baud)
 {
   if (port<0 || port>NUMSERPORTS) return;
 
@@ -135,7 +135,8 @@ void init_tty_serial_port(int port, char *config)  {
   char *s, *dev, *settings;  
   char device[64];
 
-  int baud=0, bits=8, stopbits=1;
+  uint32 baud=0;
+  int bits=8, stopbits=1;
   char parity='N';
   // /dev/ttyUSB0
   // "/dev/ttyUSB0|9600,N,8,1"

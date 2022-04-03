@@ -1,8 +1,8 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-PRE-RC4-UNSTABLE_2021.08.10                    *
-*                  Copyright (C) 2021 Ray Arachelian                                   *
+*              The Lisa Emulator Project  1.2.7-Pre-RC4_2022.02.22                    *
+*                  Copyright (C) 2022 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *
 *                        Reset Global Variables .c file                                *
@@ -24,16 +24,18 @@ void unvars(void)
 #undef AGLOBAL
 #undef ACGLOBAL
 
-REASSIGN(int,cheat_ram_test,1);       // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
+REASSIGN(int,cheat_ram_test,1);            // careful if we change the type of this: `extern "C" float hidpi_scale;` in LisaConfigFrame.cpp also
 REASSIGN(uint32, bootblockchecksum,0);     // checksum of bootsector (sector 0) whether from profile or floppy.
-REASSIGN(int,romless,0);
-REASSIGN(int,macworks_hle,1);         // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
-REASSIGN(int,los31_hle,1);            // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
-REASSIGN(int,uniplus_hacks,1);        // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
-REASSIGN(int,uniplus_loader_patch,1); // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
-REASSIGN(int,uniplus_sunix_patch,1);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+REASSIGN(int,romless,0);                   // are we romless?
+REASSIGN(int,xenix_patch,1);               // 2022.03.06 flag to signal Xenix HLE patches
+REASSIGN(int,macworks_hle,1);              // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
+REASSIGN(int,los31_hle,1);                 // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
+REASSIGN(int,monitor_patch,1);             // 2022.03.06 flag to signal Monitor 12.x has been patched for HLE
+REASSIGN(int,uniplus_hacks,1);             // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking
+REASSIGN(int,uniplus_loader_patch,1);      // 2021.03.17 flag to signal that UniPlus boot loader has been patched for profile handshaking
+REASSIGN(int,uniplus_sunix_patch,1);       // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 REASSIGN(uint32,rom_profile_read_entry,0); // ROM entry to profile read block
-REASSIGN(int,double_sided_floppy,0);  // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
+REASSIGN(int,double_sided_floppy,0);       // 2021.03.18 flag to signal that UniPlus sunix v1.1 kernel (used for installing) has been patched for profile handshaking
 REASSIGN(int,sound_effects_on,1);
 REASSIGN(int,profile_power,127);
 REASSIGN(int32,video_scan,0);

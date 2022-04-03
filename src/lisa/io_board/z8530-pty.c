@@ -50,11 +50,12 @@
 #endif
 
 #define _XOPEN_SOURCE 600
+#define __USE_BSD
 
 #include <fcntl.h>
 #include <errno.h>
 
-#define __USE_BSD
+//#define __USE_BSD
 #include <termios.h>
 #include <sys/select.h>
 #include <sys/ioctl.h>
@@ -291,8 +292,9 @@ void init_pty_serial_port(int port)
   ALERT_LOG(0,"got fd# %d for port %d",fds[port],port);
   ALERT_LOG(00,"Getting ready to fork...");
   // Create the child process
-  if (child_pid[port]=fork()) i=init_parent(port);
-  else                        i=init_child(port);
+
+  if ( (child_pid[port]=fork()) ) i=init_parent(port);
+  else                            i=init_child(port);
   ALERT_LOG(0,"done with fork");
   return;
 } // main

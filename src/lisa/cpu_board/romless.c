@@ -1,9 +1,9 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.6      DEV 2007.12.04                   *
+*              The Lisa Emulator Project  V1.2.7          2022.03.22                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -747,8 +747,8 @@ void romless_proread(void)
   uint32 sectornumber=reg68k_regs[1];
   uint8 *sectordata=&P->DataBlock[4]; 
 
-  if (P==NULL)        {ALERT_LOG(0,"ProFile Pointer for via:%d is null",vianum); return;}
-  if (&P->DC42==NULL) {ALERT_LOG(0,"ProFile DC42 for via:%d Pointer is null",vianum); return;}
+  if (  P==NULL       ) {ALERT_LOG(0,"ProFile Pointer for via:%d is null",vianum);      return;}
+  if ((&P->DC42)==NULL) {ALERT_LOG(0,"ProFile DC42 for via:%d Pointer is null",vianum); return;}
 
 //  #ifdef DEBUG
 //    if (sectornumber==2055 && running_lisa_os==LISA_OFFICE_RUNNING) debug_on("los-hle");   //2021.03.31

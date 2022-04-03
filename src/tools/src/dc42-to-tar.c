@@ -2,7 +2,7 @@
 *                                                                                      *
 *           dc42-to-tar - Convert Xenix tar.dc42 floppies to a tar file                *
 *                                                                                      *
-*          Copyright (C) MMXX, Ray A. Arachelian, All Rights Reserved.                 *
+*          Copyright (C) 2022, Ray A. Arachelian, All Rights Reserved.                 *
 *              Released under the GNU Public License, Version 2.0                      *
 *    There is absolutely no warranty for this program. Use at your own risk.           *
 *                                                                                      *
@@ -113,7 +113,7 @@ int is_null_header(tarhdr *t, size_t offset)
 }
 
 #ifdef DEBUG
-char niceascii(char c)
+char niceascii(unsigned char c)
 { c &=127;
  if (c<31) c|=32;
  if (c==127) c='.';
@@ -126,7 +126,7 @@ int is_valid_header(tarhdr *t, size_t offset)
    int i,j, invalid=0;
    t=get_tarhdr_ptr(t, offset);
 
-   #ifdef DEBUG
+   #ifdef XXXDEBUG
    fprintf(stderr,"checking for valid header\n");
    for (i=0; i<256; i+=16) {
       fprintf(stderr,"%08x: ",offset+i);
@@ -135,7 +135,13 @@ int is_valid_header(tarhdr *t, size_t offset)
 
       fprintf(stderr," | ");
 
-      for (j=0; j<16; j++) { fprintf(stderr,"%c",niceascii((unsigned char)(t->name[i+j])) ); }
+// :TODO: warning fix.
+// tar header is 512 bytes, name is only in the 1st 100 bytes, hence this error.
+//dc42-to-tar.c: In function ‘is_valid_header’:dc42-to-tar.c:138:83: warning: iteration 7 invokes undefined behavior [-Waggressive-loop-optimizations]  
+//138 |       for (j=0; j<16; j++) { fprintf(stderr,"%c",niceascii((unsigned char)(t->name[i+j])) ); }      
+//    |                                                                           ~~~~~~~~^~~~~~dc42-to-tar.c:131:4: note: within this loop...
+//     t->name[100] does go over 116 chars at 7 maybe change this to (char *)(t)[q] since really we're printing the whole header and not the name
+      for (j=0; j<16; j++) { int q=i+j; fprintf(stderr,"%c",niceascii((unsigned char)(t->name[q])) ); }
       fprintf(stderr,"\n");
    }
    #endif
@@ -441,7 +447,7 @@ int main(int argc, char *argv[])
       
            memsize=memsize - (cursor+512-lastfileends);
 
-           set_file_size(tarball,lastfilecursor,  lastfilesize+currentfilesize);
+           set_file_size((tarhdr *)tarball, lastfilecursor,  lastfilesize+currentfilesize);
            
            fprintf(stderr,"Restarting on %s as was merged\n",currentfilename);
            cursor=lastfilecursor; lastfilename=currentfilename; 

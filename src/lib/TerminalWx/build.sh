@@ -88,6 +88,13 @@ CHECKFILES src/GTerm/actions.cpp src/GTerm/gterm.cpp src/GTerm/keytrans.cpp src/
 
 # Parse command line options if any, overriding defaults.
 #echo parsing options
+
+#echo "$@" 1>&2
+#echo "WARNINGS: $WARNINGS" 1>&2
+#echo "CFLAGS: $CFLAGS" 1>&2
+#echo "CPPFLAGS: $CPPFLAGS" 1>&2
+#echo "CXXFLAGS: $CXXFLAGS" 1>&2
+
 for i in $@
 do
  i=`echo "$i" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
@@ -112,9 +119,17 @@ do
             Z="`echo $@ | grep -i install``echo $@ | grep -i build`"
             [[ -z "$Z" ]] && return 2>/dev/null >/dev/null
             [[ -z "$Z" ]] && exit 0
-
+	    export WARNINGS="-w" # 2022.03.27 - disable warnings for this proj
+            export CFLAGS="$CFLAGS -w"
+            export CPPFLAGS="$CPPFLAGS -w -Wno-effc++"
+            export CXXFLAGS="$CXXFLAGS -w -Wno-effc++"
   ;;
- build*)    echo ;;    #default - nothing to do here, this is the default.
+ build*)    
+	    export WARNINGS="-w" # 2022.03.27 - disable warnings for this proj
+            export CFLAGS="$CFLAGS -w"
+            export CPPFLAGS="$CPPFLAGS -w -Wno-effc++"
+            export CXXFLAGS="$CXXFLAGS -w -Wno-effc++"
+	    ;;
  install)
             if [[ -z "$CYGWIN" ]]; then
                [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
@@ -159,7 +174,7 @@ do
   -64|--64|-m64)
                                export SIXTYFOURBITS="--64"; 
                                export THIRTYTWOBITS="";
-                               export ARCH="-m64"; export SARCH="-m64"  ;;
+                               export ARCH="-m64"; export SARCH="-m64" ;;
 
   -32|--32|-m32)
                                export SIXTYFOURBITS=""; 
@@ -171,21 +186,34 @@ do
  -arch=*)                      export ARCH="$(echo ${i} | sed -e 's/=/ /g') $ARCH"
                                export SARCH="$i $SARCH"                ;;
 
- --no-debug)                   WITHDEBUG=""
-                               WARNINGS=""                               ;;
+ --no-debug)                   export WITHDEBUG=""
+                               export WARNINGS=""                      ;;
  --profile)
                                export WITHDEBUG="$WITHDEBUG -p"
                                export LIBGENOPTS="$LIBGENOPTS --with-profile"
-                               export WITHPROFILE="yes"                                 ;;
+                               export WITHPROFILE="yes"                ;;
 
  --debug)                      WITHDEBUG="$WITHDEBUG -g"
-                               WARNINGS="-Wall -Wextra -Wno-write-strings -g -DDEBUG" ;;
+                               export WARNINGS="-g -DDEBUG" ;;
 
- --no-banner)                  NOBANNER="1";                             ;;
- *)                            UNKNOWNOPT="$UNKNOWNOPT $i"               ;;
+ --no-banner)                  NOBANNER="1"
+                               export WARNINGS="-w" # 2022.03.27 - disable warnings for this proj
+                               export CFLAGS="$CFLAGS -w"
+                               export CPPFLAGS="$CPPFLAGS -w -Wno-effc++"
+                               export CXXFLAGS="$CXXFLAGS -w -Wno-effc++"
+                                                                       ;;
+ *)                            UNKNOWNOPT="$UNKNOWNOPT $i"             ;;
  esac
 
 done
+
+
+#echo "$@" 1>&2
+#echo "WARNINGS: $WARNINGS" 1>&2
+#echo "CFLAGS: $CFLAGS" 1>&2
+#echo "CPPFLAGS: $CPPFLAGS" 1>&2
+#echo "CXXFLAGS: $CXXFLAGS" 1>&2
+
 
 
 if [ -n "$UNKNOWNOPT" ]
@@ -279,9 +307,7 @@ cd "${XTLD}"
 export COMPILEPHASE="C++ code"
 export PERCENTPROGRESS=${PERCENTCEILING}
 
-pwd 1>&2
-
-echo "$PHASETLIST" 1>&2
+#echo "$PHASETLIST" 1>&2
 
 export PERCENTCEILING=$(( ${PERCENTPROGRESS:-100} + ${ESTPHASETCOUNT:-0} ))
 export PERCENTJOB=0 NUMJOBSINPHASE=6

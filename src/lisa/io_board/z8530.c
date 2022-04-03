@@ -216,7 +216,7 @@ extern void init_pty_serial_port(int portnum);
 extern char read_serial_port_tty(unsigned int port);
 extern void write_serial_port_tty(unsigned int port, char c);
 extern void init_tty_serial_port(int portnum);
-extern void set_port_baud_tty(int port, int baud);
+extern void set_port_baud_tty(int port, uint32 baud);
 
 #else
 // temp disable for windows until we flesh these guys out
@@ -378,7 +378,7 @@ void scc_channel_reset_port(unsigned int port)
 extern char read_serial_port_terminal(int port);
 extern void write_serial_port_terminal(int port, uint8 data);
 
-void read_port_if_ready_nothing(unsigned int port) { return; }
+void read_port_if_ready_nothing(unsigned int port) { (void)(port); return; }
 
 void rx_char_available(int port) {RX_CHAR_AVAILABLE(port);}
 
@@ -545,6 +545,7 @@ void initialize_scc(int actual)
                               scc_fn[port].write_serial_port=write_serial_port_tty;
                               scc_fn[port].read_port_if_ready=read_port_if_ready_tty;
                               scc_fn[port].set_baud_rate=set_port_baud_tty;
+
                               break;
       case SCC_TERMINAL:      scc_fn[port].read_serial_port=read_serial_port_terminal;
                               scc_fn[port].write_serial_port=write_serial_port_terminal;

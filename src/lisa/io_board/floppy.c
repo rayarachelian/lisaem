@@ -744,7 +744,7 @@ static void do_floppy_read(DC42ImageType *F)
 
         if (sectornumber==0) {
             bootblockchecksum=0;
-            for (int i=0; i<F->datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ ptr[i] ^ i;
+            for (uint32 i=0; i<F->datasize; i++) bootblockchecksum=( (uint32)(bootblockchecksum<<1) | ((uint32)(bootblockchecksum & 0x80000000) ? 1:0) ) ^ (uint32)ptr[i] ^ i;
         }
 
         DEBUG_LOG(0,"reading tags for sector %d",sectornumber);
@@ -752,7 +752,7 @@ static void do_floppy_read(DC42ImageType *F)
         if (ptr!=NULL) memcpy(&floppy_ram[DISKDATAHDR],ptr,F->tagsize);
 
         if (sectornumber==0) {
-            for (int i=0; i<F->tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ ptr[i] ^ i;
+            for (uint32 i=0; i<F->tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ ptr[i] ^ i;
 
             ALERT_LOG(0,"Bootblock checksum:%08x",bootblockchecksum);
 

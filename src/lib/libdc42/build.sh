@@ -265,7 +265,7 @@ echo "LASTMACHINE=\"$THISMACHINE\""  >>.last-opts
 [[ -z "$PERCENTPROGRESS" ]] && export PERCENTPROGRESS=0 PERCENTCEILING=100 PERCENTJOB=0 NUMJOBSINPHASE=1 COMPILEPHASE="libdc42"
 
 ###########################################################################
-echo Building libdc42...
+echo "* Building libdc42..."
 echo
 
 # :TODO: silence warnings via rewriting code that emits them
@@ -280,7 +280,7 @@ if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
 
-   echo "Making libdc42.a library..." 1>&2
+   echo "  Making libdc42.a library..." 1>&2
    makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
 fi
 
