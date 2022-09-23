@@ -43,7 +43,7 @@ uname=popen("uname -msr","r");
 if  (uname) {
     memset(buffer,0,255);
     (void)fread(buffer,254,1,uname);
-    fclose(uname);
+    pclose(uname);
 }
 
 out=fopen("machine.h","wt");

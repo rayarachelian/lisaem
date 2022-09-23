@@ -35,10 +35,12 @@ class TerminalWxFrame: public wxFrame
         void OnQuit(wxCommandEvent& event);
         void OnAbout(wxCommandEvent& event);
         void OnClose(wxCloseEvent& event);
-        void OnCustom1Paint(wxPaintEvent& event);
+        void OnSetFont(wxCommandEvent& event);
         void OnTextUpload(wxCommandEvent& event);
         void OnXmodemUpload(wxCommandEvent& event);
         void OnXModemDownload(wxCommandEvent& event);
+
+        void OnCustom1Paint(wxPaintEvent& event);
         void OnTimer(wxTimerEvent& event);
 
         void OnChar(wxKeyEvent& event); // RA for console intercept

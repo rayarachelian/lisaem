@@ -18,6 +18,7 @@ the LisaList2 forum, or github issues.
   https://docs.wxwidgets.org/trunk/classwx_sound.html
     "Currently this class is implemented on Windows and Unix and can use either Open Sound System (OSS) or Simple DirectMedia Layer (SDL) under the latter. Notice that OSS is not provided any more by most, and maybe even all, Linux systems in 2017 and osspd (OSS Proxy Daemon) package typically needs to be installed to make it work."
   not sure about newer sound managers on Linux yet.
+  - this is being addressed by replacing wxSound with OpenAL
 
 * Mouse tracking fails to work under high load throttle- noticed on GTK.
   On my system when using a debug compiled binary and throttle set to 100MHz,

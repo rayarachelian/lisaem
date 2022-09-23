@@ -463,7 +463,6 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
   wxString wfontname=wxString(fontname, wxConvLocal, 2048);
   wxFont monospacedFont(m_fontsize, wxMODERN, wxNORMAL, wxNORMAL, false, wfontname ); //"Courier New");
-
   SetFont(monospacedFont);
 
   // 10pt Courier New is 8 pixels wide and 16 pixels high... set up

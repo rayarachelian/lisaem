@@ -117,6 +117,19 @@ export CXXFLAGS="${CXXFLAGS} -mmacosx-version-min=${MIN_MACOSX_VERSION}"
 export CLICMD=""
 export GUIAPP=""
 
+
+
+// -framework OpenAL -I/usr/local/Cellar/alure/1.2_1/include/  -L/usr/local/Cellar/alure/1.2_1/lib/ -lalure-static
+
+export USEOPENAL=""
+# Do we have OpenAL installed? Only -l's are needed -L and -I for these paths are default
+if [[ -f "$(ls -1 /Developer/SDKs/*/System/Library/Frameworks/OpenAL.framework/Headers/al.h)" ]]; then
+   [[ -f "$(ls -1 /Developer/SDKs/*/System/Library/Frameworks/OpenAL.framework/Headers/al.h)" ]] && 
+   [[ -d /usr/local/include/AL ]] &&  [[ -f "$(ls -1 /usr/local/lib/libopenal.so.*\.*\.\* )" ]] && export USEOPENAL="-framework OpenAL -I/usr/local/Cellar/alure/1.2_1/include/  -L/usr/local/Cellar/alure/1.2_1/lib/ -lalure-static"
+   [[ -d /usr/local/include/AL ]] &&  [[ -f "$(ls -1 /usr/local/lib/libopenal.*\.*.a)"       ]] && export USEOPENAL="-framework OpenAL -I/usr/local/Cellar/alure/1.2_1/include/  -L/usr/local/Cellar/alure/1.2_1/lib/ -lalure-static"
+fi
+
+
 # Only used on Windows
 function windres() {
 true 

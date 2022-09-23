@@ -23,9 +23,18 @@
 *                   or visit: http://www.gnu.org/licenses/gpl.html                     *
 *                                                                                      *
 *                                                                                      *
-*   Z8530 SCC terminal window (wxterm) interface functions for Lisa serial ports       *
+*   Z8530/8250 SCC terminal window (wxterm) interface functions for Lisa serial ports  *
 *                                                                                      *
 \**************************************************************************************/
+
+/* ::TODOs::
+   - add size report i.e. 80,50 to status bar
+   - add font set menu item + filter for monospace
+   - color selectors/themes? i.e. green/amber on black, black text on white, etc.
+   - save font/color to preferences, separate for each term id, or global?
+   - add cmd/control +/- to zoom font
+   - add double click/tripple click text select
+   - scrollback? maybe, not sure. */
 
 #include <wx/wx.h>
 #include <wx/scrolwin.h>
@@ -57,6 +66,8 @@
 #include <wx/choicdlg.h>
 #include <wx/utils.h> 
 #include <wx/dnd.h>
+#include <wx/fontdata.h>
+#include <wx/fontdlg.h>
 
 #include <machine.h>
 #include <fliflo_queue.hpp>
@@ -152,7 +163,8 @@ enum
     ID_FileCapture,
     ID_TextUpload,
     ID_XMODEM_UP,
-    ID_XMODEM_DN
+    ID_XMODEM_DN,
+    ID_SETFONT
 };
 
 wxString getportname(int port)
@@ -225,7 +237,7 @@ void xwriteport(uint8 data, int port) {
 }
 
 
-extern "C" void write_serial_port_terminal(int portnum, uint8 data);
+extern "C" void write_serial_port_terminal(unsigned int portnum, char data); // fwd ref
 
 
 // interface for console output from uniplus, Xenix (future), LPW (future)
@@ -291,6 +303,7 @@ TerminalWxFrame::TerminalWxFrame(wxWindow* parent,wxWindowID id, int port)
     FileMenu->AppendSeparator();
 //  FileMenu->Append(ID_XMODEM_UP+(port*100), _("Upload XModem"), _("Upload a file using XModem Protocol") );
 //  FileMenu->Append(ID_XMODEM_DN+(port*100), _("Download XModem"), _("Download a file using XModem Protocol") );
+    FileMenu->Append(ID_SETFONT  /*+(port*100)*/, _("Select Font"), _("Select Font and size") );
 
     MenuBar1->Append(FileMenu,  _("&File"));
     MenuBar1->Append(editMenu,  _("&Edit"));
@@ -369,12 +382,11 @@ TerminalWx::TerminalWx(wxWindow* parent, wxWindowID id, int port,
                                 const wxString& name, int fontsize, char *fontname):  wxTerm(parent,id,pos,width,height,name) {
     portnum=port;
 
-    // meh when it opens on my machine (wxGTK linux) it shows only 50 cols x 10 lines though I've asked for 80x25 :(
     ResizeTerminal(width, height);
     SetInitialSize( wxSize(width*m_charWidth, height*m_charHeight) );
     SetClientSize(width*m_charWidth, height*m_charHeight);
     TerminalFrame[port]->SetClientSize((width+2)*m_charWidth, (height+3)*m_charHeight);
-    fprintf(stderr,"%s:%s:%d Set Term size (%d,%d) window size:(%d,%d)",__FILE__,__FUNCTION__,__LINE__, width,height,width*m_charWidth, height*m_charHeight);
+  //fprintf(stderr,"%s:%s:%d Set Term size (%d,%d) window size:(%d,%d)\n",__FILE__,__FUNCTION__,__LINE__, width,height,width*m_charWidth, height*m_charHeight);
 }
 
 
@@ -488,6 +500,45 @@ void TerminalWxFrame::OnCopy(wxCommandEvent& event) {
     fprintf(stderr,"%s:%s:%d OnCopy portnum=%d completed\n",__FILE__,__FUNCTION__,__LINE__,portnum);
     #endif
 }
+
+// config file settings - in lisaem_wx.cpp
+extern wxString GetConfigTerminalFont(int term);
+extern int GetConfigTerminalFontSize(int term);
+extern void SetConfigTerminalFont(int term, wxString font, int size);
+
+void  TerminalWxFrame::OnSetFont(wxCommandEvent& WXUNUSED(event)) {
+
+    wxFontData data;
+
+    if (portnum<0 || portnum>MAXTERMS) return;
+
+    wxFont currentFont( Terminal[portnum]->m_fontsize, 
+                        wxFONTFAMILY_TELETYPE, wxNORMAL, wxNORMAL, false, 
+                        Terminal[portnum]->m_fontname );
+    data.SetInitialFont(currentFont);
+    //data.SetColour(this->GetColor());
+
+    wxFontDialog dialog(this, data);
+    if ( dialog.ShowModal() == wxID_OK )
+    {
+        wxFontData retData = dialog.GetFontData();
+        wxFont font = retData.GetChosenFont();
+        wxColour colour = retData.GetColour();
+
+        if  ( !font.IsFixedWidth() ) {
+            wxMessageBox(wxT("Please select a monospace font"),wxT("That's not a monospaced font."));
+            return;
+        }
+
+        wxString name=font.GetFaceName();
+        Terminal[portnum]->m_fontname=CSTR(name);
+        Terminal[portnum]->m_fontsize=font.GetPointSize();
+        Terminal[portnum]->SetFont(font);
+
+        SetConfigTerminalFont(portnum, name, font.GetPointSize()); // save font to config
+    }
+}
+
 
 void TerminalWxFrame::OnSelectAll(wxCommandEvent& WXUNUSED(event)) { if (portnum>-1 && portnum<MAXTERMS) Terminal[portnum]->SelectAll(); }
 
@@ -886,7 +937,7 @@ void TerminalWx::DisplayCharsUnsafe(const wxString& str)
 void TerminalWx::OnTerminalInput(TerminalInputEvent& evt) { DisplayCharsUnsafe(evt.GetString()); }
 
 // interface function called by LisaEm main z8530, must be C call
-extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
+extern "C" void write_serial_port_terminal(unsigned int portnum, char data) {
     wxString s=_("");
 
     char *lastchars=TerminalFrame[portnum]->lastchars;
@@ -926,7 +977,7 @@ extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
 }
 
 // interface function called by LisaEm main z8530 must be C call
-extern "C" char read_serial_port_terminal(int port) {
+extern "C" char read_serial_port_terminal(unsigned int port) {
     if  (fliflo_buff_has_data(&SCC_READ[port]))
         {
             rx_char_available(port); 
@@ -1057,8 +1108,6 @@ TerminalWx::~TerminalWx()  {
 }
 
 
-
-
 extern "C" void init_terminal_serial_port(int port) {
     wxString name="";
     name << getportname(port);
@@ -1083,7 +1132,10 @@ extern "C" void init_terminal_serial_port(int port) {
     
     if  (!Terminal[port])
         {
-            Terminal[port]=new TerminalWx(TerminalFrame[port], wxID_ANY, port, wxDefaultPosition, 80, 25, (const wxString) name, 12, "Courier New");
+            wxString fontname=GetConfigTerminalFont(port);
+            int      fontsize=GetConfigTerminalFontSize(port);
+
+            Terminal[port]=new TerminalWx(TerminalFrame[port], wxID_ANY, port, wxDefaultPosition, 80, 25, (const wxString) name, fontsize, CSTR(fontname));
             #ifdef DEBUG
             fprintf(stderr,"Created new TerminalWindow for port %d\n",port);
             #endif
@@ -1101,6 +1153,7 @@ BEGIN_EVENT_TABLE(                   TerminalWxFrame, wxFrame)
     EVT_MENU(       wxID_COPY,       TerminalWxFrame::OnCopy)
     EVT_MENU(       wxID_PASTE,      TerminalWxFrame::OnPaste)
     EVT_MENU(       wxID_SELECTALL,  TerminalWxFrame::OnSelectAll)
+    EVT_MENU(       ID_SETFONT,      TerminalWxFrame::OnSetFont)
     EVT_CLOSE(                       TerminalWxFrame::OnClose)
 END_EVENT_TABLE()
 

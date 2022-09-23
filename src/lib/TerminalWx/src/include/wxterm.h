@@ -47,11 +47,7 @@ class wxTerm : public wxWindow, public GTerm
     m_curBG,
     m_curFlags,
     m_curState,
-    m_curBlinkRate,
-    m_fontsize;
-
-  char *m_fontname;
-
+    m_curBlinkRate;
 
   int m_charsInLine;
   int m_linesDisplayed;
@@ -110,6 +106,8 @@ public:
   int m_charWidth,
       m_charHeight;
 
+  int   m_fontsize;
+  char *m_fontname;
 
 private:
   BOLDSTYLE

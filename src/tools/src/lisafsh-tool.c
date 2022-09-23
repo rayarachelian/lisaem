@@ -151,11 +151,10 @@ char *cmdstrings[LASTCOMMAND+2] =
 
 // Prototypes and Macros //////////////////////////////////////////////////////////////////////
 
-
-
 // careful, cannot use ++/-- as parameters for TAGFILEID macro.
 #define TAGFILEID(xmysect)  (tagfileid(F,xmysect))
 #define TAGFFILEID(xmysect) (tagfileid(&F,xmysect))
+#define TAGABSNEXT(xmysect)  (tagabsnext(F,xmysect))
 
 
 void getcommand(void);
@@ -219,6 +218,11 @@ uint32 hex2long(uint8 *s)
  return strtol(buffer,NULL,16);
 }
 
+uint16 tagabsnext(DC42ImageType *F,int mysect)
+{   uint8 *tag=dc42_read_sector_tags(F,mysect);
+           if (!tag) return 0;
+           return ((tag[6]<<8) | (tag[7]));
+}
 
 
 uint16 tagfileid(DC42ImageType *F,int mysect)
@@ -304,7 +308,6 @@ void dump_mddf(FILE *out, DC42ImageType *F)
      {
        sect=sorttag[sector];
 
-
        sec=(uint8 *)dc42_read_sector_data(F,sect); //&(sectors[sect*sectorsize]);
 
        if (TAGFILEID(sect)==TAG_MDDF)
@@ -315,7 +318,19 @@ void dump_mddf(FILE *out, DC42ImageType *F)
 
         if (sect<firstmddf) firstmddf=sect;  // keep track of the first one in the image for bitmap sizing.
 
-        fprintf(out,"MDDF (Superblock) found at sector #%04x(%4d) fsversion:%02x\n",sect,sect,fsversion);
+        uint32 disk_sn=(sec[0xcc]<<24) | (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
+        uint32 lisa_sn=                  (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
+        uint32 los_lisa_num=(sec[0xcd] * 65536) + disk_sn;
+
+        fprintf(out,"Last used by Lisa 0x%08x (AppleNet 001%05d)  LOS Lisa Number: %d\n",disk_sn,lisa_sn,  los_lisa_num);
+        fprintf(out,"MDDF (Superblock) found at sector 0x%04x(%4d decimal) fsversion:%02x\n",sect,sect,fsversion);
+        switch (fsversion) {
+           case 0x0e: fprintf(out,"LOS 1.x file system version 0e\n"); break;
+           case 0x0f: fprintf(out,"LOS 2.x file system version 0f\n"); break;
+           case 0x11: fprintf(out,"LOS 3.x file system version 11\n"); break;
+           default:   fprintf(out,"*** UNKNOWN FILE SYSTEM VERSION %02x ***\n",fsversion);
+        };
+
        }
      }
      if (!fsversion) fprintf(out,"MDDF not found.\n");
@@ -491,8 +506,6 @@ void get_dir_file_names(DC42ImageType *F)
       f=getfileidbyid(i);
       strncpy(filenames[i][0],f,63);
       filenamecleanup(filenames[i][0],filenames[i][1]);
-      size1[i]=0;
-      size2[i]=0;
       fileflags[i]=0;
       serialized[i]=0;
       bozo[i]=0;
@@ -582,7 +595,103 @@ flags   : 56
 
 */  
 
-for (mysect=0; mysect<F->numblocks; mysect++)
+if  (fsversion==0x0e || fsversion==0x0f) {
+// handle LOS 1.x, 2.x by just doing extent blocks. Note 1.x has two extent blocks for each file, second one doesn't have the filename!
+// LOS FS 2.0 size is broken,
+// extract: file names when doing extract don't work right, are geneic: fn getfileidbyid  around line 493 needs filename but have to use santized filename.
+
+    // estimate file sizes for LOS FS 1.x, 2.x since we can't (yet) get them from the directory/extent blocks
+    for  (int i=0; i<65536; i++)  
+         { size1[i]=0; size2[i]=0;}
+
+    for  (mysect=0; mysect<F->numblocks; mysect++)  {
+          uint16 fid=TAGFILEID(mysect);
+          size2[fid]=size2[fid]+512;
+    }
+
+    for  (mysect=0; mysect<F->numblocks; mysect++)  {  // find the extent/inode block for this file id, and fill the rest of the fields.
+    {
+        uint16 fid=TAGFILEID(mysect);
+        uint16 nfid=(0x10000-fid) & 0xffff;
+
+        //                  LOS FS 1.x (0e) uses two extent blocks, ignore the 2nd one (has absnext=1), LOS FS 2.x (0f) has only one extent
+        if (fid>0xefff && ( (fsversion==0x0e && TAGABSNEXT(mysect)==0) || fsversion==0x0f) ) {
+            char temp[1024], buf1[128], buf2[128], buf3[128];
+            char inodename[33];
+            int match=1;
+
+            fid=fileid;
+            fileid=(~fid) & 0xffff;
+            sec=(uint8 *)dc42_read_sector_data(F,mysect);
+
+            // copy pascal filename from extent
+            for (int n=1; n<=sec[0]; n++) {filenames[nfid][0][n-1]=sec[n]; filenames[nfid][0][n]=0;} 
+            filenamecleanup(filenames[nfid][0],filenames[nfid][1]);
+
+            // process the extent/inode block
+            uint8 len=sec[0];
+            
+            time_t t;
+            struct tm *ts;
+                        
+            memset(inodename,0,32);
+            proccessed[fileid]=1;
+            
+            creationdate[nfid]    =(sec[0x36]<<24) | (sec[0x37]<<16) | (sec[0x38]<<8) | sec[0x39];
+            modificationdate[nfid]=(sec[0x2e]<<24) | (sec[0x2f]<<16) | (sec[0x30]<<8) | sec[0x31];
+            accesstime[nfid]      =(sec[0x32]<<24) | (sec[0x33]<<16) | (sec[0x34]<<8) | sec[0x35];
+
+            serialized[nfid]      =(sec[0x42]<<24) | (sec[0x43]<<16) | (sec[0x44]<<8) | sec[0x45];
+            bozo[nfid]=(sec[0x48]<<8) | sec[0x49];
+            passworded[nfid]=sec[0x62]; // 62=passwd length 0-7 actual length 8=(8-20 bytes), 63-6B hash
+
+            // epoc adjust b/w Lisa and unix time
+            #define ADJUST 2177452800
+            
+            t=(time_t)((time_t)(creationdate[nfid])    - (time_t)(ADJUST)); ts=localtime(&t);
+            strftime(buf1, sizeof(buf1), "%Y.%m.%d-%H:%M",ts);
+            t=(time_t)((time_t)(modificationdate[nfid])- (time_t)(ADJUST)); ts=localtime(&t);
+            strftime(buf2, sizeof(buf2), "%Y.%m.%d-%H:%M",ts);
+            t=(time_t)((time_t)(accesstime[nfid])      - (time_t)(ADJUST)); ts=localtime(&t);
+            strftime(buf3, sizeof(buf3), "%Y.%m.%d-%H:%M",ts);
+                                    
+            filenamecleanup(filenames[nfid][0],           // clean it up, now output name is set
+                            filenames[nfid][1]);
+            
+            if (serialized[nfid])
+               snprintf(temp,1023,"%04x    %-32s     %s %s %s  %10ld %10ld  %s %s %s branded:%08x\n",
+                               nfid,filenames[nfid][0],buf1,buf2,buf3,
+                               (long)size1[nfid],(long)size2[nfid],
+                               (passworded[nfid] ? "PASSWD":""),
+                               get_fileflags(fileflags[nfid]),
+                               get_bozo(bozo[nfid]),
+                               serialized[nfid]);
+            else
+               snprintf(temp,1023,"%04x    %-32s     %s %s %s  %10ld %10ld  %s %s %s\n",
+                               nfid,filenames[nfid][0],buf1,buf2,buf3,(long)size1[nfid],(long)size2[nfid],
+                               (passworded[nfid] ? "PASSWD":""),
+                               get_fileflags(fileflags[nfid]),
+                               get_bozo(bozo[nfid]));
+            strncat(directory,temp,65535);                // add filename to directory.
+
+            //Append Desktop alias name if we have it.
+            //aliasname=63 chars max starts at 0x182 (what's 180-181? set to 00 02, what are the fields following?)
+            if (sec[0x182]) {
+               int len=sec[0x182];
+               for (int x=0; x<len; x++) filenames[nfid][3][x]=sec[0x183+x];
+               filenames[nfid][3][len]=0;
+               snprintf(temp,1023,"        +-->: %s\n",
+                         //(uint16)((sec[0x180]<<8)|(sec[0x180]<<8)),
+                         filenames[nfid][3]);
+               strncat(directory,temp,65535);
+            }
+            else {filenames[nfid][3][0]=0;}
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        }
+    }
+} else for (mysect=0; mysect<F->numblocks; mysect++) // LOS 3.x
     {
      if (TAGFILEID(mysect)==TAG_DIRECTORY) {
         sec=(uint8 *)dc42_read_sector_data(F,mysect);
@@ -668,8 +777,8 @@ for (mysect=0; mysect<F->numblocks; mysect++)
                               int len=fsec[0x182];
                               for (int x=0; x<len; x++) filenames[fileid][3][x]=fsec[0x183+x];
                               filenames[fileid][3][len]=0;
-                              snprintf(temp,1023,"        (%04x) +->DocumentName: %s\n",
-                                        (uint16)((fsec[0x180]<<8)|(fsec[0x180]<<8)),
+                              snprintf(temp,1023,"        +-->: %s\n",
+                                        //(uint16)((fsec[0x180]<<8)|(fsec[0x180]<<8)),
                                         filenames[fileid][3]);
                               strncat(directory,temp,65535);
                            }
@@ -694,9 +803,9 @@ void sorttags(DC42ImageType *F) {
  for (i=0; i<F->numblocks; i++) sorttag[i]=i;  // initial index of tags is a 1:1 mapping
  qsort((void *)sorttag, (size_t) F->numblocks, sizeof (int), tagcmp); // sort'em
 
+ dump_mddf(stdout,F);
  get_allocation_bitmap(F);
  get_dir_file_names(F);
- dump_mddf(stdout,F);
 }
 
 
@@ -1096,6 +1205,8 @@ command_name_completion(const char *text, int start, int end)
 }
 #endif
 
+static int last_direction=SECTOR_NXT;
+
 void getcommand(void)
 {
 char *space, *s, *ss;
@@ -1158,18 +1269,27 @@ command=LASTCOMMAND;
 #endif
 
 if (feof(stdin)) {puts("EOF"); exit(1);}
-
-if (!len) {command=-1;return;}       // shortcut for next sector.
-if (line[0]=='!')                 {if (len==1) i=system("sh");
-                                   else        i=system(&line[1]);
-                                   command=NULL_CMD;}                                       // shell out
-if (line[0]=='?')                 {strncpy(line,"help",6);}                                 // help synonym
-if (line[0]=='+' && len==1)       {command=SECTOR_NXT; return;}                             // next sector
-if (line[0]=='-' && len==1)       {command=SECTOR_PRV; return;}                             // previous sector
-if (line[0]=='+' || line[0]=='-') {l=strtol(line,NULL,0);sector+=l; command=DISPLAY_CMD; return;} // delta jump
-
 space=strchr(line,32);
 if (space) space[0]=0;
+
+//printf("::%s::%d:%x:\n",line,len,line[0]);
+
+if  (!len || (len==1 && !line[0])) { // return by itself: shortcut for next sector (or previous)
+      command=last_direction;
+      return;
+    }
+
+if (line[0]=='!')                 {if (len==1) i=system("sh");                                     // shell command
+                                   else        i=system(&line[1]);
+                                   command=NULL_CMD;}                                              // shell out
+if (line[0]=='?')                 {strncpy(line,"help",6);}                                        // help shortcut
+if (line[0]=='+' && len==1)       {command=SECTOR_NXT; last_direction=SECTOR_NXT; return;}         // next sector
+
+if (line[0]=='-' && len==1)       {command=SECTOR_PRV; last_direction=SECTOR_PRV; return;}         // previous sector
+
+if (line[0]=='+' || line[0]=='-') {l=strtol(line,NULL,0);sector+=l; command=DISPLAY_CMD; 
+                                   last_direction=(line[0]=='-') ? SECTOR_PRV:SECTOR_NXT; return;} // delta jump (len>0 i.e. +10 -5)
+if (line[0]=='q' && len<3)        {command==QUITCOMMAND; return;}                                  // shortcut for quit
 
 for (i=0; i<LASTCOMMAND; i++) 
     if (strncmp(line,cmdstrings[i],16)==0) command=i;
@@ -1177,8 +1297,7 @@ for (i=0; i<LASTCOMMAND; i++)
 // shortcut for sector number
 iargs[0]=strtol(line,NULL,0); if ( line[0]>='0' && line[0]<='9' ) {command=0; return;}
 
-
-if (command==LASTCOMMAND) {puts("Say what?  Type in help for help...\n"); return;}
+if (command==LASTCOMMAND) {puts("Say what?  Type in help for help..."); return;}
 if (command==QUITCOMMAND) {puts("Quit: Closing image"); dc42_close_image(&F); puts("Bye"); exit(0);}
 if (!space) return;
 line[len]=' ';
@@ -1311,7 +1430,7 @@ void version_banner(void)
   //   ..........1.........2.........3.........4.........5.........6.........7.........8
   //   012345678901234567890123456789012345678901234567890123456789012345678901234567890
   puts("  ---------------------------------------------------------------------------");
-  puts("    Lisa File System Shell Tool  v0.99     http://lisaem.sunder.net/lisafsh  ");
+  puts("    Lisa File System Shell Tool  v1.2.7    http://lisaem.sunder.net/lisafsh  ");
   puts("  ---------------------------------------------------------------------------");
   puts("         Copyright (C) MMXXI, Ray A. Arachelian, All Rights Reserved.");
   puts("              Released under the GNU Public License, Version 2.0");
@@ -1403,9 +1522,10 @@ while (1)
        case DIR_CMD:
             if (!havetags) {puts("I can't do that, this image doesn't have tags."); break;}
             if (!tagsaresorted) {sorttags(F);    tagsaresorted=1;}
-            //             01234567890123456789012345678912
-            printf("\nExtent   File Name                           Date Created     Date Modified    Last Access Date        filesizes        attr DRM\n");
-            printf("------------------------------------------------------------------------------------------------------------------------------\n%s\n",directory);
+            //                 1         2         3         4         5         6         7         8         9         10        11        12        13        14       
+            //       012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+            printf("\n|FileId|  File Name                         | Date Created   | Date Modified  | Last Access    | file size | size of blks      | attr | DRM\n");
+            printf(  "----------------------------------------------------------------------------------------------------------------------------------------------------\n%s\n",directory);
             break;
 
        case DIRX_CMD:

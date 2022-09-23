@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 
 # I use this on my machine to test against multiple versions of wxWidgets, for normal people
-# 3.1.5 is enough, I tend to build them all.
+# 3.1.6 is enough, I tend to build them all.
 #
 # for Fedora/CentOS/RHEL, need to first do:
 #  dnf install gcc-g++ gtk3-devel gstreamer1-devel clutter-devel webkit2gtk3-devel libgda-devel gobject-introspection-devel
 #
 
+#set -x
+#trap read debug
 
-LIBTIFF="--with-libtiff=builtin"
+
+#LIBTIFF="--with-libtiff=builtin"
+LIBTIFF="--without-libtiff"
 
 function FreeBSDgetcpus()
 {
@@ -33,23 +37,24 @@ fi
 SDL2="$( find /usr -name libSDL2.a | head -1 )"
 [[ -n "$SDL2" ]] && SDL2="--with-sdl=$SDL2"
 
-if [[ "$( uname -s )"=="OpenBSD" ]]; then
+if [[ "$( uname -s )" == "OpenBSD" ]]; then
    echo OpenBSD detected
    LIBTIFF="--with-libtiff=sys"
 else
-   LIBTIFF="$( find /usr -name 'libtiff.a' | head -1 )"
-   if [[ -z "$LIBTIFF" ]]; then
-      LIBTIFF="--with-libtiff=builtin"
+   #found=""
+   found="$( find /usr -name 'libtiff.a' | head -1 )"
+   if [[ -z "$found" ]]; then
+      LIBTIFF="--without-libtiff"
    else
       # builtin doesn't compile on FreeBSD (tested only on fbsd13)
-      [[ -z "$FREEBSD" ]] && LIBTIFF="--with-libtiff=$LIBTIFF" || LIBTIFF=""
+      [[ -z "$FREEBSD" ]] && LIBTIFF="--with-libtiff=builtin" || LIBTIFF=""
    fi
 fi
 
 
-for VER in 3.1.5; do
-#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3 3.1.4 3.1.5; do
-#^ swap these two to compile multiple versions for testing LisaEm against them vs just 3.1.5
+#for VER in 3.0.2 3.0.4 3.1.0 3.1.1 3.1.2 3.1.3 3.1.4 3.1.5 3.1.6; do
+for VER in 3.2.0; do
+#^ swap these two to compile multiple versions for testing LisaEm against them vs just 3.1.6
   export VER
 
   if [[ ! -d wxWidgets-${VER} ]]; then

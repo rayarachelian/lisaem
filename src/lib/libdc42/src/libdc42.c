@@ -1,11 +1,11 @@
 /**************************************************************************************\
 *                                     LibDC42                                          *
 *                                                                                      *
-*                            Version 0.9.7  2007.08.21                                 *
+*                            Version 1.2.8  2022.06.05                                 *
 *                                                                                      *
 *                       A Part of the Lisa Emulator Project                            *
 *                                                                                      *
-*                  Copyright (C) 1998, 2007 Ray A. Arachelian                          *
+*                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
 *                                All Rights Reserved                                   *
 *                                                                                      *
 *           This program is free software; you can redistribute it and/or              *
@@ -55,196 +55,16 @@
 // Remove this if your code needs pure GPL compatibility, or is of a commercial nature.
 //
 #define USE_LZHUF  1
-
-
-// needed for LisaEm compatibility, you can remove this, but you must
-// define int8, int16, int32, uint8, uint16, uint32.
-#include <machine.h>
-
-
-// normal includes
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-// Windows lacks MMAP, strcasestr functions
-#ifndef __MSVCRT__
-#include <sys/mman.h>
-#include <glob.h>
-#define HAVE_MMAPEDIO
-#else
-#define strncasecmp _strnicmp
-#define strcasecmp _stricmp
-#include <strcasestr.h>
-#endif
-
-
-
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
-
-
-////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#ifndef fgetc
-#define fgetc(xx) ((unsigned)(getc(xx)))
-#endif
-
-#define DC42_HEADERSIZE 84
-#define DART_CHUNK      20960
-#define DART_CHUNK_TAGS 20480
-
-#define TWIG860KFLOPPY 0
-#define SONY800KFLOPPY 2
-#define SONY400KFLOPPY 1
-
-
-
-typedef struct                          // floppy type
-{
-  int    fd;                            // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
-  FILE  *fh;                            // file handle on Win32
-
-
-  uint32 size;                          // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
-                                        // used for mmap fn's
-
-  char   fname[FILENAME_MAX+2];         // File name of this disk image (needed for future use to re-create/re-open the image)
-                                        // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
-                                        // to set this to whatever is reasonable for your OS.  ie. 256 or 1024, etc.
-                                        //
-                                        // Also can be used to automatically copy a r/o master disk to a private r/w copy - not yet implemented
-                                        // copy made on open.
-
-  char  mfname[FILENAME_MAX+2];         // r/o master filename path - not yet implemented.
-
-
-  uint8  readonly;                      // 0 read/write image - writes are sync'ed to disk image and checksums recalculated on close
-                                        // 1 read only flag - writes return error and not saved, not even in RAM
-                                        // 2 if writes saved in RAM, but not saved to disk when image closed
-
-  uint8  synconwrite;                   // sync writes to disk immediately, but note that this is very very slow!
-                                        // only used for mmap'ed I/O
-
-  uint8  mmappedio;                     // 0 if disabled, 1 if enabled.
-
-  uint8  ftype;                         // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
-
-
-  uint32 tagsize;                       // must set to 12 - expect ProFile/Widget to use 24 byte tags
-  uint32 datasize;                      // must set to 512
-
-  uint32 datasizetotal;                 // data size (in bytes of all sectors added together)
-  uint32 tagsizetotal;                  // tag size total in bytes
-
-  uint32 sectoroffset;                  // how far into the file is the 1st sector
-  uint16 sectorsize;                    // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
-  uint32 tagstart;                      // how far into the file to 1st tag - similar to sectoroffset
-
-  uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by the Lisa Emulator
-
-  uint8 *RAM;                           // memory mapped file pointer - or a single sector's tags + data
-
-  long  dc42seekstart;                  // when opening an existing fd, points to start of dc42 image
-
-  char returnmsg[256];                  // error message buffer - used internally for storage, instead, access error via errormsg
-  char *errormsg;                       // pointer to error message, use this to read text of error returned.
-  int retval;                           // error number of last operation
-
-} DC42ImageType;
-
-
-
-
-int dc42_open(DC42ImageType *F, char *filename, char *options);                    // open a disk image, map it and fill structure
-
-int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options);
-                                                                                   // open an embedded dc42 image in an already
-                                                                                   // opened file descriptor at the curren file
-                                                                                   // position.
-
-
-int dc42_close_image(DC42ImageType *F);                                            // close the image: fix checksums and sync data
-int dc42_close_image_by_handle(DC42ImageType *F);                                  // close, but don't call close on the fd.
-
-int dc42_create(char *filename,char *volname, uint32 datasize,uint32 tagsize);     // create a blank new disk image
-                                                                                   // does not open the image, may not be called
-                                                                                   // while the image file is open.
-
-int dc42_add_tags(char *filename, uint32 tagsize);                                 // add tags to a dc42 image that lacks them.
-                                                                                   // if tagsize is zero adds 12 bytes of tags for
-                                                                                   // every 512 bytes of data.  Does not open the
-                                                                                   // image, can be used pre-emptively when opening
-                                                                                   // and image for access.  Call it with 0 as the tag
-                                                                                   // size before calling dc42 open to ensure it has tags.
-                                                                                   // does not open the image, may not be called
-                                                                                   // while theimage file is open.
-
-uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
-int dc42_sync_to_disk(DC42ImageType *F);                                           // like fsync, sync's writes back to file. Does
-                                                                                   // NOT write proper tag/data checksums, as that
-                                                                                   // would be too slow.  Call recalc_checksums yourself
-                                                                                   // when you need it, or call dc42_close_image.
-
-uint32 dc42_has_tags(DC42ImageType *F);                                            // returns 0 if no tags, 1 if it has tags
-
-uint32 dc42_calc_tag_checksum(DC42ImageType *F);                                   // calculate the current tag checksum
-
-uint32 dc42_calc_data_checksum(DC42ImageType *F);                                  // calculate the current sector data checksum
-
-int dc42_recalc_checksums(DC42ImageType *F);                                       // calculate checksums and save'em in the image
-
-
-int dart_to_dc42(char *dartfilename, char *dc42filename);                          // converts a DART fast-compressed/uncompressed
-                                                                                   // image to a DiskCopy42 image.  Does
-                                                                                   // work with LZH compressed images
-
-int dc42_is_valid_image(char *filename);                                           // returns 0 if it can't open the image, or the
-                                                                                   // image is not a valid dc42 image.  Returns 1
-                                                                                   // if valid, or 2 if mac binary II enclosed but valid.
-
-int dart_is_valid_image(char *dartfilename);                                       // returns 0 if it can't open the image, or
-                                                                                   // the image is not a valid DART image. Returns 1
-                                                                                   // if valid, or 2 if valid but macbinII encapsulated.
-
-int dc42_is_valid_macbinii(char *infilename, char *creatortype);                   // returns 1 if file is macbinII encapsulated
-                                                                                   // if creatortype is passed a non-NULL ponter
-                                                                                   // the Macintosh creator and type are returned
-                                                                                   // by thefunction.  This must be at leat 9 bytes!
-
-
-int dc42_extract_macbinii(char *infilename);                                       // file name is overwritten by new file name!
-                                                                                   // will return 1 if converted,
-                                                                                   // 0 if not converted,
-                                                                                   // -1 can't read file,
-                                                                                   // -2 if out of memory - filename clobbered
-                                                                                   // -3 if unable to create new file - filename clobbered
-
-
-int dc42_set_volname(DC42ImageType *F,char *name); // set/get the disk image volume name
-char *dc42_get_volname(DC42ImageType *F);
-
-int searchseccount( DC42ImageType *F, int sector, int size, uint8 *s);
-int replacesec(DC42ImageType *F, int sector, int size, uint8 *s, uint8 *r);
-
-
-////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#define IN_LIBDC42_C 1
+#include <libdc42.h>
 
 char *DiskCopy42Sig="\026-not a Macintosh disk-";
 char *NotAMacintoshDisk="-not a Macintosh disk-";
                     //   0123456789012345678901
 
 static char copyleft[]=
-"libdc42 0.8 2007.01.05 - A Part of the Lisa Emulator Project. see: http://lisaem.sunder.net/lisafsh/   \
-Copyright (C) 2007 by Ray A. Arachelian, All Rights Reserved.  \
+"libdc42 1.2.7 2022.06.05 - A Part of the Lisa Emulator Project. see: http://lisaem.sunder.net/lisafsh/   \
+Copyright (C) 2022 by Ray A. Arachelian, All Rights Reserved.  \
 Released under the terms of the GPL2 or the LGPL 2.1 - licenses your choice. \
 see http://www.gnu.org/licenses/gpl.txt or http://www.gnu.org/licenses/lgpl.txt for details";
 
@@ -271,23 +91,23 @@ see http://www.gnu.org/licenses/gpl.txt or http://www.gnu.org/licenses/lgpl.txt 
 uint32 dc42_ror32(uint32 data)   {uint32 carry=(data & 1)<<31; return (data>>1)|carry; }
 
 #define DC42_CHECK_VALID_F(F)      { if (!F)       return -1;   \
-                                     if (!F->RAM) {DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",return F->retval);}\
-                                     if (F->fd<3 && !F->fh) {DC42_RET_CODE(F,-5,"Invalid file descriptor",return F->retval);}                       \
+                                     if (!F->RAM) {DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",return F->retval);} \
+                                     if (F->fd<3 && !F->fh) {DC42_RET_CODE(F,-5,"Invalid file descriptor",return F->retval);}              \
                                    }
 
-#define DC42_CHECK_VALID_F_NR(F)   {if (!F)                                                                                return;       \
-                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return);      \
-                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",return);                                   \
+#define DC42_CHECK_VALID_F_NR(F)   {if (!F)                                                                                return;         \
+                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return);        \
+                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",return);                           \
                                    }
 
-#define DC42_CHECK_VALID_F_NUL(F)  {if (!F)                                                                                return NULL;  \
-                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return NULL); \
-                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",return NULL);                              \
+#define DC42_CHECK_VALID_F_NUL(F)  {if (!F)                                                                                return NULL;    \
+                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return NULL);   \
+                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",return NULL);                      \
                                    }
 
-#define DC42_CHECK_VALID_F_ZERO(F) {if (!F)                                                                                return 0;     \
-                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return 0);    \
-                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",                             return 0);    \
+#define DC42_CHECK_VALID_F_ZERO(F) {if (!F)                                                                                return 0;       \
+                                    if (!F->RAM) DC42_RET_CODE(F,-3,"Disk image closed or no memory allocated to it",      return 0);      \
+                                    if (F->fd<3 && !F->fh) DC42_RET_CODE(F,-5,"Invalid file descriptor",                   return 0);      \
                                    }
 
 
@@ -312,8 +132,6 @@ uint32 dc42_get_datachecksum(DC42ImageType *F)
                                         i=fread(&F->RAM[72],(79-72),1,F->fh);
                                       }
                      }
-
-
 
   return  (F->RAM[72]<<24) |
           (F->RAM[73]<<16) |
@@ -369,16 +187,16 @@ int dc42_recalc_checksums(DC42ImageType *F)
   F->RAM[79]=(( newtagchks    ) & 0xff);
 
   if (!F->mmappedio) {
-                       if ( F->fd>2)  {
-                                        int i;
-                                        lseek(F->fd,72,SEEK_SET);
-                                        i=write(F->fd,&F->RAM[72],(79-72) );
-                                      }
-                       if ( F->fh  )  {
-                                        int i;
-                                        fseek(F->fh,72,SEEK_SET);
-                                        i=fwrite(&F->RAM[72],(79-72),1,F->fh);
-                                      }
+                        if ( F->fd>2)  {
+                                          int i;
+                                          lseek(F->fd,72,SEEK_SET);
+                                          i=write(F->fd,&F->RAM[72],(79-72) );
+                                       }
+                        if ( F->fh  )  {
+                                          int i;
+                                          fseek(F->fh,72,SEEK_SET);
+                                          i=fwrite(&F->RAM[72],(79-72),1,F->fh);
+                                       }
                      }
   return 0;
 }
@@ -447,7 +265,7 @@ int dc42_sync_to_disk(DC42ImageType *F)                                    // re
    if (F->fd) _commit( F->fd);          // fucking microsoft!
 #endif
 
-  return 0;
+ return 0;
 }
 
 
@@ -521,16 +339,16 @@ uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber)
       {  int i;
          if (F->fd>2)
             {
-             lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
-             i= read(F->fd,&F->RAM[F->datasize],F->tagsize);         // put tags at the end of the buffer so we can overlap reads of tags
+               lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
+               i= read(F->fd,&F->RAM[F->datasize],F->tagsize);         // put tags at the end of the buffer so we can overlap reads of tags
 
               //fprintf(stderr,"fd-read tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
 
             }
          if (F->fh)
             {
-             fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
-             i=fread(      &F->RAM[F->datasize],F->tagsize,1,F->fh); // put tags at the end of the buffer so we can overlap reads of tags
+               fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
+               i=fread(      &F->RAM[F->datasize],F->tagsize,1,F->fh); // put tags at the end of the buffer so we can overlap reads of tags
 
               //fprintf(stderr,"fh-read tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
 
@@ -559,25 +377,25 @@ uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber)
 
 
    if (!F->mmappedio)
-      { int i;
-        if (F->fd>2)
+      {  int i;
+         if (F->fd>2)
          {
-          lseek(F->fd,GET_DATA_POS(sectornumber),SEEK_SET);
-          i= read(F->fd,F->RAM,F->sectorsize);
+            lseek(F->fd,GET_DATA_POS(sectornumber),SEEK_SET);
+            i= read(F->fd,F->RAM,F->sectorsize);
 
            //fprintf(stderr,"fd-read data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
 
          }
 
-        if (F->fh)
+         if (F->fh)
          {
-          fseek(F->fh,GET_DATA_POS(sectornumber),SEEK_SET);
-          i=fread(      F->RAM,F->sectorsize,1,F->fh);
+            fseek(F->fh,GET_DATA_POS(sectornumber),SEEK_SET);
+            i=fread(      F->RAM,F->sectorsize,1,F->fh);
 
           //fprintf(stderr,"fh-read data %4d at loc:%08x PTR:%p\n",sectornumber,GET_DATA_POS(sectornumber),F);
          }
 
-        return F->RAM;
+         return F->RAM;
       }
 
 //   fprintf(stderr,"Returning code:%d string:%s\n",F->retval,F->errormsg); fflush(stderr);
@@ -631,116 +449,116 @@ int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data)
 
 int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata)
 {
-  DC42_CHECK_VALID_F(F);
-  DC42_CHECK_WRITEABLE1(F);
-  F->retval=0;
-  F->errormsg=F->returnmsg;
+   DC42_CHECK_VALID_F(F);
+   DC42_CHECK_WRITEABLE1(F);
+   F->retval=0;
+   F->errormsg=F->returnmsg;
   *F->returnmsg=0;
-  if (F->numblocks==0) F->numblocks=  (F->datasizetotal/F->sectorsize);
-  if (sectornumber   > F->numblocks ) { DC42_RET_CODE(F,999,"invalid sector #",return 999);}
+   if (F->numblocks==0) F->numblocks=  (F->datasizetotal/F->sectorsize);
+   if (sectornumber   > F->numblocks ) { DC42_RET_CODE(F,999,"invalid sector #",return 999);}
 
-  if (!F->mmappedio)
-     {
+   if (!F->mmappedio)
+      {
          if (F->fd>2)
             {int i;
-             lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
-             i=write(F->fd,tagdata,F->tagsize);
+               lseek(F->fd,GET_TAG_POS(sectornumber),SEEK_SET);
+               i=write(F->fd,tagdata,F->tagsize);
              //fprintf(stderr,"fd-write tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
             }
 
          if (F->fh)
-            {int i;
-             fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
-             i=fwrite(     tagdata,F->tagsize,1,F->fh);
+            {  int i;
+               fseek(F->fh,GET_TAG_POS(sectornumber),SEEK_SET);
+               i=fwrite(     tagdata,F->tagsize,1,F->fh);
              //fprintf(stderr,"fh-write tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_POS(sectornumber),F);
             }
 
          return 0;
-     }
+      }
 
   //fprintf(stderr,"mem-write tag %4d at loc:%08x PTR:%p\n",sectornumber,GET_TAG_IDX(sectornumber),F);
-  if (F->tagsize>4 && F->tagsizetotal>0)                        // write tag data to the image, if it originally had tags
-     memcpy( &F->RAM[ GET_TAG_IDX(sectornumber) ],  tagdata, F->tagsize);
-  else {
-        //{fprintf(stderr,"libdc42.c::FAILED TO WRITE %d tag bytes to block#%ld, returning:%d\n",F->tagsize, sectornumber, -4); fflush(stderr);}
-                    return -4;
-       }
+   if (F->tagsize>4 && F->tagsizetotal>0)                        // write tag data to the image, if it originally had tags
+      memcpy( &F->RAM[ GET_TAG_IDX(sectornumber) ],  tagdata, F->tagsize);
+   else   {
+            //{fprintf(stderr,"libdc42.c::FAILED TO WRITE %d tag bytes to block#%ld, returning:%d\n",F->tagsize, sectornumber, -4); fflush(stderr);}
+            return -4;
+         }
 
-  if (F->synconwrite && F->readonly==0 ) dc42_sync_to_disk(F);
+   if (F->synconwrite && F->readonly==0 ) dc42_sync_to_disk(F);
   //{fprintf(stderr,"libdc42.c::wrote %d tag bytes to block#%ld, returning:%ld\n",F->tagsize, sectornumber, F->retval); fflush(stderr);}
-  DC42_RET_CODE(F,0,"Sector Tag Written",return F->retval);
-  return F->retval;                   // suppress dumb compiler warning
+   DC42_RET_CODE(F,0,"Sector Tag Written",return F->retval);
+   return F->retval;                   // suppress dumb compiler warning
 }
 
 
 uint32 dc42_calc_data_checksum(DC42ImageType *F)
 {
-    uint32 i,j,mydatachks=0;
-    uint8 *d;
+      uint32 i,j,mydatachks=0;
+      uint8 *d;
 
-    DC42_CHECK_VALID_F_ZERO(F);
+      DC42_CHECK_VALID_F_ZERO(F);
 
-    for (i=0; i<F->numblocks; i++)
-    {
-       d=dc42_read_sector_data(F,i);
-       for (j=0; j<F->sectorsize ; j+=2)
-           mydatachks=dc42_ror32(mydatachks+(uint32)(d[j]<<8) + (uint32)(d[j+1]));
-    }
+      for (i=0; i<F->numblocks; i++)
+      {
+         d=dc42_read_sector_data(F,i);
+         for (j=0; j<F->sectorsize ; j+=2)
+               mydatachks=dc42_ror32(mydatachks+(uint32)(d[j]<<8) + (uint32)(d[j+1]));
+      }
 
-    DC42_RET_CODE(F,mydatachks,"Data Checksum returned",return F->retval);
-    return F->retval;                   // suppress dumb compiler warning
+      DC42_RET_CODE(F,mydatachks,"Data Checksum returned",return F->retval);
+      return F->retval;                   // suppress dumb compiler warning
 }
 
 uint32 dc42_calc_tag_checksum(DC42ImageType *F)
 {
-    uint32 i,j,mytagchks=0;
-    uint8 *t;
+      uint32 i,j,mytagchks=0;
+      uint8 *t;
 
-    DC42_CHECK_VALID_F(F);
+      DC42_CHECK_VALID_F(F);
 
     for (i=1; i<F->numblocks; i++)      // this is not a bug! - used by DC42
-    {
-     t=dc42_read_sector_tags(F,i);
-     for (j=0; j<F->tagsize; j+=2)
-           mytagchks=dc42_ror32(mytagchks+(uint32)((uint32)(t[j]<<8)+(uint32)(t[j+1])));
-    }
-    DC42_RET_CODE(F,mytagchks,"Tag Checksum returned",return F->retval);
-    return F->retval;                   // suppress dumb compiler warning
+      {
+         t=dc42_read_sector_tags(F,i);
+         for (j=0; j<F->tagsize; j+=2)
+               mytagchks=dc42_ror32(mytagchks+(uint32)((uint32)(t[j]<<8)+(uint32)(t[j+1])));
+      }
+      DC42_RET_CODE(F,mytagchks,"Tag Checksum returned",return F->retval);
+      return F->retval;                   // suppress dumb compiler warning
 }
 
 uint32 dc42_calc_tag0_checksum(DC42ImageType *F)  // used by DART
 {
-    uint32 i,j,mytagchks=0;
-    uint8 *t;
+      uint32 i,j,mytagchks=0;
+      uint8 *t;
 
-    DC42_CHECK_VALID_F(F);
+      DC42_CHECK_VALID_F(F);
 
-    for (i=0; i<F->numblocks; i++)
-    {
-     t=dc42_read_sector_tags(F,i);
-     for (j=0; j<F->tagsize; j+=2)
-           mytagchks=dc42_ror32(mytagchks+(uint32)((uint32)(t[j]<<8)+(uint32)(t[j+1])));
-    }
-    DC42_RET_CODE(F,mytagchks,"Tag Checksum returned",return F->retval);
-    return F->retval;                   // suppress dumb compiler warning
+      for (i=0; i<F->numblocks; i++)
+      {
+         t=dc42_read_sector_tags(F,i);
+         for (j=0; j<F->tagsize; j+=2)
+               mytagchks=dc42_ror32(mytagchks+(uint32)((uint32)(t[j]<<8)+(uint32)(t[j+1])));
+      }
+      DC42_RET_CODE(F,mytagchks,"Tag Checksum returned",return F->retval);
+      return F->retval;                   // suppress dumb compiler warning
 }
 
 
 uint32 dc42_has_tags(DC42ImageType *F)
 {
-    uint32 i,j,hastags=0;
-    uint8 *t;
+      uint32 i,j,hastags=0;
+      uint8 *t;
 
-    DC42_CHECK_VALID_F_ZERO(F);
+      DC42_CHECK_VALID_F_ZERO(F);
 
-    for (i=1; i<F->numblocks && !hastags; i++)
-    {
-     t=dc42_read_sector_tags(F,i);
-     for (j=0; j<12 && !hastags; j++) hastags|=t[j];
-    }
+      for (i=1; i<F->numblocks && !hastags; i++)
+      {
+         t=dc42_read_sector_tags(F,i);
+         for (j=0; j<12 && !hastags; j++) hastags|=t[j];
+      }
 
-    DC42_RET_CODE(F,(hastags!=0),"Tag State returned",return F->retval);
-    return F->retval;                   // suppress dumb compiler warning
+      DC42_RET_CODE(F,(hastags!=0),"Tag State returned",return F->retval);
+      return F->retval;                   // suppress dumb compiler warning
 }
 
 
@@ -748,134 +566,117 @@ uint32 dc42_has_tags(DC42ImageType *F)
 int dc42_is_valid_image(char *filename)
 {
 //    FILE *handle;
-    static DC42ImageType FF, *F=&FF;
-    int i,flag=0;
-    long filesizetotal=0;
-    uint8 tempbuf[2048];
+      static DC42ImageType FF, *F=&FF;
+      int i,flag=0;
+      long filesizetotal=0;
+      uint8 tempbuf[2048];
 
-    strncpy(F->fname,filename,FILENAME_MAX);
+      strncpy(F->fname,filename,FILENAME_MAX);
 
-    int is_macbin=dc42_is_valid_macbinii(filename,NULL);
+      int is_macbin=dc42_is_valid_macbinii(filename,NULL);
 
 
     // open the image as read only and grab it's header - we re-open it as r/w later if everything's happy.
 
 #ifndef __MSVCRT__
-    F->fd=open(F->fname,O_RDONLY);
-    // why 3? because 0 is stdin, 1 is stdout, 2 is stderr.  Duh!
-    if (F->fd<3)  DC42_RET_CODE(F,-6,"Cannot open the file.",return F->retval);
-    F->fh=NULL;
+      F->fd=open(F->fname,O_RDONLY);
+      // why 3? because 0 is stdin, 1 is stdout, 2 is stderr.  Duh!
+      if (F->fd<3)  DC42_RET_CODE(F,-6,"Cannot open the file.",return F->retval);
+      F->fh=NULL;
 #else
-    F->fh=fopen(F->fname,"rb");
-    if (!F->fh)   DC42_RET_CODE(F,-6,"Cannot open the file.",return F->retval);
-    F->fd=0;
+      F->fh=fopen(F->fname,"rb");
+      if (!F->fh)   DC42_RET_CODE(F,-6,"Cannot open the file.",return F->retval);
+      F->fd=0;
 #endif
 
 
-    if (F->fd>2)
-       {
-	    uint16 extras=0;
+      if (F->fd>2)
+         {
+            uint16 extras=0;
 
-		 if (is_macbin) 
-		    {int i;
-			  uint8 buf[2];
-			  lseek(F->fd,120,SEEK_SET);
-			  i=read(F->fd,buf,2);
-			  //  Length of a secondary header. If this is non-zero, skip this many bytes (rounded up to the next multiple of 128). 
-			  extras=(buf[0]<<8) | (buf[1]);
-			  if (extras & 127) extras=(extras|127)+1;
-		    }
+            if (is_macbin) 
+            {     int i;
+                  uint8 buf[2];
+                  lseek(F->fd,120,SEEK_SET);
+                  i=read(F->fd,buf,2);
+			          //  Length of a secondary header. If this is non-zero, skip this many bytes (rounded up to the next multiple of 128). 
+                  extras=(buf[0]<<8) | (buf[1]);
+                  if (extras & 127) extras=(extras|127)+1;
+            }
 
-         filesizetotal=lseek(F->fd,0,SEEK_END);
-         filesizetotal=lseek(F->fd,0,SEEK_CUR);
-                       lseek(F->fd,is_macbin ? 128+extras: 0,SEEK_SET);
-		 if (is_macbin) filesizetotal-=(128+extras);
+         filesizetotal= lseek(F->fd,0,SEEK_END);
+         filesizetotal= lseek(F->fd,0,SEEK_CUR);
+                        lseek(F->fd,is_macbin ? 128+extras: 0,SEEK_SET);
+         if (is_macbin) filesizetotal-=(128+extras);
 
-       }
+         }
 
-    if (F->fh)
-       {
-		uint16 extras=0;
-	
-		 if (is_macbin) 
-		    {
-			  uint8 ch, cl;
+      if (F->fh)
+      { uint16 extras=0;
+         if (is_macbin) 
+            {  uint8 ch, cl;
+			      //  Length of a secondary header. If this is non-zero, skip this many bytes (rounded up to the next multiple of 128). 
+               fseek(F->fh,120,SEEK_SET);  ch=fgetc(F->fh); cl=fgetc(F->fh);
+               extras=(ch<<8) | (cl);
+               if (extras & 127) extras=(extras|127)+1;
+            }
 
-			  //  Length of a secondary header. If this is non-zero, skip this many bytes (rounded up to the next multiple of 128). 
-			  fseek(F->fh,120,SEEK_SET);  ch=fgetc(F->fh); cl=fgetc(F->fh);
-			  extras=(ch<<8) | (cl);
-			  if (extras & 127) extras=(extras|127)+1;
-		    }
-
-                       fseek(F->fh,0,SEEK_END);
-         filesizetotal=ftell(F->fh);
-                       fseek(F->fh,0,SEEK_CUR);
-                       fseek(F->fh,is_macbin ? 128+extras:0,SEEK_SET);
-
-		 if (is_macbin) filesizetotal-=(128+extras);
-       }
-
-
-
-
+                           fseek(F->fh,0,SEEK_END);
+            filesizetotal= ftell(F->fh);
+                           fseek(F->fh,0,SEEK_CUR);
+                           fseek(F->fh,is_macbin ? 128+extras:0,SEEK_SET);
+         if (is_macbin)    filesizetotal-=(128+extras);
+      }
 
 //    if (filesizetotal>4294967290) DC42_RET_CODE(F,88,"File too large to be valid disk image",return F->retval);
 
-    if (F->fd>2)
-       {
-        int i;
-        i=read(F->fd,tempbuf,2048);  // read 1st 2k of image
-        close(F->fd);  F->fd=0;
-       }
-    if (F->fh)
-       {int i;
-        i=fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
-        fclose(F->fh); F->fh=NULL;
-       }
+      if (F->fd>2)
+         { int i;
+            i=read(F->fd,tempbuf,2048);  // read 1st 2k of image
+            close(F->fd);  F->fd=0;
+         }
+      if (F->fh)
+         {  int i;
+            i=fread(     tempbuf,2048,1,F->fh);  // read 1st 2k of image
+            fclose(F->fh); F->fh=NULL;
+         }
 
+      for (flag=0,i=0; i<1024 && !flag; i++) flag|=tempbuf[i];
+      if (!flag) {DC42_RET_CODE(F,-60,"This appears to be a Disk Copy 6.x uncompressed image",return F->retval);}
 
-    for (flag=0,i=0; i<1024 && !flag; i++) flag|=tempbuf[i];
-    if (!flag)                          // Disk Copy 6.3.x uncompressed image
-           {DC42_RET_CODE(F,-60,"This appears to be a Disk Copy 6.x uncompressed image",return F->retval);}
+      if (tempbuf[0]==0x80 && tempbuf[1]==0x00 && tempbuf[2]==0x7f)
+         {DC42_RET_CODE(F,-61,"This appears to be a Disk Copy 6.x compressed image",return F->retval);}
 
-    if (tempbuf[0]==0x80 && tempbuf[1]==0x00 && tempbuf[2]==0x7f)
-           {DC42_RET_CODE(F,-61,"This appears to be a Disk Copy 6.x compressed image",return F->retval);}
+      // make sure that this is a DC42 image
+      if (tempbuf[0]>64)                      DC42_RET_CODE(F,0,"This is not a Disk Copy 4.2 image or is corrupt (DC42 volume name size >64 bytes)",return F->retval);
+      if (tempbuf[82]!=1 || tempbuf[83]!=0)   DC42_RET_CODE(F,0,"This is not a Disk Copy 4.2 image or is corrupt (version is not 0100)",return F->retval);
 
-    // make sure that this is a DC42 image
-    if (tempbuf[0]>64)                      DC42_RET_CODE(F,0,"This is not a Disk Copy 4.2 image or is corrupt (DC42 volume name size >64 bytes)",return F->retval);
-    if (tempbuf[82]!=1 || tempbuf[83]!=0)   DC42_RET_CODE(F,0,"This is not a Disk Copy 4.2 image or is corrupt (version is not 0100)",return F->retval);
+      ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      F->sectoroffset=DC42_HEADERSIZE;               // data starts from byte 84 and continues on in 512 byte chunx
+      F->datasizetotal=(tempbuf[64+0]<<24)|(tempbuf[64+1]<<16)|(tempbuf[64+2]<<8)|tempbuf[64+3];
+      F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      if ((DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
+         DC42_RET_CODE(F,0,"File size does not match headers",return F->retval);
 
-    F->sectoroffset=DC42_HEADERSIZE;               // data starts from byte 84 and continues on in 512 byte chunx
-
-    F->datasizetotal=(tempbuf[64+0]<<24)|(tempbuf[64+1]<<16)|(tempbuf[64+2]<<8)|tempbuf[64+3];
-    F->tagsizetotal =(tempbuf[68+0]<<24)|(tempbuf[68+1]<<16)|(tempbuf[68+2]<<8)|tempbuf[68+3];
-
-    if ((DC42_HEADERSIZE+F->datasizetotal+F->tagsizetotal-filesizetotal) > 1024)
-              DC42_RET_CODE(F,0,"File size does not match headers",return F->retval);
-
-    DC42_RET_CODE(F,1+is_macbin,"Is valid DC42 Image",return F->retval);
-    return F->retval;                   // suppress dumb compiler warnings.
+      DC42_RET_CODE(F,1+is_macbin,"Is valid DC42 Image",return F->retval);
+      return F->retval;                   // suppress dumb compiler warnings.
 }
 
 
 
 
 int dc42_open(DC42ImageType *F, char *filename, char *options)
-{
+{  int i, flag;
+   long filesizetotal=0;
+   uint8 tempbuf[2048];
+   F->dc42seekstart=0;
+   F->retval=0;
+   F->returnmsg[0] = 0;
 
-    int i, flag;
-    long filesizetotal=0;
-    uint8 tempbuf[2048];
-    F->dc42seekstart=0;
-    F->retval=0;
-    F->returnmsg[0] = 0;
+   strncpy(F->fname,filename,FILENAME_MAX);     // copy the file name into the image structure for later use
 
-    // copy the file name into the image structure for later use
-    strncpy(F->fname,filename,FILENAME_MAX);
-
-    // open the image as read only and grab it's header - we re-open it as r/w later if everything's happy.
+   // open the image as read only and grab it's header - we re-open it as r/w later if everything's happy.
 #ifndef __MSVCRT__
     F->fd=open(F->fname,O_RDONLY);
     // why 3? because 0 is stdin, 1 is stdout, 2 is stderr.  Duh!
@@ -1033,32 +834,36 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
 
 
-       #ifdef HAVE_MMAPEDIO
+#ifdef HAVE_MMAPEDIO
        if (F->mmappedio)  { errno=0;
-
-                            F->RAM=mmap(0,F->size,PROT_READ|PROT_WRITE,MAP_SHARED,F->fd,0);   // writeable image
+                            // void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+                            F->RAM=mmap(0,F->size,PROT_READ|PROT_WRITE,MAP_SHARED,F->fd,0);   // writeable image (shared is used to write to the physical file, not share with other procs)
                             //{fprintf(stderr,"MMAPped writeable image errno:%d\n",errno); fflush(stderr);}
                           }
-       #endif
+#endif
     }
     else
     {
-
-        #ifdef HAVE_MMAPEDIO
-        if (F->mmappedio) {  errno=0;
-
-                             F->RAM=mmap(0,F->size,PROT_READ|PROT_WRITE,MAP_PRIVATE,F->fd,0);  // read only/private  - fd is already opened rd only
+// handle the read only images here.
+#ifdef HAVE_MMAPEDIO
+        if (F->mmappedio=1) {  errno=0;
+                             // read only/private  - fd is already opened rd only, private prevents write to file.
+                             F->RAM=mmap(0,F->size,PROT_READ|(F->mmappedio==2 ? PROT_WRITE:0),MAP_PRIVATE,F->fd,0);
+			     // some file systems have issues (ZFS?) with MAP_PRIVATE  so retry with MAP_SHARED, however, this will cause "p" to write back!
+                             if (!F->RAM) F->RAM=mmap(0,F->size,PROT_READ|(F->mmappedio==2 ? PROT_WRITE:0),MAP_SHARED, F->fd,0);
                              //{fprintf(stderr,"MMAPped READ-ONLY/PRIVATE image errno:%d\n",errno); fflush(stderr);}
                           }
-        #endif
+#endif
     }
 
     if (F->mmappedio==0) {
 
                            F->RAM=malloc( (F->tagsize + F->sectorsize) );
-
-                            //{fprintf(stderr,"Direct to disk image\n"); fflush(stderr);}
+                           //{fprintf(stderr,"Direct to disk image\n"); fflush(stderr);}
                          }
+    // 2022.05.27 here here here
+    // this needs to be removed from here and addressed in both have and don't have mmaped io and private image!
+    // ignore mmap and read the whole thing into RAM and then discard, but be careful with munmap! need a flag for private to not use mmap or munmap for private.
     if (F->mmappedio==2) {
 
 
@@ -1241,7 +1046,6 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
 
 int RLEExpandBlock(uint8 *in, uint8 *out, int16 size, int sector)
 {
-
  int16 i=0, o=0, s, os=size*2;                 // in,out cursors, size word
  uint8 c1,c2;                                  // use chars to avoid endian issues, slower, but portable
  memset(out,0xaa,DART_CHUNK);
@@ -1421,7 +1225,7 @@ int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize) 
 }
 
 // This does not open an image, do not use this on an already opened image.
-
+// it will add tags to an image that doesn't have one. You can open it after.
 int dc42_add_tags(char *filename, uint32 tagsize) // tagsize is in bytes.  for a 400K disk use 400*2*12 for tagsize
 {
   FILE *image;
@@ -1771,25 +1575,22 @@ return 0;
 
 
 
-
-
 // opens a DC42 image automatically converting it from DART, and/or stripping MacBinII headers if needed
 int dc42_auto_open(DC42ImageType *F, char *infilename, char *options)
 {
     int i=0;
-    char filename[FILENAME_MAX+2];
-
+    char filename[FILENAME_MAX-2];
     // we do it this way so that the macbinii extraction can change the file name
     // and get the filename passed to the next layer!
 
-    strncpy(filename,infilename,FILENAME_MAX);
+    strncpy(filename,infilename,FILENAME_MAX-3);
     if ( dc42_extract_macbinii(filename)<=0 )
-         strncpy(filename,infilename,FILENAME_MAX);
+         strncpy(filename,infilename,FILENAME_MAX-3);
 
     if (dart_is_valid_image(filename))
     {
-     char dc42filename[FILENAME_MAX+2];
-     strncpy(dc42filename,filename,FILENAME_MAX-2);
+     char dc42filename[FILENAME_MAX];
+     strncpy(dc42filename,filename,FILENAME_MAX);
      if   (strlen(dc42filename)<FILENAME_MAX-6)   strcat(dc42filename,".dc42");
      else                                         strcpy( (char *)(dc42filename+FILENAME_MAX-6),".dc42");
 
@@ -1803,7 +1604,7 @@ int dc42_auto_open(DC42ImageType *F, char *infilename, char *options)
 
 }
 
-
+// search sectors for string s of size size, return match count
 int searchseccount( DC42ImageType *F, int sector, int size, uint8 *s)
 {
     uint8 *d=dc42_read_sector_data(F,sector);
@@ -1824,6 +1625,7 @@ int searchseccount( DC42ImageType *F, int sector, int size, uint8 *s)
     return count;
 }
 
+// sector search and replace - searches for string s and replaces with r of max size size.
 int replacesec(DC42ImageType *F, int sector, int size, uint8 *s, uint8 *r)
 {
     int xsize=512-size;

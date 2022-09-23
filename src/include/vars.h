@@ -1574,14 +1574,14 @@ extern void on_lisa_exit(void);
 #ifdef DEBUG
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #define ALERT_LOG( level, fmt, args... )                                                         \
-    { if ( (level <= DEBUGLEVEL) )                                                               \
+    { if ( (level <= DEBUGLEVEL) ) {                                                             \
             fprintf((buglog ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);        \
             fprintf((buglog ? buglog:stderr),  fmt , ## args);                                   \
             fprintf((buglog ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                        \
                           lisa_clock.hours_h,lisa_clock.hours_l,                                 \
                           lisa_clock.mins_h,lisa_clock.mins_l,                                   \
                           lisa_clock.secs_h,lisa_clock.secs_l,                                   \
-                          lisa_clock.tenths, (long)cpu68k_clocks);                               \
+                          lisa_clock.tenths, (long)cpu68k_clocks);    }                          \
     }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #else
@@ -1924,10 +1924,8 @@ GLOBAL(uint32,last_bad_parity_adr,0);
 
 GLOBAL(int,scc_running,0);
 
-
-
 extern void sound_fork(void);
-extern void sound_play(uint16 freq);
+extern void sound_play(uint16 t2, uint8 SR, uint8 floppy_iorom);
 extern void sound_off(void);
 
 //DECLARE(scc_func_t, scc_fn[2] );
