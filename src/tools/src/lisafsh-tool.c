@@ -301,6 +301,7 @@ void dump_mddf(FILE *out, DC42ImageType *F)
  uint8 *sec;
  int i,j ;
  uint32 sector, sect;
+ uint8 volname_len;
 
  if (!volumename[0])                        // if we already did the work don't bother.
   {//fprintf(out,"Searching for MDDF block.\n");
@@ -312,7 +313,8 @@ void dump_mddf(FILE *out, DC42ImageType *F)
 
        if (TAGFILEID(sect)==TAG_MDDF)
        {
-        for (j=0,i=0x0d; i<0x20; i++,j++) volumename[j]=sec[i];
+        volname_len = sec[0xc];
+        for (j=0,i=0x0d; j<volname_len; i++,j++) volumename[j]=sec[i];
 
         fsversion=(sec[0]<<8)|sec[1];
 
@@ -346,7 +348,7 @@ void dump_mddf(FILE *out, DC42ImageType *F)
     case 0x0f : fprintf(out,"Version 0x0f: Flat File System with hash table catalog Release 2.0 - Pepsi\n"); break;
     case 0x11 : fprintf(out,"Version 0x11: Hierarchial FS with B-Tree catalog Spring Release - 7/7\n"); break;
 
-    default   : fprintf(out,"Unknow MDDF Version: %02x Could be we didn't find the right MDDF\n",version);
+    default   : fprintf(out,"Unknown MDDF Version: %02x Could be we didn't find the right MDDF\n",version);
  }
 
  fprintf(out,"-----------------------------------------------------------------------------\n");
