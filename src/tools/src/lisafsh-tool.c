@@ -321,10 +321,10 @@ void dump_mddf(FILE *out, DC42ImageType *F)
         if (sect<firstmddf) firstmddf=sect;  // keep track of the first one in the image for bitmap sizing.
 
         uint32 disk_sn=(sec[0xcc]<<24) | (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
-        uint32 lisa_sn=                  (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
-        uint32 los_lisa_num=(sec[0xcd] * 65536) + disk_sn;
+        uint32 lisa_sn=(sec[0xce]<<8) | (sec[0xcf]);
+        uint32 los_lisa_num=(sec[0xcd] * 65536) + lisa_sn;
 
-        fprintf(out,"Last used by Lisa 0x%08x (AppleNet 001%05d)  LOS Lisa Number: %d\n",disk_sn,lisa_sn,  los_lisa_num);
+        fprintf(out,"Last used by Lisa 0x%08x (AppleNet 001%05d)  LOS Lisa Number: %d\n",disk_sn, lisa_sn, los_lisa_num);
         fprintf(out,"MDDF (Superblock) found at sector 0x%04x(%4d decimal) fsversion:%02x\n",sect,sect,fsversion);
         switch (fsversion) {
            case 0x0e: fprintf(out,"LOS 1.x file system version 0e\n"); break;
