@@ -46,13 +46,13 @@ void deserialize(DC42ImageType *F)
         (2^16) * (001) + (01635) = 65536 + 1635 = 67171
         */
 
-        uint16 fsversion=(mddfsec[0] << 8) | mddfsec[1];
+        uint16 fsversion = (mddfsec[0] << 8) | mddfsec[1];
 
         switch (fsversion) {
-            case 0x0e: printf("LOS 1.x file system version 0e\n"); break;
-            case 0x0f: printf("LOS 2.x file system version 0f\n"); break;
-            case 0x11: printf("LOS 3.x file system version 11\n"); break;
-            default: printf("*** UNKNOWN FILE SYSTEM VERSION %02x (expected 0x0e, 0x0f, or 0x11)***\n", fsversion);
+            case 0x0e: fprintf(stderr, "LOS 1.x file system version 0e\n"); break;
+            case 0x0f: fprintf(stderr, "LOS 2.x file system version 0f\n"); break;
+            case 0x11: fprintf(stderr, "LOS 3.x file system version 11\n"); break;
+            default: fprintf(stderr, "*** UNKNOWN FILE SYSTEM VERSION %02x (expected 0x0e, 0x0f, or 0x11)***\n", fsversion);
         };
 
         if (disk_sn)
@@ -71,11 +71,11 @@ void deserialize(DC42ImageType *F)
     for (int sec = 32; (unsigned)sec < (F->numblocks); sec++)
     {
         char name[64];
-        ftag=dc42_read_sector_tags(F, sec);
+        ftag = dc42_read_sector_tags(F, sec);
 
-        if (ftag[4]==0xff)         // tool entry tags have tag 4 as ff
+        if (ftag[4] == 0xff)         // tool entry tags have tag 4 as ff
         {
-            fsec=dc42_read_sector_data(F, sec);
+            fsec = dc42_read_sector_data(F, sec);
             int s = fsec[0];                   // size of string (pascal string)
             // possible file name, very likely to be the right size.  
             // Look for {T*}obj.  i.e. {T5}obj is LisaList, but could have {T9999}obj but very unlikely
@@ -85,13 +85,13 @@ void deserialize(DC42ImageType *F)
             if (s > 6 && s < 32 && fsec[1] == '{' && tolower(fsec[2]) == 't' && fsec[3] >= '0' && fsec[3] <= '9'  &&
                 fsec[s - 3] == '}' && tolower(fsec[s - 2]) == 'o' && tolower(fsec[s - 1]) == 'b' && tolower(fsec[s]) == 'j')
             {                    
-                s=fsec[0x0];                  // Size of tool name
+                s = fsec[0x0];                  // Size of tool name
                 memcpy(name, &fsec[0x1], s);  // copy it over.
-                name[s]=0;                    // string terminator.
+                name[s] = 0;                    // string terminator.
                 
-                uint32 lisa_sn=(fsec[0x44] << 8) | (fsec[0x45]);
-                uint32 toolsn=(fsec[0x42] << 24) | (fsec[0x43] << 16) | (fsec[0x44] << 8) | fsec[0x45];
-                uint32 los_lisa_num=(fsec[0x42] * 65536) + toolsn;
+                uint32 lisa_sn = (fsec[0x44] << 8) | (fsec[0x45]);
+                uint32 toolsn = (fsec[0x42] << 24) | (fsec[0x43] << 16) | (fsec[0x44] << 8) | fsec[0x45];
+                uint32 los_lisa_num = (fsec[0x42] * 65536) + toolsn;
                 if (toolsn != 0 || (fsec[0x48] | fsec[0x49]))     
                 {
                     fprintf(stderr, 
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 {
     int i, j;
 
-    DC42ImageType  F;
+    DC42ImageType F;
     char creatortype[10];
 
     puts("  ---------------------------------------------------------------------------");
