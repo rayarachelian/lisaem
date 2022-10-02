@@ -15,8 +15,7 @@
 
 ## Note
 
-Sadly, back in Feb 2022, I've been diagnosed with stage 4 cancer, my odds aren't great. I'll do what I can to finalize this release, but I may need help from the community to get help with maintaining LisaEm and f
-uture work. It's possible, though the odds are low, that I'll make it out ok. There's always hope, right?
+Sadly, back in Feb 2022, I've been diagnosed with stage 4 cancer, my odds aren't great. I'll do what I can to finalize this release, but I may need help from the community to get help with maintaining LisaEm and future work. It's possible, though the odds are low, that I'll make it out ok. There's always hope, right?
 
 ## What is this UNSTABLE thing?
 

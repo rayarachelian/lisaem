@@ -1237,7 +1237,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
             {if (P->VIA_PA==0x55)
                 {
                  P->StateMachineStep=WRITE_BLOCK_STATE; // accept command
-                 SET_PROFILE_LOOP_TIMEOUT(HUN_THOUSANDTH_OF_A_SEC*5);
+                 SET_PROFILE_LOOP_TIMEOUT( ( (running_lisa_os == LISA_OFFICE_RUNNING) ? FIFTH_OF_A_SECOND : (HUN_THOUSANDTH_OF_A_SEC*5) ) );
                  P->indexread=0;
                  PRO_STATUS_GOT55;
                  DEBUG_LOG(0,"Command accepted, transition to Step:9");

@@ -17,8 +17,6 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 
 2022.08.xx - more openAL work
 
-2022.07.27 - RC5? RELEASE? TBD
-
 2022.07.15 - fix lisafsh-tool readline enter for next sector, q=quit
 
            - optimize strip_and_compress in bashbuild to its own job

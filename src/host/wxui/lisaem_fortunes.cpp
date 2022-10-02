@@ -1792,6 +1792,24 @@ char *get_welcome_fortune(void)
   "Serial (Port) Experiments LisaEm",
   "youtu.be/izDc3G9ZRfw Never gonna give you up, never gonna let you down, never gonna run around and desert you...",
 
+  "\"As the area of our knowledge grows, so too does the perimeter of our ignorance\" - Neil deGrasse Tyson",
+  "\"I know of no time in human history where ignorance was better than knowledge.\" - Neil deGrasse Tyson",
+  "\"The cross pollination of disciplines is fundamental to truly revolutionary advances in our culture.\" - Neil deGrasse Tyson",
+  "\"Science is basically an inoculation against charlatans.\" - Neil deGrasse Tyson",
+  "\"I don't want people to say, 'Something is true because Tyson says it is true.' That's not critical thinking.\" - Neil deGrasse Tyson",
+  "\"'Boldly going where hundreds have gone before' does not make headlines.\" - Neil deGrasse Tyson",
+  "\"The Lisa is under no obligation to make sense to you.\" - Neil deGrasse Tyson",
+  "\"I lose sleep at night wondering whether we are intelligent enough to figure out the Lisa. I don't know.\" - Neil deGrasse Tyson",
+  "\"We're going to emulate a Lisa, and do these other things, not because they're easy, but because they are hard\"",
+  "\"I know of no time in human history where ignorance was better than knowledge.\" - Neil deGrasse Tyson",
+
+  "Kill the Wabbit?",
+  "Oh Mighty Warrior of Great Fighting Stock, might I enquire, What's Up Doc?",
+  "That was the Wabbit!",
+  "Well what did you expect in an opera, a happy ending?",
+
+  "The lion lives in the heart",
+
   "Do not summon (BillG) AT ALL COSTS!",
   "Thanks billg, I now hate corn!", 
   "Remember: reality is an illusion, the universe is an emulation, buy gold, bye.",
