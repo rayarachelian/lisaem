@@ -755,6 +755,7 @@ static void do_floppy_read(DC42ImageType *F)
             for (uint32 i=0; i<F->tagsize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ ptr[i] ^ i;
 
             ALERT_LOG(0,"Bootblock checksum:%08x",bootblockchecksum);
+            running_lisa_os_boot_device=1;
 
             if (bootblockchecksum==0xce0cbba3 && macworks4mb) enable_4MB_macworks(); 
         }

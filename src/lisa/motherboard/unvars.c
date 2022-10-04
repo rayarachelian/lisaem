@@ -1,7 +1,7 @@
 /**************************************************************************************\
 *                             Apple Lisa 2 Emulator                                    *
 *                                                                                      *
-*              The Lisa Emulator Project  1.2.7-RELEASE_2022.06.26                    *
+*              The Lisa Emulator Project  1.2.7-PreRC5_2022.10.22                    *
 *                  Copyright (C) 2022 Ray Arachelian                                   *
 *                            All Rights Reserved                                       *
 *                                                                                      *
@@ -44,6 +44,8 @@ REASSIGN(int,lisa_vid_size_y,364);
 REASSIGN(int,lisa_vid_size_xbytes,90);
 REASSIGN(int,has_lisa_xl_screenmod,0);
 REASSIGN(int,running_lisa_os,LISA_ROM_RUNNING);
+REASSIGN(int,running_lisa_os_version,'H');
+REASSIGN(int,running_lisa_os_boot_device,0);  // 0=in rom, 1=floppy, 2=hard drive - can be used to detect installer
 REASSIGN(int,mouse_x_tolerance,0);
 REASSIGN(int,mouse_y_tolerance,0);
 REASSIGN(int,mouse_x_halfing_tolerance,1);

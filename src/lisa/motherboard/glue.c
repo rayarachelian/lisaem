@@ -298,10 +298,13 @@ static int v1v2cycles=0;
 extern void apply_xenix_hle_patches(void);
 extern void apply_monitor_hle_patches(void);
 
+
+
+// ::TODO:: fill out running_lisa_os_version wherever possible
 int check_running_lisa_os(void)
 {
    uint32 v1,v2;
-   if (!lisaram) {running_lisa_os=UNKNOWN_OS_RUNNING; return running_lisa_os;}
+   if (!lisaram) {running_lisa_os=UNKNOWN_OS_RUNNING; running_lisa_os_version=0; return running_lisa_os;}
    
    mouse_x_tolerance=1;           mouse_y_tolerance=1;
    mouse_x_halfing_tolerance=1;   mouse_y_halfing_tolerance=1;
@@ -318,7 +321,8 @@ int check_running_lisa_os(void)
             //if (lisa_os_mouse_x_ptr!=0x00000486) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 486",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000486;   lisa_os_mouse_y_ptr=0x00000488;
             running_lisa_os=LISA_ROM_RUNNING;
-            DEBUG_LOG(0,"Lisa ROM v1:%08x v2:%08x",v1,v2);
+            running_lisa_os_version=lisarom[0x3FFD];
+            DEBUG_LOG(0,"Lisa ROM v1:%08x v2:%08x version: %02x",v1,v2,running_lisa_os_version);
             return running_lisa_os;
        }
    else

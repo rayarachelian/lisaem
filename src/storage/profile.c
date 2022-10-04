@@ -358,6 +358,7 @@ void do_profile_read(ProFileType *P, uint32 block)
     if (block==0) {
         bootblockchecksum=0;
         for (uint32 i=0; i<P->DC42.datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
+        running_lisa_os_boot_device=2;
     }
 
     blk=dc42_read_sector_tags(&(P->DC42),block);

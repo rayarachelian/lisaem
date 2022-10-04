@@ -1564,28 +1564,51 @@ enum {
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef USEOPENAL
+#define NOSOUND 1
 
-#include <LisaEmSoundOpenAL.h>
+#ifdef NOSOUND
 
-float normalthrottle=0;
+    extern "C" int      IsSoundPlaying(int soundid)                         {return 0;}
+    extern "C" int      IsSoundLoaded(int soundid)                          {return 1;}
+    extern "C" void     StopSound(int soundid)                              {return  ;}
+    extern "C" void     PlaySound(int soundid, int flags)                   {return  ;}
+    extern "C" void     sound_play(uint16 t2, uint8 SR, uint8 floppy_iorom) {return  ;}
+    extern "C" void     sound_off(void)                                     {return  ;}
+               void     InitSounds(wxString skindir, LisaSkin *skin)        {return  ;}
+               void     DestroySounds(void)                                 {return  ;}
 
-// -- Glue C wrappers/protos -----------------------------------------------------------------------------------------------------------------------------------
-// soundid is the enum below.
-extern "C" int      IsSoundPlaying(int soundid)                  {if (my_lisaem_openal) return my_lisaem_openal.IsSoundPlaying(soundid); else return 0;}
-extern "C" int      IsSoundLoaded(int soundid)                   {if (my_lisaem_openal) return my_lisaem_openal.IsSoundLoaded(soundid); else return 0;}
-extern "C" void     StopSound(int soundid);                      {if (my_lisaem_openal)        my_lisaem_openal.StopSound(soundid);}
-extern "C" void     PlaySound(int soundid);                      {if (my_lisaem_openal)        my_lisaem_openal.PlaySound(soundid);}
-extern "C" void     InitSounds(wxString skindir, LisaSkin skin)  {if (my_lisaem_openal)        my_lisaem_openal.InitSound(skindir, skin);}
-
-// these two are called from via65522.c:
-extern "C" void     sound_play(uint16 t2, uint8 SR, uint8 floppy_iorom) {if (my_lisaem_openal) my_lisaem_openal.soundplay(t2,SR,floppy_iorom);}
-extern "C" void     sound_off(void);                                    {if (my_lisaem_openal) my_lisaem_openal.soundoff();}
-//--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #else
 
-#include "LisaEmSoundWx.cpp"
+    #error "Why are we here?"
+
+    #ifdef USEOPENAL
+    
+        #include <LisaEmSoundOpenAL.h>
+        
+        float normalthrottle=0;
+        
+        // -- Glue C wrappers/protos -----------------------------------------------------------------------------------------------------------------------------------
+        // soundid is the enum below.
+        extern "C" int      IsSoundPlaying(int soundid)                  {if (my_lisaem_openal) return my_lisaem_openal.IsSoundPlaying(soundid); else return 0;}
+        extern "C" int      IsSoundLoaded(int soundid)                   {if (my_lisaem_openal) return my_lisaem_openal.IsSoundLoaded(soundid); else return 0;}
+        extern "C" void     StopSound(int soundid);                      {if (my_lisaem_openal)        my_lisaem_openal.StopSound(soundid);}
+        extern "C" void     PlaySound(int soundid, int flags);           {if (my_lisaem_openal)        my_lisaem_openal.PlaySound(soundid);}
+        extern "C" void     InitSounds(wxString skindir, LisaSkin skin)  {if (my_lisaem_openal)        my_lisaem_openal.InitSound(skindir, skin);}
+        
+        // these two are called from via65522.c:
+        extern "C" void     sound_play(uint16 t2, uint8 SR, uint8 floppy_iorom) {if (my_lisaem_openal) my_lisaem_openal.soundplay(t2,SR,floppy_iorom);}
+        extern "C" void     sound_off(void);                                    {if (my_lisaem_openal) my_lisaem_openal.soundoff();}
+
+    extern "C" void     DestroySounds(void)                                 {return  ;}
+
+        //--------------------------------------------------------------------------------------------------------------------------------------------------------------
+    
+    #else
+    
+        #include "LisaEmSoundWx.cpp"
+    
+    #endif
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3015,7 +3038,7 @@ bool LisaEmApp::OnInit()
     my_lisawin->repaintall = REPAINT_INVALID_WINDOW;
 
     // wxSound Play loading was here, moved to lisaem_sound_wx.cpp
-    void  InitSounds(wxString skindir, LisaSkin *skin);
+    //void  InitSounds(wxString skindir, LisaSkin *skin);
     InitSounds(my_lisaframe->skindir, &skin);
 
     ALERT_LOG(0,"Update ProFile menu");

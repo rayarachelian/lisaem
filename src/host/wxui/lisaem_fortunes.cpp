@@ -1459,7 +1459,7 @@ char *get_welcome_fortune(void)
   "\"Intended for fish only.\"",
   "\"Fish don't gots no good emulators to emulate!\" - Skwisgaar Skwigapple",
   "\"Many years ago, something grew inside of Apple, that thing was a Lisa! Lisa! Lisa! ... You're running out of life!\"",
-  \"He's slowly learning how to un-program the emulator\" - Skwisgaar",
+  "\"He's slowly learning how to un-program the emulator\" - Skwisgaar",
   "Go FORTH, be emulated, go FORTH and run! Open up your textbooks and turn to the chapter concerning your 68000 code",
   "\"No Ray, you do not get a banana sticker, not until you have proven yourself by pushing a release, until then these banana stickers shall remain locked in here\" - Dr. Jonathan Twinkletits",
   "\"This emulators is dildoes.\"",

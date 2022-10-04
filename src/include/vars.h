@@ -970,6 +970,9 @@ GLOBAL(int,has_lisa_xl_screenmod,0);
 #define UNKNOWN_OS_RUNNING          100
 
 GLOBAL(int,running_lisa_os,LISA_ROM_RUNNING);
+GLOBAL(int,running_lisa_os_version,'H');
+GLOBAL(int,running_lisa_os_boot_device,0);  // 0=in rom, 1=floppy, 2=hard drive - can be used to detect installer
+
 int check_running_lisa_os(void);
 GLOBAL(int,mouse_x_tolerance,0);
 GLOBAL(int,mouse_y_tolerance,0);

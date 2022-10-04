@@ -304,54 +304,63 @@ void dump_mddf(FILE *out, DC42ImageType *F)
  uint8 volname_len;
 
  if (!volumename[0])                        // if we already did the work don't bother.
-  {//fprintf(out,"Searching for MDDF block.\n");
-   for (sector=0; sector<F->numblocks; sector++)
-     {
-       sect=sorttag[sector];
-
-       sec=(uint8 *)dc42_read_sector_data(F,sect); //&(sectors[sect*sectorsize]);
-
-       if (TAGFILEID(sect)==TAG_MDDF)
-       {
-        volname_len = sec[0xc];
-        for (j=0,i=0x0d; j<volname_len; i++,j++) volumename[j]=sec[i];
-
-        fsversion=(sec[0]<<8)|sec[1];
-
-        if (sect<firstmddf) firstmddf=sect;  // keep track of the first one in the image for bitmap sizing.
-
-        uint32 disk_sn=(sec[0xcc]<<24) | (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
-        uint32 lisa_sn=(sec[0xce]<<8) | (sec[0xcf]);
-        uint32 los_lisa_num=(sec[0xcd] * 65536) + lisa_sn;
-
-        fprintf(out,"Last used by Lisa 0x%08x (AppleNet 001%05d)  LOS Lisa Number: %d\n",disk_sn, lisa_sn, los_lisa_num);
-        fprintf(out,"MDDF (Superblock) found at sector 0x%04x(%4d decimal) fsversion:%02x\n",sect,sect,fsversion);
-        switch (fsversion) {
-           case 0x0e: fprintf(out,"LOS 1.x file system version 0e\n"); break;
-           case 0x0f: fprintf(out,"LOS 2.x file system version 0f\n"); break;
-           case 0x11: fprintf(out,"LOS 3.x file system version 11\n"); break;
-           default:   fprintf(out,"*** UNKNOWN FILE SYSTEM VERSION %02x ***\n",fsversion);
-        };
-
-       }
-     }
-     if (!fsversion) fprintf(out,"MDDF not found.\n");
-  }
+    {
+       for (sector=0; sector<F->numblocks; sector++)
+         {
+           sect=sorttag[sector];
+    
+           sec=(uint8 *)dc42_read_sector_data(F,sect); //&(sectors[sect*sectorsize]);
+    
+           if (TAGFILEID(sect)==TAG_MDDF)
+           {
+            volname_len = sec[0xc];
+            for (j=0,i=0x0d; j<volname_len; i++,j++) volumename[j]=sec[i];
+    
+            fsversion=(sec[0]<<8)|sec[1];
+    
+            if (sect<firstmddf) firstmddf=sect;  // keep track of the first one in the image for bitmap sizing.
+    
+            uint32 disk_sn=(sec[0xcc]<<24) | (sec[0xcd]<<16) | (sec[0xce]<<8) | (sec[0xcf]);
+            uint32 lisa_sn=(sec[0xce]<<8) | (sec[0xcf]);
+            uint32 los_lisa_num=(sec[0xcd] * 65536) + lisa_sn;
+    
+            fprintf(out,"Last used by Lisa 0x%08x (AppleNet 001%05d)  LOS Lisa Number: %d\n",disk_sn, lisa_sn, los_lisa_num);
+            fprintf(out,"MDDF (Superblock) found at sector 0x%04x(%4d decimal) fsversion:%02x\n",sect,sect,fsversion);
+            switch (fsversion) {
+               case 0x0e: fprintf(out,"LOS 1.x file system version 0e\n"); break;
+               case 0x0f: fprintf(out,"LOS 2.x file system version 0f\n"); break;
+               case 0x11: fprintf(out,"LOS 3.x file system version 11\n"); break;
+               default:   fprintf(out,"*** UNKNOWN FILE SYSTEM VERSION %02x ***\n",fsversion);
+            };
+    
+           }
+         }
+         if (!fsversion) fprintf(out,"MDDF not found.\n");  
+    }    
 
  fprintf(out,"\n-----------------------------------------------------------------------------\n");
  fprintf(out,"MDDF Volume Name: \"%s\"\n",volumename);
  
  switch(fsversion)
  {
-    case 0x00 : fprintf(out,"FS Version information not found or MDDF version=0 or bad MMDF!\n"); break;
-    case 0x0e : fprintf(out,"Version 0x0e: Flat File System with simple table catalog Release 1.0\n"); break;
-    case 0x0f : fprintf(out,"Version 0x0f: Flat File System with hash table catalog Release 2.0 - Pepsi\n"); break;
-    case 0x11 : fprintf(out,"Version 0x11: Hierarchial FS with B-Tree catalog Spring Release - 7/7\n"); break;
-
+    case 0x00 : fprintf(out,"FS Version information not found or MDDF version=0 or bad MMDF!\n");               break;
+    case 0x0e : fprintf(out,"FS Version 0x0e: Flat File System with simple table catalog Release 1.0\n");       break;
+    case 0x0f : fprintf(out,"FS Version 0x0f: Flat File System with hash table catalog Release 2.0 - Pepsi\n"); break;
+    case 0x11 : fprintf(out,"FS Version 0x11: Hierarchial FS with B-Tree catalog Spring Release - 7/7\n");      break;
     default   : fprintf(out,"Unknown MDDF Version: %02x Could be we didn't find the right MDDF\n",version);
  }
 
- fprintf(out,"-----------------------------------------------------------------------------\n");
+uint8 *tag=dc42_read_sector_tags(F,0);
+if  (tag[4]==0xaa && tag[5]==0xaa)
+    {
+        sec=(uint8 *)dc42_read_sector_data(F,0);
+        uint32 bootblockchecksum=0;
+        for (uint32 i=0; i<512; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ sec[i] ^ i;
+        fprintf(out,"Bootblock Checksum: %08x\n",         bootblockchecksum);
+    } else { fprintf(out,"Not bootable\n"); }
+    
+
+fprintf(out,"-----------------------------------------------------------------------------\n");
 
 }
 

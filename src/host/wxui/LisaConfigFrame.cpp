@@ -108,8 +108,8 @@ void LisaConfigFrame::check_and_fix_serial_checksum(void)  // messagebox string 
 
     if (stored_checksum != calculated_checksum ) {
         wxString text="The checksum in this serial # is incorrect, shall I fix it for you?";
-        wxString title="Invalid serial number"; title << t;
-        wxMessageDialog w(my_lisawin,"The checksum in this serial # is incorrect, shall I fix it for you?",
+        wxString title="Invalid serial number";
+        wxMessageDialog w(this,"The checksum in this serial # is incorrect, shall I fix it for you?",
                                  "Invalid checksum in serail #", wxICON_QUESTION  | wxYES_NO |wxNO_DEFAULT,wxDefaultPosition );
         if (w.ShowModal()==wxID_YES) {
            sn2[1]=calculated_checksum / 100; calculated_checksum = calculated_checksum % 100;
