@@ -18,13 +18,13 @@ void process(char *Image) {
 
   if (!Image)  {fprintf(stderr,"No image name passed\n");                     return;}
 
-  if (dc42_auto_open(&F,Image,"p")) 
+  if (dc42_auto_open(&F,Image,"wb"))
      {
-       fprintf(stderr,"could not open: '%s' because:%s\n",Image,F.errormsg); 
+       fprintf(stderr,"xxxxxxxx could not open: '%s' because:%s\n",Image,F.errormsg); 
 		 perror("\n"); return;
      }
 
-  if  (!dc42_has_tags(&F)) {fprintf(stderr,"%s has no tags, non-bootable\n"); return;}
+//  if  (!dc42_has_tags(&F)) {fprintf(stderr,"XXXXXXXX Non-bootable: NO TAGS %s\n",Image); return;}
 
   uint8 *tag=dc42_read_sector_tags(&F,0);
   if  (tag[4]==0xaa && tag[5]==0xaa)
@@ -33,7 +33,7 @@ void process(char *Image) {
           uint32 bootblockchecksum=0;
           for (uint32 i=0; i<512; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ sec[i] ^ i;
           fprintf(stdout,"%08x %s\n",  bootblockchecksum, Image);
-      } else { fprintf(stdout,"Non-bootable: %s\n",Image); }
+      } else { fprintf(stdout,"xxxxxxxx Non-bootable: %s\n",Image); }
 
   dc42_close_image(&F);
 }

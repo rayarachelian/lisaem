@@ -37,7 +37,7 @@ fi
     STABILITY="LiveDev"                   # DEVELOP, ALPHA, BETA, RC1, RC2, RC3...
                                           # RELEASE/PRODUCTION - PRE-* keep short
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2022.10.04"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2022.10.05"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -403,6 +403,10 @@ for j in $@; do
  --no-sound)
 	    export NOSOUND="-D NOSOUND"                              
 	    export EXTRADEFINES="${EXTRADEFINES} -DNOSOUND"          ;;
+ --no-openal)
+	    unset USEOPENAL
+	    export NOOPENAL="yes"                                    ;;
+
 
  --trace*on-start)
             export LIBGENOPTS="$LIBGENOPTS --debug --trace-on-start -DDEBUGLOG_ON_START"
@@ -498,6 +502,7 @@ Options:                (can skip '--with-', or use '--no-' instead of '--withou
 --with-static           Enables a static compile
 --without-static        Enables shared library compile (not recommended)
 --without-sound         Disable all sound playback in LisaEm
+--without-openal        Disable using OpenAL (will default to wxSound)
 --without-optimize      Disables optimizations
 --without-upx           Disables UPX compression (no upx on some macos x)
 --without-strip         Disable strip when compiling without debug
@@ -570,7 +575,8 @@ export  PHASE2LIST="\
         src/host/wxui/z8530-terminal"
 # change ^- hq3x vs hq3x-3x here as needed as well as the #define
 
-[[ -n "$USEOPENAL" && -z "$NOSOUND" ]] && export PHASE2LIST="$PHASE2LIST src/host/wxui/LisaEmSoundOpenAl"
+
+[[ -n "$USEOPENAL" && -z "$NOSOUND" ]] && export PHASE2LIST="$PHASE2LIST src/host/wxui/LisaEmSoundOpenAL"
 
 [[ -n "${WITHDEBUG}${WITHTRACE}" ]] && if [[ -n "$INSTALL" ]];
 then

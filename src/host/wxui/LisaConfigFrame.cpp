@@ -78,7 +78,7 @@ This is the AppleNet number of the machine that did the serializing. Perhaps you
 to the line that prints information about tools, as well?
 */
 
-uint16 LisaConfigFrame::get_sn_stored_checksum_bytes(uint8 *sn2)   { return (sn2[24] * 100 + sn2[25] *10 + sn2[26]); }
+uint16 LisaConfigFrame::get_sn_stored_checksum_bytes(uint8 *sn2) { return (sn2[24] * 100 + sn2[25] *10 + sn2[26]); }
 
 uint16 LisaConfigFrame::get_sn_checksum_bytes(uint8 *sn2) { // based on the "H" ROM Source code @ 0cb2
        uint16 d2=0;
@@ -87,41 +87,42 @@ uint16 LisaConfigFrame::get_sn_checksum_bytes(uint8 *sn2) { // based on the "H" 
 }
 
 
-
 void LisaConfigFrame::check_and_fix_serial_checksum(void)  // messagebox string of text, title
 {
-    uint8 sn2[16];                          //  0 1 2 3 4 5 6 7 8 9 a b c d e f
+    uint8 sn2[32];                          //  0 1 2 3 4 5 6 7 8 9 a b c d e f
     wxString myserno=serialtxt->GetValue(); // ff000000000000ff0000000000000000
-    wxString hexserno, decserno;
+    wxString hexserno, decserno;            // FF999999999999FF9999999918995D2C
     unsigned long serno_i=0;
 
-    for  (int i=0; i<16; i++) {
-         hexserno=_T("0x") + myserno.SubString(i,2); // serial number
-         hexserno.ToULong(&serno_i,16);
-         sn2[i]=(uint8) serno_i;
+    fprintf(stderr,"Original Serial #",serno_i);
+    for  (int i=0; i<32; i++) {
+          hexserno=myserno.SubString(i,i); // serial number
+          hexserno.ToULong(&serno_i,16);
+          fprintf(stderr,"%01x",serno_i);
+          sn2[i]=(uint8) serno_i & 0x0f;
     }
+    fprintf(stderr,"\n");
 
-    sn2[0]=0xff; sn2[7]=0xff; // force/correct sync bytes, must be ff
-
-    uint16 stored_checksum    =get_sn_stored_checksum_bytes(sn2);
-    uint16 calculated_checksum=get_sn_checksum_bytes(sn2);
+    uint16 stored_checksum     = get_sn_stored_checksum_bytes(sn2);
+    uint16 calculated_checksum = get_sn_checksum_bytes(sn2);
 
     if (stored_checksum != calculated_checksum ) {
-        wxString text="The checksum in this serial # is incorrect, shall I fix it for you?";
-        wxString title="Invalid serial number";
-        wxMessageDialog w(this,"The checksum in this serial # is incorrect, shall I fix it for you?",
-                                 "Invalid checksum in serail #", wxICON_QUESTION  | wxYES_NO |wxNO_DEFAULT,wxDefaultPosition );
-        if (w.ShowModal()==wxID_YES) {
-           sn2[1]=calculated_checksum / 100; calculated_checksum = calculated_checksum % 100;
-           sn2[2]=calculated_checksum / 10;  calculated_checksum = calculated_checksum % 10;
-           sn2[3]=calculated_checksum;
+        sn2[24]=calculated_checksum / 100; calculated_checksum = calculated_checksum % 100;
+        sn2[25]=calculated_checksum / 10;  calculated_checksum = calculated_checksum % 10;
+        sn2[26]=calculated_checksum;
+        
+        char *hex="0123456789ABCDEF";
+        char fixed_serno[33];
+        for (int i=0; i<32; i++) fixed_serno[i]=hex[sn2[i]];
+        fixed_serno[32]=0;
 
-           myserno="";
-           for  (int i=0; i<16; i++) {
-                myserno << wxString::Format(wxT("%02x"),sn2[i]);
-           }
-           serialtxt->SetValue(myserno);
-        }
+        wxString fixedserno=fixed_serno;
+        wxString text="The checksum in this serial #" + myserno + " has an incorrect checksum,\nA corrected Serial # would be:" + fixedserno +
+                     " shall I correct it for you?";
+        wxString title="Invalid Lisa Serial Number - Bad Checksum";
+        wxMessageDialog w(this, text, title, wxICON_QUESTION  | wxYES_NO |wxNO_DEFAULT,wxDefaultPosition );
+
+        if (w.ShowModal()==wxID_YES) { serialtxt->SetValue(fixedserno); }
     }
 }
 

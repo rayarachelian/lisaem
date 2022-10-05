@@ -2,6 +2,13 @@
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
+2022.10.04 - added --no-sound and --no-openal options to build.sh
+
+2022.09.30 - merged in fixes from Tom Frikker to lisafsh-tool and
+             los-deserialize
+
+2022.09.23 - added "livedev" branch to github
+
 2022.09.12 - added LOS FS 1.x, 2.x directory listing to lisafsh-tool, but
              missing file size.
 

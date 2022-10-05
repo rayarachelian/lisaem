@@ -26,18 +26,17 @@ ${COMPILE} 2>&1 || exit $?
 
 #env       >>/tmp/cc-strip-upx.txt
 
-#COMPILEDSIZE="  Compiled size:        $( printf '%-32s %s %s ' "${app}" $(ls -lh ${fullapp} 2>/dev/null | awk '{print $5}' )) "
-COMPILEDSIZE="  Compiled size:        $( printf '%s %s ' $(ls -lh ${fullapp} 2>/dev/null | awk '{print $5}' )) "
+COMPILEDSIZE="  Compiled size: $( printf '%8s %s ' $(ls -lh ${fullapp} 2>/dev/null | awk '{print $5}' )) "
 
 if [[ -z "$WITHOUTSTRIP" ]] && [[ -n "$STRIP" ]]; then
    "$STRIP" "${fullapp}" 2>/dev/null
-   COMPILEDSIZE="$COMPILEDSIZE stripped: $( printf '%-5s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) "
+   COMPILEDSIZE="$COMPILEDSIZE stripped: $( printf '%-8s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) "
    flag="yes"
 fi
 
 if [[ -z "$WITHOUTUPX" ]] && [[ -n "$UPXCMD" ]]; then
    "${TLD}/bashbuild/upxcmd.sh" "$UPXCMD" "${fullapp}"
-   COMPILEDSIZE="$COMPILEDSIZE UPX Size $( printf '%-5s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) "
+   COMPILEDSIZE="$COMPILEDSIZE UPX Size $( printf '%-8s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) "
    flag="yes"
 fi
 
@@ -46,7 +45,7 @@ fi
 [[ -n "$SHA256"  ]] && $SHA256  $HASOPTS "${fullapp}" >>hashes.txt 2>/dev/null
 echo                                                  >>hashes.txt 2>/dev/null
 
-[[ -n "$flag" ]] && COMPILEDSIZE="$COMPILEDSIZE Final: $( printf '%-5s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) $app"
+[[ -n "$flag" ]] && COMPILEDSIZE="$COMPILEDSIZE Final: $( printf '%-8s %s ' $(ls -lh ${fullapp}  2>/dev/null | awk '{print $5}' )) $app"
 
 echo "$COMPILEDSIZE" 1>&2
 #echo "COMPILEDSIZE: $COMPILEDSIZE"             >>/tmp/cc-strip-upx.txt
