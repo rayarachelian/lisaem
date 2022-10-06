@@ -1578,9 +1578,9 @@ extern void on_lisa_exit(void);
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #define ALERT_LOG( level, fmt, args... )                                                         \
     { if ( (level <= DEBUGLEVEL) ) {                                                             \
-            fprintf((buglog ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);        \
-            fprintf((buglog ? buglog:stderr),  fmt , ## args);                                   \
-            fprintf((buglog ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                        \
+            fprintf((buglog!=NULL ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);  \
+            fprintf((buglog!=NULL ? buglog:stderr),  fmt , ## args);                             \
+            fprintf((buglog!=NULL ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                  \
                           lisa_clock.hours_h,lisa_clock.hours_l,                                 \
                           lisa_clock.mins_h,lisa_clock.mins_l,                                   \
                           lisa_clock.secs_h,lisa_clock.secs_l,                                   \

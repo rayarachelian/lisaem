@@ -298,9 +298,7 @@ void do_profile_read(ProFileType *P, uint32 block)
 {
     //uint16 i,j;
     uint8 *blk;
-    //#ifdef DEBUG
     uint32 oblock=block;
-    //#endif
 
     if (!P                 ) {ALERT_LOG(0,"ProfileType P is null!"); return;}    // no image is opened!
     if (!P->DC42.sectorsize) {ALERT_LOG(0,"Profile sector size is 0!"); return;}
@@ -1225,9 +1223,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
-
-         DEBUG_LOG(0,"State:8 - wait for 3rd 0x55 - write:bsy:%d, PA=%02x CMD:%d",P->BSYLine,P->VIA_PA,P->CMDLine);
+         if (!(EVENT_WRITE_NUL)) DEBUG_LOG(0,"State:8 - wait for 3rd 0x55 - write:bsy:%d, PA=%02x CMD:%d",P->BSYLine,P->VIA_PA,P->CMDLine);
          #endif
 
          CHECK_PROFILE_LOOP_TIMEOUT;
@@ -1252,8 +1248,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
     case WRITE_BLOCK_STATE:                    // 8  // do the write and waste some time
          #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
-         DEBUG_LOG(0,"State:9 - write and waste more time (%d)",PROFILE_WAIT_EXEC_CYCLE);
+         if (!(EVENT_WRITE_NUL)) DEBUG_LOG(0,"State:9 - write and waste more time (%d)",PROFILE_WAIT_EXEC_CYCLE);
          #endif
          if ( !TIMEPASSED_PROFILE_LOOP(HUN_THOUSANDTH_OF_A_SEC*5) ) return;
 
@@ -1263,8 +1258,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
                      (P->DataBlock[6]<< 8) |
                      (P->DataBlock[7]    ) ;
 
-         #ifdef DEBUG
-                                                      //   0    1   2     3    4      5    6   7      8    9   10   11   12   13   14  15
+         #ifdef DEBUG                                                      //   0    1   2     3    4      5    6   7      8    9   10   11   12   13   14  15
           DEBUG_LOG(0,"Writing block#%d,0x%06x - buffer: %02x.%02x.%02x.%02x(%02x )[%02x %02x %02x]:%02x:%02x|%02x %02x %02x %02x %02x %02x",
             blocknumber, blocknumber,
             P->DataBlock[ 0],
@@ -1307,7 +1301,6 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
             P->DataBlock[522+ 18],
             P->DataBlock[522+ 19]
             );
-
          #endif
 
          do_profile_write(P,blocknumber);
@@ -1417,6 +1410,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) 
              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
+
          P->BSYLine=0;
 
          if (EVENT_WRITE_NUL || EVENT_READ_IRB) return;

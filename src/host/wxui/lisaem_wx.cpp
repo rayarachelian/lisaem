@@ -585,6 +585,8 @@ enum
 
     ID_EMULATION_TIMER,
 
+    ID_THROTTLE0_25,
+    ID_THROTTLE0_5,
     ID_THROTTLE1,
     ID_THROTTLE5,
     ID_THROTTLE8,
@@ -780,6 +782,8 @@ public:
     void OnThrottle256(wxCommandEvent& event);
 
     #ifdef DEBUG
+    void OnThrottle0_25(wxCommandEvent& event);
+    void OnThrottle0_5(wxCommandEvent& event);
     void OnThrottle1(wxCommandEvent& event);
     void OnThrottle512(wxCommandEvent& event);
     #endif
@@ -857,35 +861,35 @@ public:
 
     wxStopWatch runtime;               // idle loop stopwatch
     wxStopWatch soundsw;
-    int soundplaying;
+    int         soundplaying;
 
-    uint16 lastt2;
-    long    last_runtime_sample;
-    long    last_display_sample;
-    long    last_decisecond;
-    XTIMER clx;
-    XTIMER lastclk;
-    XTIMER cpu68k_reference;
-    XTIMER last_runtime_cpu68k_clx;
-    int dwx,dwy;
+    uint16      lastt2;
+    long        last_runtime_sample;
+    long        last_display_sample;
+    long        last_decisecond;
+    XTIMER      clx;
+    XTIMER      lastclk;
+    XTIMER      cpu68k_reference;
+    XTIMER      last_runtime_cpu68k_clx;
+    int         dwx,dwy;
 
-    float          throttle;
-    float          clockfactor;
-    float          mhzactual;
+    float       throttle;
+    float       clockfactor;
+    float       mhzactual;
 
-    wxString floppy_to_insert;
-    long lastcrtrefresh;
-    long hostrefresh;
-    long onidle_calls;
-    XTIMER cycles_wanted;
+    wxString    floppy_to_insert;
+    long        lastcrtrefresh;
+    long        hostrefresh;
+    long        onidle_calls;
+    XTIMER      cycles_wanted;
 
-    wxString skindir;
-    wxString skinname;
-    wxString resdir;
-    wxString osslash;
+    wxString    skindir;
+    wxString    skinname;
+    wxString    resdir;
+    wxString    osslash;
 
-    wxTimer* m_emulation_timer;
-    int barrier;
+    wxTimer*    m_emulation_timer;
+    int         barrier;
     DECLARE_EVENT_TABLE()
 };
 
@@ -973,6 +977,8 @@ BEGIN_EVENT_TABLE(LisaEmFrame, wxFrame)
     EVT_MENU(ID_RAWKBBUF,        LisaEmFrame::OnRAWKBBUF)
 
     #ifdef DEBUG
+    EVT_MENU(ID_THROTTLE0_25,    LisaEmFrame::OnThrottle0_25)
+    EVT_MENU(ID_THROTTLE0_5,     LisaEmFrame::OnThrottle0_5)
     EVT_MENU(ID_THROTTLE1,       LisaEmFrame::OnThrottle1)
     EVT_MENU(ID_THROTTLEX,       LisaEmFrame::OnThrottle512)
     #endif
@@ -6345,6 +6351,13 @@ Throttle_MENU(256);
 #ifdef DEBUG
 Throttle_MENU(1);
 Throttle_MENU(512);
+
+  void LisaEmFrame::OnThrottle0_5(wxCommandEvent &WXUNUSED(event)) \
+    {  throttle = 0.5; reset_throttle_clock(); save_global_prefs(); update_menu_checkmarks(); ALERT_LOG(0,"Set CPU to %f MHz",throttle);}
+
+  void LisaEmFrame::OnThrottle0_25(wxCommandEvent &WXUNUSED(event)) \
+    {  throttle = 0.5; reset_throttle_clock(); save_global_prefs(); update_menu_checkmarks(); ALERT_LOG(0,"Set CPU to %f MHz",throttle);}
+
 #endif
 
 extern "C" void messagebox(char *s, char *t)  // messagebox string of text, title
@@ -6473,11 +6486,14 @@ void update_menu_checkmarks(void)
             }
 
         #ifdef DEBUG
-            throttleMenu->Check(ID_THROTTLEX,   my_lisaframe->throttle == 512 );
-            throttleMenu->Check(ID_THROTTLE1,   my_lisaframe->throttle ==  1.0);
+            throttleMenu->Check(ID_THROTTLEX,    my_lisaframe->throttle == 512.0 );
+            throttleMenu->Check(ID_THROTTLE1,    my_lisaframe->throttle ==   1.0 );
+            throttleMenu->Check(ID_THROTTLE0_5,  my_lisaframe->throttle ==   0.5 );
+            throttleMenu->Check(ID_THROTTLE0_25, my_lisaframe->throttle ==   0.25);
+
         #else
-            if (my_lisaframe->throttle>256.0) my_lisaframe->throttle=256.0;    
-        #endif
+            if (my_lisaframe->throttle>256.0)    my_lisaframe->throttle  =  256.0;    
+        #endif 
 
             throttleMenu->Check(ID_THROTTLE5,    my_lisaframe->throttle ==  5.0);
             throttleMenu->Check(ID_THROTTLE8,    my_lisaframe->throttle ==  8.0);
@@ -7179,6 +7195,8 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     #endif
 
     #ifdef DEBUG
+    throttleMenu->AppendRadioItem(ID_THROTTLE0_25,    wxT("0.25 MHz"),wxT("0.25 MHz - Slowdown for debugging") );
+    throttleMenu->AppendRadioItem(ID_THROTTLE0_5,     wxT("0.50 MHz"),wxT("0.50 MHz - Slowdown for debugging") );
     throttleMenu->AppendRadioItem(ID_THROTTLE1,       wxT("1 MHz")  , wxT("1 MHz - Slowdown for debugging") );
     #endif
     throttleMenu->AppendRadioItem(ID_THROTTLE5,       wxT("5 MHz")  , wxT("5 MHz - Stock Lisa Speed, recommended.") );

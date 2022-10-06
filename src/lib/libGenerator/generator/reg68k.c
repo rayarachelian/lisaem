@@ -1485,11 +1485,14 @@ void a_line(void) {  // this is invoked from cpu68k-a.c before the vector is tak
 
       default:
             {
+              return;
               #ifdef DEBUG
               #ifndef __MSVCRT__
               uint32 straddrp = reg68k_regs[8+7]+0; // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               uint32 straddr  = lisa_ram_safe_getlong(context,straddrp); // this is usually odd so have to use fetchbyte, most likely this was a pString which had a length byte ahead of it
               uint8 size=lisa_ram_safe_getbyte(context,straddr); if (size==0xaf) return;
+              
+              if (!buglog) return;
               fprintf(buglog,"ALINE:%08x:%016llx: A7=%08x\n",alineopcode,(long long)cpu68k_clocks,straddrp);
 
               for (int i=0; i<32; i+=2)

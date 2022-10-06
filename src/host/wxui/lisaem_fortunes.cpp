@@ -1649,6 +1649,7 @@ char *get_welcome_fortune(void)
   "The end will justify the means, but in the end it stays the same",
   "I've fallen out of touch with who you think I am",
   "I can't pretend to care about how this will end",
+  "Grayscale eyes slide, from black to white, lived through dark days, stillness in a crashing wave",
 
   "I am the son and the heir Of a shyness that is criminally vulgar...  Of nothing in particular",
   "shut your mouth, how can you say I go about things the wrong way?  I am human and I need to be loved Just like everybody else does",

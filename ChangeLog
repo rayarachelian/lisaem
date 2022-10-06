@@ -1,6 +1,15 @@
 ------------------------------------------------------------------------------
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
+2022.10.06 - fixed files with CRLF endings in repo
+
+           - added 0.25MHz and 0.5MHz throttle for --tracelog enabled builds
+             this is useful because Wayland doesn't update the display
+             otherwise and it's hard to isolate turning tracelog on/off at
+             the right times using Right-Click. So the fix is to set 0.25MHz
+             right before turning on tracelog.
+
+2022.10.05 - debugging LOS 2.0 install issues writing to ProFile HD
 
 2022.10.04 - added --no-sound and --no-openal options to build.sh
 
