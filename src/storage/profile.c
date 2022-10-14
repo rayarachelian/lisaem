@@ -1408,7 +1408,8 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          CHECK_PROFILE_LOOP_TIMEOUT;
 
-         if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) 
+         if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING ||
+             running_lisa_os==LISA_OFFICE_RUNNING ) //2022.10.14
              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
 
          P->BSYLine=0;

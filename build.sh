@@ -37,7 +37,7 @@ fi
     STABILITY="LiveDev"                   # DEVELOP, ALPHA, BETA, RC1, RC2, RC3...
                                           # RELEASE/PRODUCTION - PRE-* keep short
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2022.10.06"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2022.10.14"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
