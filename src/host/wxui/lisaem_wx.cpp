@@ -2856,7 +2856,7 @@ void save_global_prefs(void)
 }
 
 
-void LisaEmFrame::SetStatusBarText(wxString &msg) {SetStatusText(msg,0);}
+void LisaEmFrame::SetStatusBarText(wxString &msg) {if (!!msg && !!my_lisaframe) SetStatusText(msg,0);}
 
 DECLARE_APP(LisaEmApp)           // Implements LisaEmApp& GetApp()
 IMPLEMENT_APP(LisaEmApp)         // Give wxWidgets the means to create a LisaEmApp object //valgrind reports:: Conditional jump or move depends on uninitialised value(s)
@@ -7338,7 +7338,6 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
 
     ALERT_LOG(0,"Welcome status")
 
-//    SetStatusText(wxT("Welcome to the Lisa Emulator Project!"));
     char *t=get_welcome_fortune();
     SetStatusText(t);
     soundplaying=0;

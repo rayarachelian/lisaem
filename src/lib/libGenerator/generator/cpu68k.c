@@ -851,7 +851,7 @@ t_ipc_table *get_ipct(uint32 address)
             }
     }
 
-#ifdef DEBUG
+#ifdef XXXDEBUG
         for (long i=0; i<iipct_mallocs; i++)
           for (long s=0; s<sipct_mallocs[i]; s++ )
           {

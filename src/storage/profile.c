@@ -1408,7 +1408,8 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          CHECK_PROFILE_LOOP_TIMEOUT;
 
-         if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING ||
+         // this needs to be turned on for LOS 2.0, *BUT* not 3.x! Need a reliable way to detect LOS version #
+         if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING  ||
              running_lisa_os==LISA_OFFICE_RUNNING ) //2022.10.14
              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
 
@@ -1422,7 +1423,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
             {
              P->VIA_PA=P->DataBlock[P->indexread++]; if (P->indexread>3) P->indexread=0;
              P->last_a_accs=0;
-             SET_PROFILE_LOOP_TIMEOUT(HALF_OF_A_SECOND);   // reset timeout  // was FIFTH_OF_A_SECOND
+             SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND);   // reset timeout  // was FIFTH_OF_A_SECOND
              DEBUG_LOG(0,"Returning %02x from index:%d",P->VIA_PA,P->indexread-1);
             }
          }

@@ -313,7 +313,15 @@ int check_running_lisa_os(void)
 
    #ifdef REPORT_OS
    v1v2cycles++;
-   if  (v1v2cycles>20) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x PC24:@%08x\n",v1,v2,bootblockchecksum,pc24); v1v2cycles=0; }
+   if  (v1v2cycles>20) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x PC24:@%08x\n",v1,v2,bootblockchecksum,pc24); v1v2cycles=0; 
+      uint32 last=0;
+      for (uint32 addr=0x68+4; addr<0x3fc; addr+=4)
+          {
+            uint32 v=lisa_ram_safe_getlong((uint8)1,(uint32)addr);
+            if (last!=v) ALERT_LOG(0,"vector at %08x = %08x",addr,v);
+          }
+   ALERT_LOG(0,"------------------------------------------------------------------------------------------");
+   }
    #endif
 
    if  ((v1 & 0x00ff0000) ==0x00fe0000  && (v2 & 0x00ff0000)==0x00fe0000)           // Lisa ROM
@@ -416,6 +424,8 @@ int check_running_lisa_os(void)
 
    running_lisa_os=UNKNOWN_OS_RUNNING;
    ALERT_LOG(0,"Unknown OS Running: v1=%08x v2=%08x; test1,2,3: %08x, %08x, %08x bootblockchecksum:%08x",v1,v2,test1, test2, test3, bootblockchecksum);
+
+
    return running_lisa_os;
 }
 
