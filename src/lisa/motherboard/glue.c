@@ -298,7 +298,28 @@ static int v1v2cycles=0;
 extern void apply_xenix_hle_patches(void);
 extern void apply_monitor_hle_patches(void);
 
-
+void get_los_version_from_mddf(DC42ImageType *F)
+{
+  int blk;
+  uint8 *data=NULL, *tag=NULL;
+  uint8 fsver=0;
+  for (blk=20; blk<128; blk++) {
+      tag=dc42_read_sector_tags(F,blk);
+      if (tag[4]==0 && tag[5]==1) {
+         data=dc42_read_sector_data(F,blk);
+         fsver=data[1];
+         running_lisa_os_version=0;
+         switch(fsver) {
+            case 0x0e: running_lisa_os_version=0x10; break; // LOS1x
+            case 0x0f: running_lisa_os_version=0x20; break; // LOS20
+            case 0x11: running_lisa_os_version=0x30; break; // LOS3x
+         }
+         ALERT_LOG(0,"Found LOS FS version MDDF at block #%d, LOS version is %02x FS version is %02x",blk,running_lisa_os_version, fsver);
+         return;
+      }
+  }
+  ALERT_LOG(0,"Could not find MDDF, so cannot tell what OS version.");  
+}
 
 // ::TODO:: fill out running_lisa_os_version wherever possible
 int check_running_lisa_os(void)
@@ -313,14 +334,14 @@ int check_running_lisa_os(void)
 
    #ifdef REPORT_OS
    v1v2cycles++;
-   if  (v1v2cycles>20) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x PC24:@%08x\n",v1,v2,bootblockchecksum,pc24); v1v2cycles=0; 
-      uint32 last=0;
-      for (uint32 addr=0x68+4; addr<0x3fc; addr+=4)
-          {
-            uint32 v=lisa_ram_safe_getlong((uint8)1,(uint32)addr);
-            if (last!=v) ALERT_LOG(0,"vector at %08x = %08x",addr,v);
-          }
-   ALERT_LOG(0,"------------------------------------------------------------------------------------------");
+   if  (v1v2cycles>20) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x, running_lisa_os_version:%02x, PC24:@%08x\n",v1,v2,bootblockchecksum,running_lisa_os_version, pc24); v1v2cycles=0; 
+      //uint32 last=0;
+      //for (uint32 addr=0x68+4; addr<0x3fc; addr+=4)
+      //    {
+      //      uint32 v=lisa_ram_safe_getlong((uint8)1,(uint32)addr);
+      //      if (last!=v) ALERT_LOG(0,"vector at %08x = %08x",addr,v);
+      //    }
+      // ALERT_LOG(0,"------------------------------------------------------------------------------------------");
    }
    #endif
 

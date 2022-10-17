@@ -742,9 +742,12 @@ static void do_floppy_read(DC42ImageType *F)
         ptr=dc42_read_sector_data(F,sectornumber);  if (!ptr) {DEBUG_LOG(0,"Could not read sector #%ld",sectornumber); return;}
         memcpy(&floppy_ram[DISKDATASEC],ptr,F->datasize);
 
-        if (sectornumber==0) {
+
+        extern void get_los_version_from_mddf(DC42ImageType *F);
+        if (sectornumber==0 && (bootblockchecksum==0 || ((pc24 & 0x00ff000)==0x00fe0000))) {
             bootblockchecksum=0;
             for (uint32 i=0; i<F->datasize; i++) bootblockchecksum=( (uint32)(bootblockchecksum<<1) | ((uint32)(bootblockchecksum & 0x80000000) ? 1:0) ) ^ (uint32)ptr[i] ^ i;
+            get_los_version_from_mddf(F);
         }
 
         DEBUG_LOG(0,"reading tags for sector %d",sectornumber);
