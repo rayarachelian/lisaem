@@ -1,6 +1,13 @@
 ------------------------------------------------------------------------------
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
+
+2022.10.19 - possible hacky fix for opening some UTF8 file path issues such
+             as 'Système de Bureau 2.0F I.dc42' - tested to work on Linux
+             so far
+
+2022.10.06 - 2022.10.13 ER/Hospital stay
+
 2022.10.06 - fixed files with CRLF endings in repo
 
            - added 0.25MHz and 0.5MHz throttle for --tracelog enabled builds

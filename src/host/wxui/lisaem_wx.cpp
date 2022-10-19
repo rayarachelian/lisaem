@@ -5452,6 +5452,9 @@ int initialize_all_subsystems(void);
 
 void handle_powerbutton(void)
 {
+      if (my_lisawin==NULL) return;
+      if (my_lisaframe==NULL) return;
+
       ALERT_LOG(0,"======== ENTRY ================");
       ALERT_LOG(0,"powerstate: %d",my_lisawin->powerstate);
       ALERT_LOG(0,"running   : %d",my_lisaframe->running);
@@ -5579,9 +5582,9 @@ extern "C" void lisa_rebooted(void)
   buglog=fopen("lisaem-output.txt","a+");
 #endif
 
-  my_lisaframe->running=emulation_off;              // prevent init_all_subs from barking
-  my_lisawin->powerstate = POWER_OFF;               // will be turned back on immediately
-  handle_powerbutton();                             // back on we go.
+  if (my_lisaframe) my_lisaframe->running=emulation_off;              // prevent init_all_subs from barking
+  if (my_lisawin)   my_lisawin->powerstate = POWER_OFF;               // will be turned back on immediately
+  handle_powerbutton();                                               // back on we go.
   free_all_ipcts();
   //free(lisaram);
   //lisaram=NULL;
@@ -6733,12 +6736,31 @@ void LisaEmFrame::OnFLOPPY(wxCommandEvent& WXUNUSED(event)) {OnxFLOPPY();}
 void LisaEmFrame::insert_floppy_anim(wxString openfile)
 {
     if (!openfile.Len()) return;
-    const wxCharBuffer s = CSTR(openfile);
+
+    // this expression ( openfile.char_str(wxConvUTF8) ) returns a null string for say, 'Système de Bureau 2.0F I.dc42'
+    // breaking access on EU and other non-USA paths, including in Windows where the username 
+    // contains one of these UTF chars, same is likely true of ProFile paths stored in the user's home directory.
+    // returns: error 84: Invalid or incomplete multibyte or wide character
+    //
+    // error 84: Invalid or incomplete multibyte or wide character
+    //
+    // So have to do this crazy thing here, by opening wxFFile first, getting back the same filename, and converting that
+    // to UTF8, to get around "error 84: Invalid or incomplete multibyte or wide character" - not sure why this is so!
+
+    wxString i(openfile);
+    char f[16384];
+    wxFFile wff;
+    if  ( wff.Open(i,"r") ) {
+           strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
+           ALERT_LOG(0,"wff C string: :::%s:::",f);
+           wff.Close();
+    }
 
     if (my_lisaframe->running) {
-        if (floppy_insert((char *)(const char *)s)) return;
+        ALERT_LOG(0,"Inserting floppy:::%s:::",  f  );
+        if (floppy_insert(f)) return;
     } 
-    else 
+    else
     {
         floppy_to_insert = openfile;
     }
@@ -7747,7 +7769,16 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
           else return; // invalid via index
         }
 
-        t=strncpy(tmp,cSTR(file),MAXPATHLEN-1);
+        wxString ii(*file);
+        char f[16384];
+        wxFFile wff;
+        if  ( wff.Open(ii,"r") ) {
+               strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
+               ALERT_LOG(0,"wff C string: :::%s:::",f);
+               wff.Close();
+        }
+
+        t=strncpy(tmp,f,MAXPATHLEN-1);
         ALERT_LOG(0, "Attempting to attach VIA#%d to profile %s", v, tmp);
         if (!via[v].ProFile) via[v].ProFile = (ProFileType *)calloc(1,sizeof(ProFileType));  // valgrind reports leak here, but it's ok, just not freed before exit
 
@@ -7970,7 +8001,18 @@ int romlessboot_pick(void) //returns 0=profile, 1=floppy
   {
       if (!my_lisaframe->floppy_to_insert.Len()) my_lisaframe->OnxFLOPPY();
       if (!my_lisaframe->floppy_to_insert.Len()) return -1;  // if the user hasn't picked a floppy, abort.
-      int i=floppy_insert(CSTR(my_lisaframe->floppy_to_insert));
+
+      // have to do this crazy thing to get around an issue, see void LisaEmFrame::insert_floppy_anim(wxString openfile)
+      wxString ii(my_lisaframe->floppy_to_insert);
+      char f[16384];
+      wxFFile wff;
+      if  ( wff.Open(ii,"r") ) {
+             strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
+             ALERT_LOG(0,"wff C string: :::%s:::",f);
+             wff.Close();
+      }
+
+      int i=floppy_insert(f);
       wxMilliSleep(100);  // wait for insert sound to complete to prevent crash.
       if (i) { eject_floppy_animation(); return -1;}
       my_lisaframe->floppy_to_insert=_T("");
