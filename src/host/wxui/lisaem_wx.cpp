@@ -7082,7 +7082,8 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     
 #ifndef __WXOSX__
     ALERT_LOG(0,"Setting icon");
-    SetIcon( wxICON( lisa2icon ));
+    wxIcon lisaemicon(resdir+osslash+"lisaem.png",wxBITMAP_TYPE_ANY,-1,-1);
+    SetIcon( lisaemicon );
 #endif
 
     if (skins_on)

@@ -310,9 +310,9 @@ void get_los_version_from_mddf(DC42ImageType *F)
          fsver=data[1];
          running_lisa_os_version=0;
          switch(fsver) {
-            case 0x0e: running_lisa_os_version=0x10; break; // LOS1x
-            case 0x0f: running_lisa_os_version=0x20; break; // LOS20
-            case 0x11: running_lisa_os_version=0x30; break; // LOS3x
+            case 0x0e: running_lisa_os_version=0x10; running_lisa_os=LISA_OFFICE_RUNNING; break; // LOS1x
+            case 0x0f: running_lisa_os_version=0x20; running_lisa_os=LISA_OFFICE_RUNNING; break; // LOS20
+            case 0x11: running_lisa_os_version=0x30; running_lisa_os=LISA_OFFICE_RUNNING; break; // LOS3x
          }
          ALERT_LOG(0,"Found LOS FS version MDDF at block #%d, LOS version is %02x FS version is %02x",blk,running_lisa_os_version, fsver);
          return;
@@ -345,7 +345,7 @@ int check_running_lisa_os(void)
    }
    #endif
 
-   if  ((v1 & 0x00ff0000) ==0x00fe0000  && (v2 & 0x00ff0000)==0x00fe0000)           // Lisa ROM
+   if  ((v1 & 0x00ff0000) ==0x00fe0000  && (v2 & 0x00ff0000)==0x00fe0000 && bootblockchecksum==0)           // Lisa ROM
        {
             //if (lisa_os_mouse_x_ptr!=0x00000486) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 486",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
             lisa_os_mouse_x_ptr=0x00000486;   lisa_os_mouse_y_ptr=0x00000488;

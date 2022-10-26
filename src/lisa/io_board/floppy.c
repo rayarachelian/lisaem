@@ -744,7 +744,7 @@ static void do_floppy_read(DC42ImageType *F)
 
 
         extern void get_los_version_from_mddf(DC42ImageType *F);
-        if (sectornumber==0 && (bootblockchecksum==0 || ((pc24 & 0x00ff000)==0x00fe0000))) {
+        if (sectornumber==0 && (bootblockchecksum==0) ) {
             bootblockchecksum=0;
             for (uint32 i=0; i<F->datasize; i++) bootblockchecksum=( (uint32)(bootblockchecksum<<1) | ((uint32)(bootblockchecksum & 0x80000000) ? 1:0) ) ^ (uint32)ptr[i] ^ i;
             get_los_version_from_mddf(F);

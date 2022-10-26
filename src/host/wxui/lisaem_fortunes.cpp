@@ -208,6 +208,8 @@ char *get_welcome_fortune(void)
   "Quick! Hide in this closet!",
   "Round Rects! Round Rects! Round Rects!",
   "Under the surface we're not machines, under the surface we're living dreams",
+  "Look in my eyes, Look in my eyes, It's not over, I will survive, I will survive",
+  "Breathing new life now, I will regenerate",
   "I am the disruptor. Follow your own way. Nothing can define you. Break off, disobey. I refuse. I resist.",
   "...we're all emulations, in the end. Just make it a good one, eh?",
   "\"Jinkies! Old man Jobs tried to kill the Lisa!\" \"And I would have gotten away with it too if it weren't for you meddeling kids!\"",

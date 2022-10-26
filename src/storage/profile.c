@@ -354,7 +354,7 @@ void do_profile_read(ProFileType *P, uint32 block)
     if (blk!=NULL) memcpy( &(P->DataBlock[4+P->DC42.tagsize]), blk, P->DC42.datasize); //4
 
     extern void get_los_version_from_mddf(DC42ImageType *F);
-    if (block==0 && (bootblockchecksum==0 || ((pc24 & 0x00ff000)==0x00fe0000))) {
+    if (block==0 && (bootblockchecksum==0  )) {
         bootblockchecksum=0;
         for (uint32 i=0; i<P->DC42.datasize; i++) bootblockchecksum=( (bootblockchecksum<<1) | ((bootblockchecksum & 0x80000000) ? 1:0) ) ^ blk[i] ^ i;
         running_lisa_os_boot_device=2;
@@ -1410,7 +1410,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
          CHECK_PROFILE_LOOP_TIMEOUT;
 
-         // this needs to be turned on for LOS 2.0, *BUT* not 3.x! Need a reliable way to detect LOS version #
+         // this needs to be turned on for LOS 2.0, *BUT* not 3.x! 
          if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING  ||
              (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20) ) //2022.10.14
              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on

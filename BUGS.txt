@@ -1,10 +1,13 @@
 Here's a list of some of the current known issues, there are likely many others. Please report them on
 the LisaList2 forum, or github issues.
 
+
 * Windows - unicode chars in paths to Profile disks fail to work properly so the hard drive won't be found. Stick to all ASCII paths.
   If this is not possible because your user name contains UTF8, etc. please store your disk images in something like C:\LisaDisks, etc.
   (an ASCII only path) this is not an issue for macos, I suspect this is some wxwidgets string conversion issue that will take a significant
   work around to switch between wxWidgets wxStrings to C strings when communicating with libdc42 open fn's.
+2022.10.19 ^^^ this might be fixed now, but it's a big hack, not sure if it will work everywhere, or forever.
+
 * TerminalWx code isn't complete - xmodem is missing, font picker/color picker is missing.
 * serial port A is broken on Lisa Office System (causes a lockup on access to the port) so it's disabled by default, there's a build script option to force enable it anyway.
 * UniPlus kernel v1.4 from pre-installed disk images works, new installs fail because sunix kernel v1.1 isn't yet supported.
