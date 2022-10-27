@@ -224,9 +224,6 @@ char read_serial_port_pty(unsigned int port) {return 0;}
 int  poll_telnet_serial_read(int portnum)    {return 0;}
 #endif
 
-void write_serial_port_terminal(int port, uint8 data);
-char read_serial_port_terminal(int port);
-
 static inline void on_read_irq_handle(int port);
 
 /*
@@ -375,8 +372,8 @@ void scc_channel_reset_port(unsigned int port)
 }
 
 
-extern char read_serial_port_terminal(int port);
-extern void write_serial_port_terminal(int port, uint8 data);
+extern char read_serial_port_terminal(unsigned int port);
+extern void write_serial_port_terminal(unsigned int port, char data);
 
 void read_port_if_ready_nothing(unsigned int port) { (void)(port); return; }
 
@@ -941,10 +938,10 @@ void lisa_wb_Oxd200_sccz8530(uint32 address,uint8 data)
                                                    scc_fn[port].write_serial_port(port,data);
                                                    TX_BUFF_EMPTY(port);
 
-                                                   #ifdef DEBUG
-                                                   if (scc_fn[port].write_serial_port==write_serial_port_pty) ALERT_LOG(0,"sent to pty");
-                                                   if (scc_fn[port].write_serial_port==write_serial_port_nothing) ALERT_LOG(0,"sent to NOTHING!");
-                                                   #endif
+                                                   //#ifdef DEBUG
+                                                   //if (scc_fn[port].write_serial_port==write_serial_port_pty) ALERT_LOG(0,"sent to pty");
+                                                   //if (scc_fn[port].write_serial_port==write_serial_port_nothing) ALERT_LOG(0,"sent to NOTHING!");
+                                                   //#endif
                                                    }
           else                                    {ALERT_LOG(0,"write method is null, calling generic handler to write %02x",data);
                                                    write_serial_port(port,data);

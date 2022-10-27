@@ -1,8 +1,8 @@
 ###############################################################################
-#          Unified Build Script lib  -  A Part of LisaEm
+#             BashBuild Script lib  -  A Part of LisaEm
 #                    http://lisaem.sunder.net
 #                   The Lisa Emulator Project
-#   Copyright (C) 2010,2019 Ray A. Arachelian, All Rights Reserved
+#   Copyright (C) 2010, 2022 Ray A. Arachelian, All Rights Reserved
 # Released under the terms of the GNU General Public License 2.0
 #----------------------------------------------------------------
 #
@@ -163,8 +163,8 @@ if ! is_bashbuild_loaded 2>/dev/null; then
 fi
 #########################################################################################
 
-
-function strip_and_compress() {
+# obsolete?
+function x_strip_and_compress() {
   local app
 
   # there's some weird sync issues on my machine with zfs where du shows 512 bytes

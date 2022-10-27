@@ -2,12 +2,74 @@
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
-2022.04.01 - RC4
+2022.10.19 - possible hacky fix for opening some UTF8 file path issues such
+             as 'Système de Bureau 2.0F I.dc42' - tested to work on Linux
+             so far
+
+2022.10.06 - 2022.10.13 ER/Hospital stay
+
+2022.10.06 - fixed files with CRLF endings in repo
+
+           - added 0.25MHz and 0.5MHz throttle for --tracelog enabled builds
+             this is useful because Wayland doesn't update the display
+             otherwise and it's hard to isolate turning tracelog on/off at
+             the right times using Right-Click. So the fix is to set 0.25MHz
+             right before turning on tracelog.
+
+2022.10.05 - debugging LOS 2.0 install issues writing to ProFile HD
+
+2022.10.04 - added --no-sound and --no-openal options to build.sh
+
+2022.09.30 - merged in fixes from Tom Frikker to lisafsh-tool and
+             los-deserialize
+
+2022.09.23 - added "livedev" branch to github
+
+2022.09.12 - added LOS FS 1.x, 2.x directory listing to lisafsh-tool, but
+             missing file size.
+
+2022.09.09 - added mkvsrom, fixes to decode-vsrom
+
+           - added SN checksum test to LisaConfigFrame to prevent CPU board
+             error messages as per Tom Frikker
+
+2022.08.28 - Looking at directory structure of LOS 1.x and 2.x to use in 
+             lisafsh-tool + deserialize tools
+
+2022.08.15 - gathering ESC codes for ADWP, PJ1080A printers for ~v1.2.8
+
+2022.08.xx - more openAL work
+
+2022.07.15 - fix lisafsh-tool readline enter for next sector, q=quit
+
+           - optimize strip_and_compress in bashbuild to its own job
+             some display output issues on first and last line, but, 
+             works otherwise. (lisa tools)
+
+2022.06.20 - move wxSound to it's own .cpp via #include
+           - openAL sound support start - samples apps working,
+             now integrating w/LisaEm C++ code
+
+2022.06.14 - updates to libdc42 to load whole image in RAM for private
+             images - private allows r/w access but changes are discarded.
+
+2022.06.03 - switching sound to OpenAL on platforms where it's available
+             (trying to avoid OpenAL-libalure as it doesn't build on 10.5
+             with macports properly.)
+
+2022.05.26 - added dc42-checksum tool - report + fix DC42 checksums
+
+2022.05.15 - sound issues on Ubuntu 22.04 w/Pipewire, OSSPD, etc.
+
+2022.04.05 - font picker for TerminalWx + preferences save
+
+2022.04.01 - RC4 - has dc42/floppy issues on macos and windows, do not use
 
 2022.03.31 - add alt-icons from Andrew Yaros posted here: 
              https://lisalist2.com/index.php/topic,52.msg1909.html#msg1909
+
            - added GNU readline/history support for lisafsh-tool on systems
-	           where the library is pre-installed in /usr/local and is static
+             where the library is pre-installed in /usr/local and is static
 
 2022.03.30 - windows build fixes
 
@@ -16,8 +78,9 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 2022.03.12 - Monitor OS 0.12.3 work now
 
 2022.03.06 - Work on getting TerminalWx window for Monitor OS 0.12.3             
+
            - TerminalWx window for Xenix but not quite right, 
-             (Xenix doesn't boot yet, this is for the future)
+             (Xenix doesn't fully boot yet, this is for the future)
 
 2022.03.03 - TerminalWx Window for LPW via SOROC->VT100 translation
 
@@ -39,10 +102,12 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 
 2021.10.23 - added classic Solaris package creation for OpenIndiana, i.e.:
              pkg_add -i . SUNDERNETlisaem.1.2.7.OI_2021.04.x86-64.pkg
+
            - added IPS Solaris package creation for OpenIndiana
 
 2021.10.22 - added FreeBSD package + port prototype (on FreeBSD 13) and
              scripts/build-wx3.1.5-gtk updates
+
            - added Solaris/OpenIndiana compile/build support and
              scripts/build-wx3.1.5-gtk updates
 
@@ -75,9 +140,11 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 
 2021.09.06 - added back lost --diet option to macos lisaem.sh option to remove
              unusable obese/universal binaries on your specific system.
+
            - modifications to allow cross platform build from x86_64 to M1 arm
 
 2021.09.03 - fix macos missing ptsname_r (only exists in linux)
+
            - unstable push
 
 2021.08.24 - added "Select existing ProFile" option when ProFile hard disk
@@ -220,21 +287,28 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              Serial A port for now.
 
 2020.11.26 - more guard code around xon/xoff handling
+
            - rewrote SCC reconnect/disconnect code for ROM SCC tests vs LOS
+
            - SCC port B xon/xoff now works properly
 
 2020.11.22 - found a bug in the EXITR macro and fixed it
+
            - using the new MMU code MacWorks XL starts up
+
            - verified + fixed high contrast turns display yellow in MonitorOS
 
 2020.11.19 - rewrote 3 MMU ea code candidates + wrote testers
 
 2020.11.08 - found a possible MMU bug where stack space is incorrect via
              debugging uniplus crashing
+
            - monitor OS was crashing on boot
+
            - MacWorks was crashing on boot
              
 2020.11.06 - fixed Xenix pfcmd bad state: 0306 but Xenix still doesn't start
+
            - enabled illegal instructions to follow the ILLEGAL trap, this
              got UniPlus to get further along, but double panics on startup
 
@@ -251,6 +325,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
              receiving mouse up events, though they are being sent, making
              windows drag. Also it seems it only notices mouse movement
              on mouse down rather than all mouse move events.
+
            - even though pty code uses a 32K buffer for serial ports, we get
              cut off after about 30 or so chars, so ls -l on host via
              LisaTerm gets cut off. Need some way to limit number of times
@@ -265,10 +340,14 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 2020.08.28 - fixed crash on reboot caused by freeing lisaram
 
 2020.08.23 - fixed lisaem.sh CPU name on PowerPC
+
            - fixed crash on ROMless boot when user selects ProFile but cancels
              ProFile creation.
+
            - fixed build.sh misplaced fi breaking windows installs
+
            - verified 10.5 PPC vs i386 machine.h match for crosscompiling
+
            - fixed bug: 10.5 i386 crosscompiling PPC did not set BIG_ENDIAN
              PPC builds
 
@@ -327,6 +406,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 
 
 2020.06.13 - fixed screenshots save dialog box file filter
+
            - enabled proper floppy insert sound when power is off (so no motor
              sound plays)
 
@@ -570,6 +650,7 @@ Lisa Emulator Change History                         http://lisaem.sunder.net/
 2018.10.27 - work on Drag and Drop files - allows dropping a floppy on top
              of the emulator, or a text file (which will be typed into the
              virtual keyboard the same as clipboard text pastes.)
+
            - HQX upscaler works nicely now
              
 2019.10.15 - 2019.10.27 more HQX upscaler work, much nicer than the other
@@ -634,16 +715,21 @@ to   08.27 - moved skin settings to their own class
            - fixed a bug with sound playback
 
 2019.07.02 - switch sound playback to RAM wave creation instead of /tmp
+
            - cleaned up reg68k_external_execute by moving debug code out
              to its own function
+
            - fixed a bunch of GUI bugs, not saving screen size, etc.
 2019.06.06 - fixing GUI bugs - meh
+
 2019.06.01 - fixed MMU bug caused by mmu_trans array not being auto-zero filled
+
 2019.05.30 - removing some of the unused insetjumpland code/if statements
 
              { break; /* - too busy with work, LisaList2, etc. */ }
 
 2018.11.28 - added region grab in debug mode
+
            - removed File -> Run menu item to remove confusion between pause
              and run. User should use Key Power-On or click on power button
 
@@ -664,6 +750,7 @@ to   08.27 - moved skin settings to their own class
              that I'd need a real widget and a protocol analyzer to get at.
 
 2018.05.22 - control-q/q/Q will quit when not running an OS
+
            - Added command line options.
              -p, --power       	power on as soon as LisaEm is launched
              -f, --floppy=<str>	boot from which floppy image
@@ -693,15 +780,18 @@ to   08.27 - moved skin settings to their own class
              to be set doesn't affect the execution of LOS/LPW at all. Infact
              it uses the A-Trap as an address to where it should jump to...
              [I swear this is not an April Fool's joke, though it should be!]
+
            - ipc cache invalidations now work across MMU contexts, i.e.
              supervisor mode (cx1) can load code into cx4, will now invalidate
              memory caches in both cx1 and cx4.
+
            - fixed a hidden ipc memory leak not caught by valgrind
 
 2018.03.28 - paste would send LF as LF on Linux, replaced LF as a copy of CR
              so can paste code into LPW Editor now
 
 2018.03.22 - added F-line wormholes to help track down bugs
+
            - cleaned cpu68k.c ipc, memory.c RAM code to make it more readable
              and more like the original using a few C macros.
 
@@ -828,7 +918,8 @@ to   08.27 - moved skin settings to their own class
 2007.08.29 - libdc42 macbinii encoded dart to dc42 conversion bugfix
 
 2007.08.16 - added LOS error codes to ROMless error handler
-		   - fix raw screenshot crash
+
+           - fix raw screenshot crash
 
 2007.08.13 - got both ROMless boot and ROMless dual parallel card to work
 
@@ -869,7 +960,7 @@ to   08.27 - moved skin settings to their own class
 2007.07.04 - LisaEm documentation completion
 
 2007.07.03 - Testing various opcodes to locate scroll bar arrow bug in LOS
-	     not found, but eliminated shift/rotate opcodes.
+             not found, but eliminated shift/rotate opcodes.
 
 2007.07.01 - regression testing to locate MacWorks bug - not found yet, high
              probability that it lives somewhere inside the C++ code.
@@ -1150,9 +1241,13 @@ to   08.27 - moved skin settings to their own class
                it now clicks rather than beeping.
 
              Known bugs:
+
              - Floppy animation does not work on OS X due to double buffering.
+
              - Floppy motor sounds and some other sounds do not work on OS X
+
              - Some light gray screen artifacts in the Windows build.
+
              - Still no documentation at all.
 
 2007.01.24   Preview Release

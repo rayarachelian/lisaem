@@ -62,6 +62,13 @@
 #include <string.h>
 #include <unistd.h>
 
+// suppress stupid warning, it should be included from fcntl.h/stdlib.h, etc.
+#ifdef __gnu_linux__
+  extern int posix_openpt(int flags);
+  extern int grantpt(int fd);
+  extern int unlockpt(int fd);
+#endif
+
 // two internal serial ports, 4 port serial card * 3 slots = 14 future if Uni+/Xenix
 // and Quad Port Cards are implemented, for now leave it at 2.
 #define NUMSERPORTS 2

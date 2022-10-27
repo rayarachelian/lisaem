@@ -22,7 +22,7 @@
 #                  $INEXT  - infile extension i.e. "c" or "cpp" for .c/.cpp
 #                  $OUTEXT - outfile extension i.e. "o" for .o - will need
 #
-#                  $VERB   - i.e. "Compiling"
+#                  $VERB   - i.e. "Compiling", or " " to skip output
 #                  $WAIT   - if set will wait for this list to finish
 #                            before returning - useful right before linking
 #
@@ -52,7 +52,7 @@ local s
 
 if [[ -z "$INEXT" ]];           then echo "$(/bin/pwd) $0 $@ missing INEXT variable"          1>&2; exit 1; fi
 if [[ -z "$OBJDIR" ]];          then echo "$(/bin/pwd) $0 $@ missing OBJDIR variable"         1>&2; exit 1; fi
-if [[ -z "$VERB" ]];            then echo "$(/bin/pwd) $0 $@ missing VERB variable"           1>&2; exit 1; fi
+if [[ -z "$VERB" ]];            then export VERB=" "; fi
 if [[ -z "$COMPILECOMMAND" ]];  then echo "$(/bin/pwd) $0 $@ missing COMPILECOMMAND variable" 1>&2; exit 1; fi
 
 for i in $@; do
@@ -82,10 +82,10 @@ for i in $@; do
   i1=$( echo "$i" | cut -f1 -d: )
   is=$( echo "$i1" | sed -e 's/\//\\\//g')
 
-
+  bf="$( basename ${os})"
   compilecommand=$( echo "${COMPILECOMMAND}" | sed -e "s/:INFILE:/${is}/g"  -e "s/:OUTFILE:/${os}/g"   \
                     -e "s/:OBJDIR:/${objdir}/g"    -e "s/:VERB:/${VERB}/g"  -e "s/:INEXT:/${INEXT}/g"  \
-                    -e "s/:OUTEXT:/${OUTEXT}/g" )
+                    -e "s/:OUTEXT:/${OUTEXT}/g"    -e "s/:BASEOUTFILE:/${bf}/g" )
 
   if [[ -n "$deps" ]]; then
      if [[ -n "$DEBUGCOMPILE" ]]; then

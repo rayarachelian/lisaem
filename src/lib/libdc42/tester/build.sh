@@ -290,7 +290,7 @@ if [[ -z "$XTLD" ]]; then
 fi
 
 cd "${XTLD}/bin/$MACOSX_MAJOR_VER"
-strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
+bashbuild/cc-strip-upx.sh $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 

@@ -353,6 +353,7 @@ function CygwinSudoRebuild() {
      if [[ -z "$YESTOALL" ]]; then
         echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
         echo "Enter yes to start this build script in an Administrative shell or hit ENTER to abort" 1>&2
+        x="$CYGWINYES"
         [[ -z "$CYGWINYES" ]] && read x
      else
         x="$YESTOALL"

@@ -33,9 +33,9 @@ fi
    SOFTWARE="dc42 tools"                   # name of the software (can contain upper case)
      LCNAME="dc42 tools"                   # lower case name used for the directory
 DESCRIPTION="dc42 tools for Apple Lisa"    # description of the package
-        VER="0.9.6"                        # just the version number
+        VER="1.2.7"                        # just the version number
   STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
-RELEASEDATE="2020.03.31"                   # release date.  must be YYYY.MM.DD
+RELEASEDATE="2022.09.22"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
   AUTHEMAIL="ray@arachelian.com"           # email address for this software
     COMPANY="sunder.net"                   # company (vendor for sun pkg)
@@ -54,7 +54,7 @@ export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONA
 # end of standard section for all build scripts.
 #------------------------------------------------------------------------------------------#
 
-SRCLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw decode-vsrom dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar dc42-add-tags dc42-diff dc42-copy-selected-sectors lisafsh-tool"
+SRCLIST="patchxenix blu-to-dc42 dc42-resize-to-400k dc42-dumper dc42-checksum dc42-bootblock-checksum lisadiskinfo  dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize uniplus-set-profile-size uniplus-bootloader-deserialize idefile-to-dc42 rraw-to-dc42 dc42-to-raw decode-vsrom mkvsrom dc42-to-rraw dc42-to-split-raw raw-to-dc42 dc42-to-tar dc42-add-tags dc42-diff dc42-copy-selected-sectors lisafsh-tool"
 
 
 # debug - comment out for release
@@ -317,26 +317,33 @@ if  [[ -n "$WINDOWS" ]]; then
     fi
 fi
 
+waitqall
+echo 1>&2
 
 if [[ -z "$HAVEREADLINE" ]]; then
    # compile them all without readline, if we don't have it.
-   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
-   LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+   export COMPILECOMMAND="${TLD}/bashbuild/cc-strip-upx.sh :BASEOUTFILE: $CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
+   LIST1=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=" " COMPILELIST \
 	$(for i in $SRCLIST; do echo $i; done) )
 else
    # compile all but lisafsh-tool without readline
-   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
-   LIST1=$(WAIT="no"  OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+   export COMPILECOMMAND="${TLD}/bashbuild/cc-strip-upx.sh :BASEOUTFILE: $CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c $WHICHLIBDC42"
+   LIST1=$(WAIT="no"  OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=" " COMPILELIST \
 	$(for i in $SRCLIST; do echo $i | grep -v lisafsh-tool; done) )
 
    # enable readline and now compile just lisafsh-tool (and in the future anything else that uses it)
-   export COMPILECOMMAND="$CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c  $READLINECCFLAGS $WHICHLIBDC42"
-   LIST2=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB="Compiled                 " COMPILELIST \
+   export COMPILECOMMAND="${TLD}/bashbuild/cc-strip-upx.sh :BASEOUTFILE: $CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c  $READLINECCFLAGS $WHICHLIBDC42"
+   LIST2=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=" " COMPILELIST \
 	$(for i in lisafsh-tool; do echo $i; done) )
+   echo 1>&2
 
    export LIST1="$LIST1 $LIST2"
    unset  LIST2
 fi
+
+waitqall
+echo 1>&2
+echo 1>&2
 
 if [[ ! -f "${XTLD}/bin/$MACOSX_MAJOR_VER/lisafsh-tool${EXT}" ]] && [[ ! -f "${TLD}/bin/$MACOSX_MAJOR_VER/lisafsh-tool${EXT}" ]] ; then
    echo "Failed to build lisafsh-tool" 1>&2 
@@ -349,7 +356,7 @@ if [[ -z "$XTLD" ]]; then
 fi
 
 cd "${TLD}/bin/$MACOSX_MAJOR_VER"
-strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
+#strip_and_compress $(for i in $SRCLIST; do echo ${i}${EXT}; done)
 
 ###########################################################################
 

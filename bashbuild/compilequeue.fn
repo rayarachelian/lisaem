@@ -81,6 +81,8 @@ function qjob {
     # create the compile slot script in the current directory and execute it. It will delete itself
     # on completion and copy itself to /tmp if needed. We don't execute from /tmp because in many
     # systems /tmp is mounted with -o noexec
+    #
+    # Can set TMP to some other value ahead of the run to have it run from elsewhere.
     # ------------------------------------------------------------------------------------------------
 
      # $1 is the text to output.  i.e. "!!compiling foobar.c"
@@ -89,11 +91,15 @@ function qjob {
      shift                                                     # remove $1 from the list of parameters
      CMD="$( trim_duplicate_args $@ )"
 
+     [[ -z "$TMP" ]] && export TMP="/tmp"
+     export TLD
+     export XTLD
+
      # pre-seed the output file before launching the script.
-     echo "$CMD"              >>/tmp/${SLOTNAME}.out           # save compile command
-     echo "in: $( /bin/pwd )" >>/tmp/${SLOTNAME}.out
-     echo ""                  >>/tmp/${SLOTNAME}.out
-     echo "${NAME}"           >>/tmp/${SLOTNAME}.out           # output Name to the out file with newline
+     echo "$CMD"              >>${TMP}/${SLOTNAME}.out           # save compile command
+     echo "in: $( /bin/pwd )" >>${TMP}/${SLOTNAME}.out
+     echo ""                  >>${TMP}/${SLOTNAME}.out
+     echo "${NAME}"           >>${TMP}/${SLOTNAME}.out           # output Name to the out file with newline
 
     ( # shell for our slot script should also be bash
      echo "#!/usr/bin/env bash"                          
@@ -102,24 +108,24 @@ function qjob {
      echo "trap - EXIT"
      echo
 
-     echo "( ${CMD} 2>&1 ) 2>&1 >>/tmp/${SLOTNAME}.out"        # execute $2 with params $3..$N and append to out file
+     echo "( ${CMD} 2>&1 ) 2>&1 >>$TMP/${SLOTNAME}.out"        # execute $2 with params $3..$N and append to out file
                                                                # we don't want this going to the tty!
      echo
      echo 'if [[ $? -ne 0 ]]; then'                            # check for errors.
-     echo "   cp ${SLOTNAME} /tmp"                             # keep the failed job in /tmp for later analysis
+     echo "   cp ${SLOTNAME} ${TMP}"                             # keep the failed job in /tmp for later analysis
      echo
-     echo "   echo \"see: /tmp/${SLOTNAME} /tmp/${SLOTNAME}.failed for details\" >>/tmp/${SLOTNAME}.out"
-     echo "   echo \"failed command was: $@\" >>/tmp/${SLOTNAME}.out"
-     echo "   echo \"from: \$(/bin/pwd)\" >>/tmp/${SLOTNAME}.out"
-     echo "   mv /tmp/${SLOTNAME}.out /tmp/${SLOTNAME}.failed" # rename to .failed on failure, this acts as releasing a lock
+     echo "   echo \"see: ${TMP}/${SLOTNAME} ${TMP}/${SLOTNAME}.failed for details\" >>${TMP}/${SLOTNAME}.out"
+     echo "   echo \"failed command was: $@\" >>${TMP}/${SLOTNAME}.out"
+     echo "   echo \"from: \$(/bin/pwd)\" >>${TMP}/${SLOTNAME}.out"
+     echo "   mv ${TMP}/${SLOTNAME}.out ${TMP}/${SLOTNAME}.failed" # rename to .failed on failure, this acts as releasing a lock
      echo 'else'
-     echo "   mv /tmp/$SLOTNAME.out /tmp/${SLOTNAME}.done"     # rename to .done on success, this acts as releasing a lock
+     echo "   mv ${TMP}/$SLOTNAME.out ${TMP}/${SLOTNAME}.done"     # rename to .done on success, this acts as releasing a lock
      echo 'fi'
      echo "rm ${SLOTNAME}"                                     # self-remove the slot script
      echo "exit 0"                                             # and we're done.
     )       > ./${SLOTNAME}                                    # create the slot script, make it executable
 
-    chmod 755 ./${SLOTNAME}                                    # make it executable by our user
+    chmod 700 ./${SLOTNAME}                                    # make it executable by our user
 
     (./${SLOTNAME} 1>&2) 1>&2 &                                # launch it in the background, output that hasn't been saved
                                                                # to slot.x.outfile goes to stderr, not stdout!
@@ -144,6 +150,7 @@ function waitq()
   twirl='/-\\|' # twirly cursor
   [[ $NUMCPUS -eq 1 ]] && export NUMCPUS=2
   /usr/bin/tty -s && TTY="yes" || TTY=""   # don't bother with twirly cursor if non-interactive
+  [[ -z "$TMP" ]] && export TMP="/tmp"
   OUT="/tmp/slot.$$"
 
   # wait until we have slots open before enqueing more jobs 
@@ -173,7 +180,6 @@ function waitq()
         # skip over the compile command and current dir lines then output only 5 lines at most to highlight some warnings
         # or errors if there are some, but output a newline at the end (for !! jobs) this will output the job name
         # if there are no errors
-
         (
            local count=0; 
            echo "---------------------- $z -----------------------" >>${BUILDWARNINGS}
@@ -182,6 +188,8 @@ function waitq()
                  if [[ $count -gt 3 ]] && [[ $count -lt 9 ]]; then 
                     if   [[ "${l:0:2}" == '!!' ]] || [[ "${l:0:2}" == '++' ]]; then
                          printf "%s\n" "${l:2}" 1>&2
+                    elif [[ "${l:0:2}" == "--" ]]; then 
+                         echo >/dev/null;  # no output, job will produce it instead
                     else
                          printf "%s" "${l}" 1>&2 
                     fi
@@ -214,7 +222,7 @@ function waitq()
  # otherwise we'd leave behind still in flight successful jobs and junk files.
  if [[ `ls -l ${OUT}.*.sh.out 2>/dev/null | wc -l` -eq 0 ]]; then
 
-  #echo looking for failed: "`ls slot.$$.*.failed 2>/dev/null`"  >>/tmp/xxx.build.out
+  #echo looking for failed: "`ls slot.$$.*.failed 2>/dev/null`"  >>${TMP}//xxx.build.out
   if [[ `ls -l ${OUT}.*.sh.failed 2>/dev/null | wc -l` -gt 0 ]]; then
      sleep 3  # wait a few seconds incase there are any stragglers/failed jobs
      for z in ${OUT}.*.sh.failed
@@ -255,7 +263,9 @@ function waitqall()
   [[ -z "$NUMCPUS"  ]] && getcpus
   [[ $NUMCPUS -eq 1 ]] && export NUMCPUS=2
 
-  OUT="/tmp/slot.$$"  # /tmp/slot.6588.10.sh.done
+  [[ -z "$TMP" ]] && export TMP="/tmp"
+
+  OUT="${TMP}//slot.$$"  # /tmp/slot.6588.10.sh.done
 
   while [[ `ls -l $OUT.*.sh.out 2>/dev/null | wc -l` -gt 0 ]]; do waitq; done
   waitq    # one more to make sure nothing is left to process

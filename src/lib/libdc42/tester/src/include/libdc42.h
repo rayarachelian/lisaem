@@ -1,1 +1,1 @@
-libdc42.h-0.9.7-1.2.6
+../../../include/libdc42.h

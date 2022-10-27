@@ -65,6 +65,68 @@ extern "C" float hidpi_scale;
 // fix for hidpi_scale <1.0 after 2020.01.26 changes
 #define HIDPISCALE (hidpi_scale<1.0 ? 1.0 : hidpi_scale)
 
+
+// Added as per Tom Frikker: see: https://lisalist2.com/index.php/topic,313.0.html for details
+// the stored serial # is at offset 24 d0=sn2[1] * 100 + sn2[2] *10 + sn2[3];  // sn2[0]=0xff sync byte
+/*
+Another thing I noticed from los-deserialize.c (more of an improvement suggestion than a bug):
+printf("Disk MDDF signed by Lisa SN: %08x (%d) zeroed out.",disk_sn,disk_sn);
+
+Instead of printing disk_sn directly as decimal, it would probably be more useful to pull out the second two bytes, 
+and print "001" followed by those parsed as decimal (preceded by as many 0s as it takes to get to 5 digits). 
+This is the AppleNet number of the machine that did the serializing. Perhaps you could also add this number 
+to the line that prints information about tools, as well?
+*/
+
+uint16 LisaConfigFrame::get_sn_stored_checksum_bytes(uint8 *sn2) { return (sn2[24] * 100 + sn2[25] *10 + sn2[26]); }
+
+uint16 LisaConfigFrame::get_sn_checksum_bytes(uint8 *sn2) { // based on the "H" ROM Source code @ 0cb2
+       uint16 d2=0;
+       for  (int d1=0; d1<24; d1++) { d2 += (uint16)(sn2[d1] & 0x0f);}
+       return d2+(uint16)(sn2[27] & 0x0f)-60; // wonder if the 60 is related to 60Hz?
+}
+
+
+void LisaConfigFrame::check_and_fix_serial_checksum(void)  // messagebox string of text, title
+{
+    uint8 sn2[32];                          //  0 1 2 3 4 5 6 7 8 9 a b c d e f
+    wxString myserno=serialtxt->GetValue(); // ff000000000000ff0000000000000000
+    wxString hexserno, decserno;            // FF999999999999FF9999999918995D2C
+    unsigned long serno_i=0;
+
+    fprintf(stderr,"Original Serial #",serno_i);
+    for  (int i=0; i<32; i++) {
+          hexserno=myserno.SubString(i,i); // serial number
+          hexserno.ToULong(&serno_i,16);
+          fprintf(stderr,"%01x",serno_i);
+          sn2[i]=(uint8) serno_i & 0x0f;
+    }
+    fprintf(stderr,"\n");
+
+    uint16 stored_checksum     = get_sn_stored_checksum_bytes(sn2);
+    uint16 calculated_checksum = get_sn_checksum_bytes(sn2);
+
+    if (stored_checksum != calculated_checksum ) {
+        sn2[24]=calculated_checksum / 100; calculated_checksum = calculated_checksum % 100;
+        sn2[25]=calculated_checksum / 10;  calculated_checksum = calculated_checksum % 10;
+        sn2[26]=calculated_checksum;
+        
+        char *hex="0123456789ABCDEF";
+        char fixed_serno[33];
+        for (int i=0; i<32; i++) fixed_serno[i]=hex[sn2[i]];
+        fixed_serno[32]=0;
+
+        wxString fixedserno=fixed_serno;
+        wxString text="The checksum in this serial #" + myserno + " has an incorrect checksum,\nA corrected Serial # would be:" + fixedserno +
+                     " shall I correct it for you?";
+        wxString title="Invalid Lisa Serial Number - Bad Checksum";
+        wxMessageDialog w(this, text, title, wxICON_QUESTION  | wxYES_NO |wxNO_DEFAULT,wxDefaultPosition );
+
+        if (w.ShowModal()==wxID_YES) { serialtxt->SetValue(fixedserno); }
+    }
+}
+
+
 enum {
         ID_NOTEBOOK=2001,
         ID_APPLY,
@@ -356,6 +418,8 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  if (!m_text_propathh[3])  return;
  if (!m_text_propathl[3])  return;
 
+ check_and_fix_serial_checksum();
+
  my_lisaconfig->myserial= serialtxt->GetValue();
  my_lisaconfig->rompath = m_rompath->GetValue();
  my_lisaconfig->dualrom =m_dprompath->GetValue();
@@ -363,7 +427,7 @@ void  LisaConfigFrame::OnApply(wxCommandEvent& WXUNUSED(event))
  my_lisaconfig->serial1xon=serialaxon->GetValue() ? "1":"0";
  my_lisaconfig->serial2xon=serialbxon->GetValue() ? "1":"0";
  
-consoletermwindow = console_term->GetValue() ? 1:0;
+ consoletermwindow = console_term->GetValue() ? 1:0;
  /*
  fprintf(stderr,"myserial number:%s\n",my_lisaconfig->myserial.c_str());
  fprintf(stderr,"rompath        :%s\n",my_lisaconfig->rompath.c_str());

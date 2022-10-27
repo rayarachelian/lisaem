@@ -34,10 +34,10 @@ fi
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
           VER="1.2.7"                     # just the version number
-    STABILITY="RC4"                       # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
+    STABILITY="UNSTABLE"                  # DEVELOP, ALPHA, BETA, RC1, RC2, RC3...
                                           # RELEASE/PRODUCTION - PRE-* keep short
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2022.04.01"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="2022.10.27"                # release date.  must be YYYY.MM.DD
        AUTHOR="Ray Arachelian"            # name of the author
     AUTHEMAIL="ray@arachelian.com"        # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
@@ -127,7 +127,7 @@ WITHUNICODE="--unicode=yes"
 
 function CLEAN() {
             # note we expect to be inside src at this point, and we'll make our way out as needed.
-            echo "* Cleaning..." 1>&2
+            echo "+ Cleaning..." 1>&2
             cd "${TLD}"
             CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k hashes.txt "slot.*.sh" build-warnings.txt windres_private.res
             subbuild src/lib/libGenerator --no-banner clean
@@ -217,8 +217,16 @@ CHECKDIRS bashbuild bin obj resources share src src/host src/include src/lib src
             src/storage src/tools src/lib/libGenerator src/lib/libdc42
 
 
-# Parse command line options if any, overriding defaults.
 
+#2022.06.15 - remove strip/upx for non-prod releases because if it segfaults, it's hard to understand where and get a backtrace
+if [[ "$STABILITY" != "RELEASE"  &&  "$STABILITY" != "PROD" && "$STABILITY" != "PRODUCTION" ]]; then
+   export WITHOUTSTRIP="nostrip"
+   export WITHOUTUPX="noupx"
+   export CPPFLAGS="$CPPFLAGS -g"
+   export CFLAGS="$CPPFLAGS -g"
+fi
+
+# Parse command line options if any, overriding defaults.
 for j in $@; do
   opt=`echo "$j" | sed -e 's/without/no/g' -e 's/disable/no/g' -e 's/enable-//g' -e 's/with-//g'`
 
@@ -281,6 +289,7 @@ for j in $@; do
             rm -f  $PREFIX/blu-to-dc42
             rm -f  $PREFIX/dc42-copy-boot-loader
             rm -f  $PREFIX/dc42-dumper
+            rm -f  $PREFIX/dc42-checksum
             rm -f  $PREFIX/dc42-resize-to-400k
             rm -f  $PREFIX/dc42-to-raw
             rm -f  $PREFIX/dc42-to-rraw
@@ -391,6 +400,14 @@ for j in $@; do
  --no-static)
             STATIC=""                                                ;;
 
+ --no-sound)
+	    export NOSOUND="-D NOSOUND"                              
+	    export EXTRADEFINES="${EXTRADEFINES} -DNOSOUND"          ;;
+ --no-openal)
+	    unset USEOPENAL
+	    export NOOPENAL="yes"                                    ;;
+
+
  --trace*on-start)
             export LIBGENOPTS="$LIBGENOPTS --debug --trace-on-start -DDEBUGLOG_ON_START"
             export WARNINGS="-Wall -Wextra -Wno-write-strings -g"
@@ -471,6 +488,7 @@ Commands:
   package|pkg           Build a package (DEB, RPM: Linux, NSIS/ZIP: windows,
                         FreeBSD packages, OpenIndiana/Solaris: classic pkg)
 
+Compile Time
 Options:                (can skip '--with-', or use '--no-' instead of '--without-')
 --without-debug         Disables debug and profiling
 --with-debug            Enables symbol compilation
@@ -483,6 +501,8 @@ Options:                (can skip '--with-', or use '--no-' instead of '--withou
 --no-tools              don't compile dc42 tool commands
 --with-static           Enables a static compile
 --without-static        Enables shared library compile (not recommended)
+--without-sound         Disable all sound playback in LisaEm
+--without-openal        Disable using OpenAL (will default to wxSound)
 --without-optimize      Disables optimizations
 --without-upx           Disables UPX compression (no upx on some macos x)
 --without-strip         Disable strip when compiling without debug
@@ -555,6 +575,8 @@ export  PHASE2LIST="\
         src/host/wxui/z8530-terminal"
 # change ^- hq3x vs hq3x-3x here as needed as well as the #define
 
+
+[[ -n "$USEOPENAL" && -z "$NOSOUND" ]] && export PHASE2LIST="$PHASE2LIST src/host/wxui/LisaEmSoundOpenAL"
 
 [[ -n "${WITHDEBUG}${WITHTRACE}" ]] && if [[ -n "$INSTALL" ]];
 then
@@ -823,8 +845,12 @@ export COMPILEPHASE="linking"
 export PERCENTPROCESS=97 PERCENTCEILING=98 PERCENTJOB=0 NUMJOBSINPHASE=1
 update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 waitqall
-qjob  "!!* Linked ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a src/lib/TerminalWx/lib/terminalwx.a \
+#    export COMPILECOMMAND="${TLD}/bashbuild/cc-strip-upx.sh :BASEOUTFILE: $CC $CLICMD -o :OUTFILE: -W $WARNINGS -Wstrict-prototypes $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -I $DC42INCLUDE $INC -Wno-format -Wno-unused :INFILE:.c  $READLINECCFLAGS $WHICHLIBDC42"
+#   LIST2=$(WAIT="yes" OBJDIR="../bin/$MACOSX_MAJOR_VER/" INEXT=c OUTEXT="${EXTTYPE}" VERB=" " COMPILELIST 
+
+qjob  "--* Linked ${TLD}/bashbuild/cc-strip-upx.sh :BASEOUTFILE: ./bin/${LISANAME}" $CXX $ARCH $GUIAPP $GCCSTATIC $WITHTRACE $WITHDEBUG -o bin/$LISANAME  $LIST1 $LIST src/lib/libGenerator/lib/libGenerator.a src/lib/TerminalWx/lib/terminalwx.a \
       src/lib/libdc42/lib/libdc42.a  $LINKOPTS $SYSLIBS $LIBS
+waitqall
 waitqall
 
 export COMPILEPHASE="pack/install"
@@ -834,9 +860,6 @@ update_progress_bar $PERCENTPROCESS $PERCENTJOB $NUMJOBSINPHASE $PERCENTCEILING
 cd "${TLD}/bin"
 
 if  [[ -f "$LISANAME" ]]; then
-
-    strip_and_compress "${LISANAME}"
-
         #.
         #└── Contents                                ${TLD}/bin/${SOFTWARE}.app/Contents
         #    ├── Info.plist
@@ -918,7 +941,7 @@ if  [[ -f "$LISANAME" ]]; then
 
            [[ -n "$ARCHOVERRIDE" ]] && MACHINE="$ARCHOVERRIDE"
 
-           TOOLLIST="patchxenix blu-to-dc42  dc42-resize-to-400k  dc42-dumper  lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
+           TOOLLIST="patchxenix blu-to-dc42 dc42-resize-to-400k dc42-checksum dc42-dumper lisadiskinfo  lisafsh-tool dc42-copy-boot-loader lisa-serial-info los-bozo-on los-deserialize idefile-to-dc42 rraw-to-dc42"
            mv ${TOOLLIST} "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
 
            # create a tools only package

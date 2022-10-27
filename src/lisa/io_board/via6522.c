@@ -905,7 +905,7 @@ void chk_sound_play(void)
 {
             if  (  via[1].via[SHIFTREG]!=0 && via[1].via[T2LL]!=0  && ((via[1].via[ACR] & 0x10)==0x10) )
             {
-                sound_play( via[1].via[T2LH]<<8 | (via[1].via[T2LL] ) ); // enable sound, smaller the higher the pitch.
+                sound_play( via[1].via[T2LH]<<8 | (via[1].via[T2LL] ), via[1].via[SR1],floppy_iorom); // enable sound, smaller the higher the pitch.
                 return;
             }
 

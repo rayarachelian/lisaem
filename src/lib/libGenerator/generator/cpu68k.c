@@ -851,7 +851,7 @@ t_ipc_table *get_ipct(uint32 address)
             }
     }
 
-#ifdef DEBUG
+#ifdef XXXDEBUG
         for (long i=0; i<iipct_mallocs; i++)
           for (long s=0; s<sipct_mallocs[i]; s++ )
           {
@@ -1093,7 +1093,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
                     free(ipcs); ipcs=NULL; return NULL;}
 
         if (!iib ) {EXITR(53,NULL,"There's no proper IIB for the possibly illegal instruction opcode %04x @ pc=%08lx\n",opcode,(long)pc);}
-        if (!ipc)  {EXITR(54,NULL,"Have a cow man! ipc=NULL\n"); }
+        if (!ipc)  {EXITR(54,NULL,"Have a cow man! ipc=NULL - this usually happens when booting off a corrupt disk\n"); }
 
         cpu68k_ipc((pc), iib, ipc);
         if (abort_opcode==1) {free(ipcs); ipcs=NULL; return rettable;}   // got MMU Exception, but return what we have.

@@ -970,6 +970,9 @@ GLOBAL(int,has_lisa_xl_screenmod,0);
 #define UNKNOWN_OS_RUNNING          100
 
 GLOBAL(int,running_lisa_os,LISA_ROM_RUNNING);
+GLOBAL(int,running_lisa_os_version,'H');
+GLOBAL(int,running_lisa_os_boot_device,0);  // 0=in rom, 1=floppy, 2=hard drive - can be used to detect installer
+
 int check_running_lisa_os(void);
 GLOBAL(int,mouse_x_tolerance,0);
 GLOBAL(int,mouse_y_tolerance,0);
@@ -1574,14 +1577,14 @@ extern void on_lisa_exit(void);
 #ifdef DEBUG
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #define ALERT_LOG( level, fmt, args... )                                                         \
-    { if ( (level <= DEBUGLEVEL) )                                                               \
-            fprintf((buglog ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);        \
-            fprintf((buglog ? buglog:stderr),  fmt , ## args);                                   \
-            fprintf((buglog ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                        \
+    { if ( (level <= DEBUGLEVEL) ) {                                                             \
+            fprintf((buglog!=NULL ? buglog:stderr),"%s:%s:%d:",__FILE__,__FUNCTION__,__LINE__);  \
+            fprintf((buglog!=NULL ? buglog:stderr),  fmt , ## args);                             \
+            fprintf((buglog!=NULL ? buglog:stderr),"| %x%x:%x%x:%x%x.%x %ld\n",                  \
                           lisa_clock.hours_h,lisa_clock.hours_l,                                 \
                           lisa_clock.mins_h,lisa_clock.mins_l,                                   \
                           lisa_clock.secs_h,lisa_clock.secs_l,                                   \
-                          lisa_clock.tenths, (long)cpu68k_clocks);                               \
+                          lisa_clock.tenths, (long)cpu68k_clocks);    }                          \
     }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 #else
@@ -1924,10 +1927,8 @@ GLOBAL(uint32,last_bad_parity_adr,0);
 
 GLOBAL(int,scc_running,0);
 
-
-
 extern void sound_fork(void);
-extern void sound_play(uint16 freq);
+extern void sound_play(uint16 t2, uint8 SR, uint8 floppy_iorom);
 extern void sound_off(void);
 
 //DECLARE(scc_func_t, scc_fn[2] );

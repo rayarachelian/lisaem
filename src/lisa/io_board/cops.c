@@ -191,11 +191,11 @@ void dump_cops(FILE *buglog) {my_dump_cops(buglog);}
 
 //     dump_cops(buglog); was at the end of these
 #define SEND_COPS_CODE(x)          {set_kb_data_ready();DEBUG_LOG(0,"COPS queue len: %d adding 0x%02x",copsqueuelen,(unsigned)(x)); \
-                                     if (copsqueuelen>=0 && (copsqueuelen+1<MAXCOPSQUEUE)) copsqueue[copsqueuelen]=(x); copsqueuelen++; \
+                                     if (copsqueuelen>=0 && (copsqueuelen+1<MAXCOPSQUEUE)) {copsqueue[copsqueuelen]=(x); copsqueuelen++;} \
                                    }
 
 #define cops_reset_status(x)       {set_kb_data_ready();DEBUG_LOG(0,"COPS queue len: %d adding reset (0x80)",copsqueuelen); \
-                                     if (copsqueuelen>=0 && (copsqueuelen+1<MAXCOPSQUEUE)) copsqueue[copsqueuelen]=0x80; copsqueuelen++;\
+                                     if (copsqueuelen>=0 && (copsqueuelen+1<MAXCOPSQUEUE)) {copsqueue[copsqueuelen]=0x80; copsqueuelen++;}\
                                    }
 #define SEND_RESETCOPS_AND_CODE(x) {set_kb_data_ready();DEBUG_LOG(0,"COPS queue len: %d adding reset and code (0x80+0x%02x)",copsqueuelen,x);\
                                      if (copsqueuelen>=0 && (copsqueuelen+2<MAXCOPSQUEUE)) {copsqueue[copsqueuelen]=0x80; copsqueuelen++; \

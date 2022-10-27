@@ -47,6 +47,11 @@ public:
     void        OnPickProFile3L(      wxCommandEvent& event);
     void        OnPickIWDir    (      wxCommandEvent& event);
 
+    // Lisa VSROM SN verification methods
+    uint16 get_sn_stored_checksum_bytes(uint8 *sn2);
+    uint16 get_sn_checksum_bytes(uint8 *sn2);
+    void   check_and_fix_serial_checksum(void);
+
     wxPanel    *m_panel;           // the panel itself
     wxNotebook *thenoteBook;
 
