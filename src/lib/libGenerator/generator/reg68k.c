@@ -2006,7 +2006,7 @@ void reg68k_external_autovector(int avno)
 //20190601        reg68k_pc = regs.pc;
 //20190601        reg68k_regs = regs.regs;
 //20190601        reg68k_sr.sr_int = regs.sr.sr_int;
-        DEBUG_LOG(0,"Inside setjmp land, about to call internal_autovector:%ld reg68k_pc:%08lx reg68k_sr:%08lx",(long)avno,(long)reg68k_pc,(long)reg68k_sr.sr_int);
+        DEBUG_LOG(0,"about to call internal_autovector:%ld reg68k_pc:%08lx reg68k_sr:%08lx",(long)avno,(long)reg68k_pc,(long)reg68k_sr.sr_int);
         //insetjmpland=1;
 
         reg68k_internal_autovector(avno);
@@ -2377,6 +2377,9 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
 
     abort_opcode=2;  reg68k_pc=GETVECTOR(vno);    // should turn this into vector 15 - spurious IRQ
     if (abort_opcode==1) {EXIT(58,0,"Doh got abort_opcode=1 on vector fetch in %s - BYE BYE\n",__FUNCTION__); }
+
+    if (reg68k_pc==0xffffffff) LISA_REBOOTED();
+
     if (reg68k_pc &1)    {EXIT(58,0,"Doh odd PC value (%08x) on vector (%d) fetch in %s - BYE BYE\n",reg68k_pc,vno,__FUNCTION__); }
 
     abort_opcode=0;

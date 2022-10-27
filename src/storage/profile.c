@@ -1408,7 +1408,7 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
           DEBUG_LOG(0,"State:12, post write - allow Lisa to read the status and data  - pointer:%d",P->indexread);
          #endif
 
-         CHECK_PROFILE_LOOP_TIMEOUT;
+         if (  !  (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ) ) CHECK_PROFILE_LOOP_TIMEOUT;
 
          // this needs to be turned on for LOS 2.0, *BUT* not 3.x! 
          if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING  ||
