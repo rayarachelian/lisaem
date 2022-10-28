@@ -2378,7 +2378,7 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
     abort_opcode=2;  reg68k_pc=GETVECTOR(vno);    // should turn this into vector 15 - spurious IRQ
     if (abort_opcode==1) {EXIT(58,0,"Doh got abort_opcode=1 on vector fetch in %s - BYE BYE\n",__FUNCTION__); }
 
-    if (reg68k_pc==0xffffffff) LISA_REBOOTED();
+    if ((reg68k_pc & 0x00ffffff)==0x00ffffff) {lisa_rebooted(); return;}
 
     if (reg68k_pc &1)    {EXIT(58,0,"Doh odd PC value (%08x) on vector (%d) fetch in %s - BYE BYE\n",reg68k_pc,vno,__FUNCTION__); }
 
@@ -2398,7 +2398,7 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
       #endif
       EXIT(59,0,"reg68k_pc got nullified. bye");  
     }
-    if (reg68k_pc& 1)   LISA_REBOOTED();
+    //if (reg68k_pc& 1)   LISA_REBOOTED();
 
     reg68k_sr.sr_struct.t=0;                                                       // turn off trace on trap.
     regs.pc = reg68k_pc; regs.sr.sr_int = reg68k_sr.sr_int;                        // flush to external copy of regs
