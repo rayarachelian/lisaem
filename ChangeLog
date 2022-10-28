@@ -2,6 +2,10 @@
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
+2022.10.28 - fixup reboot issues
+
+2022.10.27 - bugfix: LOS 2.0 USA now able to install again
+
 2022.10.19 - possible hacky fix for opening some UTF8 file path issues such
              as 'Système de Bureau 2.0F I.dc42' - tested to work on Linux
              so far

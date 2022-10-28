@@ -5571,24 +5571,43 @@ extern "C" void free_all_ipcts(void);
 extern "C" void lisa_rebooted(void)
 {
   setstatusbar("The Lisa is rebooting.");
+
+  my_lisaframe->running=emulation_off;                // no longer running
+  if  ((my_lisawin->floppystate & FLOPPY_ANIM_MASK)!=FLOPPY_EMPTY) 
+      {
+        eject_floppy_animation();
+        flushscreen();
+      }
+
+  on_startup_actions_done=0;                        // reset
+
+  unvars();                                         // reset global vars
+
   my_lisaconfig->Save(pConfig, floppy_ram);         // save PRAM, configuration
+  my_lisaframe->runtime.Pause();                    // pause the stopwatch
 
-  free_all_ipcts();
-  unvars();                                         // reset global vars and all
+  flushscreen();
+  iw_enddocuments();
+  my_lisaframe->hostrefresh=refresh_rate_used;
 
-  on_startup_actions_done=0;
-// can't debug in windows since LisaEm is not a console app, so redirect buglog to an actual file.
-#if defined(__WXMSW__)    && defined(DEBUG) 
-  buglog=fopen("lisaem-output.txt","a+");
-#endif
+  int ret=initialize_all_subsystems();
+  if  (!ret)
+      {
+        my_lisawin->powerstate|= POWER_NEEDS_REDRAW | POWER_ON;
+        my_lisaframe->running=emulation_running; 
+        my_lisaframe->runtime.Start(0);
+        my_lisaframe->lastcrtrefresh=0;
+      }    
+  else
+      if (!romless) wxMessageBox(_T("Power on failed."), _T("Poweron Failed"), wxICON_INFORMATION | wxOK);
+  if (ret>1) EXIT(999,0,"Out of memory or other fatal error.");  // out of memory or other fatal error!
+  contrast=0;
+  presspowerswitch();                      // send keyboard event.
+  my_lisaframe->UpdateProfileMenu();
 
-  if (my_lisaframe) my_lisaframe->running=emulation_off;              // prevent init_all_subs from barking
-  if (my_lisawin)   my_lisawin->powerstate = POWER_OFF;               // will be turned back on immediately
-  handle_powerbutton();                                               // back on we go.
-  free_all_ipcts();
-  //free(lisaram);
-  //lisaram=NULL;
 }
+
+
 
 void LisaWin::OnMouseMove(wxMouseEvent &event)
 {
