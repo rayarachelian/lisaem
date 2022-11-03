@@ -186,7 +186,7 @@ const int idbl[4]={0, ID_PICK_PROFILESB1L, ID_PICK_PROFILESB2L, ID_PICK_PROFILES
 // using wxID_ANY for lower for some reason(why?), idbl - button lower line ~493
 
 LisaConfigFrame::LisaConfigFrame(const wxString& title, LisaConfig *lisaconfig)
-       : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(550*HIDPISCALE,650*HIDPISCALE), 
+       : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(630*HIDPISCALE,700*HIDPISCALE), 
                  wxDEFAULT_FRAME_STYLE|wxCLIP_CHILDREN |//|wxNO_FULL_REPAINT_ON_RESIZE)
                  wxMINIMIZE_BOX|wxMAXIMIZE_BOX|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCAPTION|
                  wxTAB_TRAVERSAL|wxCLOSE_BOX|wxNO_FULL_REPAINT_ON_RESIZE)

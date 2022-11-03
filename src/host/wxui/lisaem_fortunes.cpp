@@ -651,6 +651,7 @@ char *get_welcome_fortune(void)
   "His eyes are ablaze, See the madman in his gaze, emulate on your way, like an Eagle II, emulate as high as the sun",
 
   "Who’s the goat? Who’s the goat?  Heidrun, Heidrun",
+  "When it seems all hope is gone, I'll find a way, or make one!",
 
   "Cherry ice cream smile I suppose it's very nice",
   "And when she shines she really shows you all she can",

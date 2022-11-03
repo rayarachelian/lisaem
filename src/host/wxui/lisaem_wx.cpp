@@ -8270,14 +8270,15 @@ int initialize_all_subsystems(void)
     ALERT_LOG(0,"\n\nmmu_trans_all size: %d bytes\n\n",sizeof(mmu_trans_all));
 
 
-    DEBUG_LOG(0,"Loading Lisa ROM");
+    ALERT_LOG(0,"Loading Lisa ROM");
     strncpy(tmp, CSTR(my_lisaconfig->rompath ),MAXPATHLEN-1);
+    // DTC ROM is the text output of the assembler of the H ROM sources, it was used for debugging the emulator
     if  (read_dtc_rom(tmp,   lisarom)==0)
         {
             if  (checkromchksum())
                 {
                   if (!yesnomessagebox( "BOOT ROM checksum doesn't match, this may crash the emulator.  Continue anyway?",
-                                        "ROM Checksum mismatch"))   return -2;
+                                        "ROM Checksum mismatch"))   {lisa_powered_off(); return -2;}
                 }
               DEBUG_LOG(0,"Load of DTC assembled ROM successful");
               fixromchk();
@@ -8287,10 +8288,10 @@ int initialize_all_subsystems(void)
               if  (checkromchksum())
                   {
                     if (!yesnomessagebox( "BOOT ROM checksum doesn't match, this may crash the emulator.  Continue anyway?",
-                                          "ROM Checksum mismatch")  ) return -2;
+                                          "ROM Checksum mismatch")  ) {lisa_powered_off(); return -2;}
                   }
   
-              DEBUG_LOG(0,"Load of split ROM");
+              ALERT_LOG(0,"Load of split ROM");
               fixromchk();
             }
     else if (read_rom(tmp,       lisarom)==0)
@@ -8298,16 +8299,16 @@ int initialize_all_subsystems(void)
               if  (checkromchksum())
                   {
                     if (!yesnomessagebox( "BOOT ROM checksum doesn't match, this may crash the emulator.  Continue anyway?",
-                                          "ROM Checksum mismatch")  ) return -2;
+                                          "ROM Checksum mismatch")  ) {lisa_powered_off(); return -2;}
                   }
   
-              DEBUG_LOG(0,"Load of normal ROM successful");
+              ALERT_LOG(0,"Load of normal ROM successful");
               fixromchk();
             }
     else  
             {
               romless=1; //0=profile, 1=floppy
-              pickprofile=romlessboot_pick(); if (pickprofile<0) return -2;
+              pickprofile=romlessboot_pick(); if (pickprofile<0) {lisa_powered_off(); return -2;}
               ALERT_LOG(0,"picked %d",pickprofile);
             }
   

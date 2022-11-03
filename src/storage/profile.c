@@ -944,6 +944,8 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
              P->BSYLine=0; return;
          }
 
+        // LOS 2.0French behaves differently for some oddball reason.
+         //if (!  (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ))  
          CHECK_PROFILE_LOOP_TIMEOUT;
          
          if ( (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) && 
@@ -955,6 +957,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          }
          else 
             if (P->BSYLine!=2) {         // wait a bit before flopping busy, but if Lisa sends a byte, accept it
+              //if (! (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 )  ) // LOS2.0 FR is different
                if ( TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )  && !(EVENT_WRITE_ORA) ) //was 1/100th HUN_THOUSANDTH_OF_A_SEC 49152, 2021.03.23 add /100
                   {
                       DEBUG_LOG(0,"State:4 - wasting 1/10,000,000th of a sec, BSYLine=0");
@@ -1181,7 +1184,10 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
 
     case ACCEPT_DATA_FOR_WRITE_STATE:    // 7    // handle write/write+verify - read bytes from lisa into buffer
-         CHECK_PROFILE_LOOP_TIMEOUT;
+
+         // LOS2.0F is different
+         //if ( ! (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ) )
+            CHECK_PROFILE_LOOP_TIMEOUT;
 
          P->BSYLine=0;
 

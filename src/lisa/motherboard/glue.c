@@ -334,7 +334,7 @@ int check_running_lisa_os(void)
 
    #ifdef REPORT_OS
    v1v2cycles++;
-   if  (v1v2cycles>20) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x, running_lisa_os_version:%02x, PC24:@%08x\n",v1,v2,bootblockchecksum,running_lisa_os_version, pc24); v1v2cycles=0; 
+   if  (v1v2cycles>80) { ALERT_LOG(0,"v1:%08x v2:%08x bootblock cks: %08x, running_lisa_os_version:%02x, PC24:@%08x\n",v1,v2,bootblockchecksum,running_lisa_os_version, pc24); v1v2cycles=0; 
       //uint32 last=0;
       //for (uint32 addr=0x68+4; addr<0x3fc; addr+=4)
       //    {

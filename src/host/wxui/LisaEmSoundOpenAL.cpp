@@ -45,27 +45,8 @@ extern "C"
 #include <LisaConfigFrame.h>
 #include <LisaSkin.h>
 
+#include <LisaEmSoundOpenAL.h>
 
-#ifdef __linux__
-#include <AL/al.h>
-#include <AL/alc.h>
-#endif
-
-#ifdef __WXOSX__
-#include <OpenAL/al.h>
-#include <OpenAL/alc.h>
-#endif
-
-#include <string> 
-#include <cstring>
-#include <iostream>
-#include <limits.h>
-#include <math.h>
-#include <unistd.h>
-#include <fstream>
-#include <type_traits>
-#include <vector>
-#include <bit>
 
 #define MAX_WAV_SOUNDS 8
 

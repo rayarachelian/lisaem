@@ -448,6 +448,8 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     ROMLO=(uint8 *) calloc(1,8194); if (!ROMLO) {return -2;}
     ROMHI=(uint8 *) calloc(1,8194); if (!ROMHI) {free(ROMLO); return -2;}
 
+
+    ALERT_LOG(0,"Checking .lo/.hi in %s",infilename);
     // :TODO: is if strcasestr exists on all our supported platforms
     s=strstr(infilename,".lo"); if (!s) s=strstr(infilename,".LO"); if (!s) s=strstr(infilename,".Lo");
     if (s) *s=0; // strip off any possible .lo
@@ -458,16 +460,47 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     // You try to pick the lesser of, But evil doesn't come in twos, Whoooo!
     // note we do assignements inside the if here, because we're super cool like that
     //                         0123456
-    if ( (s=strstr(infilename,"341-175-")) || (s=strstr(infilename,"341-176-")) ) {
 
-        s[6]='5';
+    ALERT_LOG(0,"Checking 341-17x in %s",infilename);
+    if (strstr(infilename,".ROM")) return -1;
+
+
+    //                         341-0346A                        and 341-0347A
+    if ( (s=strstr(infilename,"341-0346")) || (s=strstr(infilename,"341-0347"))  ) {
+        ALERT_LOG(0,"Matched 341-17x in %s",infilename);
+
+        if (s[6]=='7') s[6]='6';
+
         low=fopen(infilename,"rb");
-        if (!low) {free(ROMHI); free(ROMLO); return -1;}
+        if (!low) {free(ROMHI); free(ROMLO); messagebox(infilename, "Could not open 3A ROM file Low half from Preferences. Going ROMless"); return -1;}
         DEBUG_LOG(0,"Opened %s\n",infilename);
 
-        s[6]='6';
+        if (s[6]=='6') s[6]='7';
+
         high=fopen(infilename,"rb");
-        if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
+        if (!high) {free(ROMHI); free(ROMLO); messagebox(infilename, "Could not open 3A ROM file High half from Preferences. Going ROMless"); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",infilename);
+
+        // strip off .bin, we'll add .ROM later
+        s=strstr(infilename,".bin"); if (!s) s=strstr(infilename,".BIN"); if (!s) s=strstr(infilename,".Bin");
+        if (s) *s=0;
+    }
+
+    if ( (s=strstr(infilename,"341-175")) || (s=strstr(infilename,"341-176")) || (s=strstr(infilename,"341-0175")) || (s=strstr(infilename,"341-0176")) ) {
+        ALERT_LOG(0,"Matched 341-17x in %s",infilename);
+
+        if (s[6]=='5') s[6]='6';
+        if (s[7]=='5') s[7]='6';
+
+        low=fopen(infilename,"rb");
+        if (!low) {free(ROMHI); free(ROMLO); messagebox(infilename, "Could not open ROM file Low half from Preferences. Going ROMless"); return -1;}
+        DEBUG_LOG(0,"Opened %s\n",infilename);
+
+        if (s[6]=='6') s[6]='5';
+        if (s[7]=='6') s[7]='5';
+
+        high=fopen(infilename,"rb");
+        if (!high) {free(ROMHI); free(ROMLO); messagebox(infilename, "Could not open ROM file High half from Preferences. Going ROMless"); return -1;}
         DEBUG_LOG(0,"Opened %s\n",infilename);
 
         // strip off .bin, we'll add .ROM later
@@ -479,14 +512,15 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
         snprintf(myfilename,FILENAME_MAX-1,"%s.lo",infilename);
         low=fopen(myfilename,"rb");
         if (!low) {free(ROMHI); free(ROMLO); return -1;}
-        DEBUG_LOG(0,"Opened %s\n",myfilename);
+        ALERT_LOG(0,"Opened %s\n",myfilename);
     
         snprintf(myfilename,FILENAME_MAX-1,"%s.hi",infilename);
         high=fopen(myfilename,"rb");
         if (!high) {fclose(low); free(ROMHI); free(ROMLO); return -1;}
         DEBUG_LOG(0,"Opened %s\n",myfilename);
     }
-
+    
+    ALERT_LOG(0,"Reading 341-17x split ROMs...");
     // [control|absorb|destroy] yourself [you're better alone|see who gives a fuck|if there was a day I could live|if there was a single breath I could breathe]... LoG!
     c=fread(ROMLO,8192,1,low);   if (c!=1) {ALERT_LOG(0,"Error reading  LOW bytes from %s",myfilename);}
     c=fread(ROMHI,8192,1,high);  if (c!=1) {ALERT_LOG(0,"Error reading HIGH bytes from %s",myfilename);}
@@ -494,27 +528,29 @@ int16 read_split_rom(char *filename, uint8 *ROMMX)
     fclose(low); fclose(high); // and bury you with honesty
 
     // stitch the lo/hi | even/odd ROMs
+    ALERT_LOG(0,"Stitching split ROMs");
     for (i=0,j=0; i<16384; i+=2, j++)
         { ROMMX[i+1]=ROMLO[j]; ROMMX[i  ]=ROMHI[j]; }
 
     // lay this to rest
     free(ROMHI); free(ROMLO);
 
-    // collosal hate arrises
+    // colossal hate arises
     snprintf(myfilename,1024,"%s.ROM",infilename);
+    ALERT_LOG(0,"Writing single ROM file: %s",myfilename);
     out=fopen(myfilename,"wb");
     if (out) {  fwrite(ROMMX,16384,1,out); fflush(out);  fclose(out); rename_rompath(myfilename);}
 
     // for (a=good; time<9999; see++) {youtu_be("KgaEI08JsiE"); ALERT_LOG(0,"Randy, you're scaring the kids.  Go scream in the closet! lel!");
-    DEBUG_LOG(0,"Saved merged rom file as %s\n",myfilename);
+    ALERT_LOG(0,"Saved merged rom file as %s\n",myfilename);
 
+    //if (ROMMX[0]==0x00 &&
+    //    ROMMX[1]==0x00 &&
+    //    ROMMX[2]==0x80 &&
+    //    ROMMX[3]==0x04   )  {ALERT_LOG(0,"Returning 0"); return 0;}
 
-    if (ROMMX[0]==0x00 &&
-        ROMMX[1]==0x00 &&
-        ROMMX[2]==0x80 &&
-        ROMMX[3]==0x04   )  return 0;
-
-    return -3;
+    ALERT_LOG(0,"returning -3");
+    return 0;
 }
 
 
@@ -534,7 +570,7 @@ int16 read_rom(char *filename, uint8 *ROMMX)
     c=fread(ROMMX,16384,1,rom); fclose(rom);
     if (c!=1) 
        {
-           ALERT_LOG(0,"fread returned %d count instead of 1",c);
+           ALERT_LOG(0,"fread returned %d count instead of 1 for file %s",c,filename);
            return -1;
        }
     #ifdef DEBUG

@@ -662,8 +662,8 @@ for (i=0; i<32768; i++)
         if (j>t+ 8   && j<t+16 && (k> r-19 && k< r-14 ))  lisaram[videolatchaddress+i]=0xff;
         if (j>t+70   && j<t+78 && (k> r-19 && k< r-14 ))  lisaram[videolatchaddress+i]=0xff;
 
-        if (j>t     && j<t+98 && (k==l+11 || k==r-11 ))  lisaram[videolatchaddress+i]=0xff;
-        if (j>t+90  && j<t+98 && (k> l+11 && k< r-11 ))  lisaram[videolatchaddress+i]=0xff;
+        if (j>t     && j<t+98 && (k==l+11 || k==r-11 ))   lisaram[videolatchaddress+i]=0xff;
+        if (j>t+90  && j<t+98 && (k> l+11 && k< r-11 ))   lisaram[videolatchaddress+i]=0xff;
 
         if (j>b-150 && j<b     && (k==l+8  || k==r- 7 ))  lisaram[videolatchaddress+i]=0xff;
         if (j>b-158 && j<b-150 && (k> l+8  && k< r- 7 ))  lisaram[videolatchaddress+i]=0xff;
