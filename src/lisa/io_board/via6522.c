@@ -1821,11 +1821,7 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
        DEBUG_LOG(0,"reading from register %d (%s)", ((addr & 0x7f)>>3) ,via_regname(((addr & 0x7f)>>3) ));
     #endif
 
-
-
-    
-
-    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_NUL); // 2021.05.24
+    //if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_NUL); // removed, 2021.05.24
 
     switch (addr & 0x79)                // was 7f, changing to 79
     {

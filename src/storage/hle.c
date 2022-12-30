@@ -1,6 +1,6 @@
 /**************************************************************************************\
 *                                                                                      *
-*              The Lisa Emulator Project  V1.2.7      DEV 2021.03.26                   *
+*              The Lisa Emulator Project  V1.2.7      DEV 2022.11.20                   *
 *                             http://lisaem.sunder.net                                 *
 *                                                                                      *
 *                  Copyright (C) 1998, 2022 Ray A. Arachelian                          *
@@ -129,7 +129,37 @@ void uniplus_set_partition_table_size(uint32 disk, uint32 sswap, uint32 rroot, i
 }
 
 
-void hle_los31_read(uint32 count) {
+void hle_los20_write(void) { //  1/00240566
+     ProFileType *P=NULL;
+     int vianum=get_vianum_from_addr( A2 );
+     if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
+
+     for  (int i=0; i<512; i++) {
+          P->DataBlock[P->indexwrite++]=fetchbyte(A0); A0++;
+     }
+
+     cpu68k_clocks+=( 0x2310 );
+     D0|=0x0000ffff;  // =-1 after dbra
+     RTS;
+}
+
+void hle_los20_read(void) {  // 1/00240366
+     ProFileType *P=NULL;
+     int vianum=get_vianum_from_addr( A2 );
+     if (vianum>1 && vianum<9) P=via[vianum].ProFile; else return;
+
+     for  (int i=0; i<512; i++) {
+          D0=fetchbyte(A2); A2++;
+          D1=(D0)^(D1);
+          P->DataBlock[P->indexread++]=D0;
+     }
+
+     cpu68k_clocks+=( 0x2A90 );
+     D2|=0x0000ffff;  // =-1 after dbra
+     RTS;
+}
+
+void hle_los31_read(uint32 count) { 
   ProFileType *P=NULL;
   int vianum=get_vianum_from_addr( A2 );
   if (vianum>1 && vianum<9) P=via[vianum].ProFile;
@@ -152,13 +182,11 @@ void hle_los31_read(uint32 count) {
 
    cpu68k_clocks += (count * (8+4+8+10) );     // this will be off for the 8x loop.
    D2|=0x0000ffff; // after DBRA.W D2 is -1
-
    RTS;
 
    ALERT_LOG(0,"Returning HLE LOS31 via:%d cmd:%d block:%d idxread:%d count:%d pc:%08x A0:%08x D1:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread,count,
              PC, A0, D1 );
 }
-
 
 void hle_los31_write(void) {
      ProFileType *P=NULL;
@@ -247,9 +275,7 @@ void hle_macws_write(void) {
      D0|=0x0000ffff;  // d0.w=-1 after dbra
      A0=fetchlong(A7); A7+=4;
      RTS;
-
      ALERT_LOG(0,"HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x",vianum, P->DataBlock[4],blocknumber,P->indexread, PC, A0, A2);
-
 }
 
 
@@ -274,44 +300,57 @@ void apply_mw30_hacks(void) {
       ALERT_LOG(0,"#### #    #### Patching for MacWorks XL 3.0 ProFile");
       ALERT_LOG(0,"#  # #    #    Patching for MacWorks XL 3.0 ProFile");
       ALERT_LOG(0,"#  # #### #### Patching for MacWorks XL 3.0 ProFile");
-
-
-
      }
-
   macworks_hle=0;
 }
 
 
 
 void hle_los_intercept(void) {
-
-   if ( PC == 0x00c08a86) { ALERT_LOG(0,"511");    hle_los31_read( 511      ); return; }
-   if ( PC == 0x00c08a2e) { ALERT_LOG(0,"D2");     hle_los31_read( D2       ); return; }
-   if ( PC == 0x00c08d0a) { ALERT_LOG(0,"c08d0a"); hle_los31_write_00c08d0a(); return; }
-   if ( PC == 0x00c08c86) { ALERT_LOG(0,"write");  hle_los31_write         (); return; }
-
-   ALERT_LOG(0,"UNHANDLED LOS31 HLE at %d/%08x",context,PC);
+    if  (running_lisa_os_version==0x20) {
+          if ( PC == 0x00240366) { ALERT_LOG(0,"LOS2 profile read");  hle_los20_read();  return; }
+          if ( PC == 0x00240566) { ALERT_LOG(0,"LOS2 profile write"); hle_los20_write(); return; }
+          ALERT_LOG(0,"UNHANDLED LOS31 HLE at %d/%08x",context,PC);
+    }
+    
+    if  (running_lisa_os_version==0x30) {
+          if ( PC == 0x00c08a86) { ALERT_LOG(0,"511");    hle_los31_read( 511      ); return; }
+          if ( PC == 0x00c08a2e) { ALERT_LOG(0,"D2");     hle_los31_read( D2       ); return; }
+          if ( PC == 0x00c08d0a) { ALERT_LOG(0,"c08d0a"); hle_los31_write_00c08d0a(); return; }
+          if ( PC == 0x00c08c86) { ALERT_LOG(0,"write");  hle_los31_write         (); return; }
+          ALERT_LOG(0,"UNHANDLED LOS31 HLE at %d/%08x",context,PC);
+    }
 }
 
 
-void apply_los31_hacks(void) {
+void apply_los31_hacks(void) { // and also 2.0 - name of fn is a bit misleading as of the update
   if (!los31_hle) return;
-  
   if (check_running_lisa_os() != LISA_OFFICE_RUNNING || context!=1) return;
 
-  if (lisa_rw_ram(0x00c08a86)==0x743f && lisa_rl_ram(0x00c08a88)==0x1012b101 && lisa_rl_ram(0x00c08a88+4)==0x10c01012) {      
+  if (running_lisa_os_version==0x20) {
+      if (lisa_rw_ram(0x00240366)==0x743f && lisa_rw_ram(0x00240566)==0x707f ) {      
+          lisa_ww_ram(0x00240366,0xf33d);
+          lisa_ww_ram(0x00240566,0xf33d);
+          ALERT_LOG(0,"#  # #    #### Patching for LOS2.0 ProFile");
+          ALERT_LOG(0,"#  # #    #    Patching for LOS2.0 ProFile");
+          ALERT_LOG(0,"#### #    #### Patching for LOS2.0 ProFile");
+          ALERT_LOG(0,"#  # #    #    Patching for LOS2.0 ProFile");
+          ALERT_LOG(0,"#  # #### #### Patching for LOS2.0 ProFile");
+      }
+  }
 
-      lisa_ww_ram(0x00c08a86,0xf33d);          // read 512
-      lisa_ww_ram(0x00c08a2e,0xf33d);          // read 1x
-      lisa_ww_ram(0x00c08d0a,0xf33d);          // write 3x
-      lisa_ww_ram(0x00c08c86,0xf33d);          // write 512
-
-      ALERT_LOG(0,"#  # #    #### Patching for LOS3.1 ProFile");
-      ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
-      ALERT_LOG(0,"#### #    #### Patching for LOS3.1 ProFile");
-      ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
-      ALERT_LOG(0,"#  # #### #### Patching for LOS3.1 ProFile");
+  if (running_lisa_os_version==0x30) {
+      if (lisa_rw_ram(0x00c08a86)==0x743f && lisa_rl_ram(0x00c08a88)==0x1012b101 && lisa_rl_ram(0x00c08a88+4)==0x10c01012) {      
+          lisa_ww_ram(0x00c08a86,0xf33d);          // read 512
+          lisa_ww_ram(0x00c08a2e,0xf33d);          // read 1x
+          lisa_ww_ram(0x00c08d0a,0xf33d);          // write 3x
+          lisa_ww_ram(0x00c08c86,0xf33d);          // write 512
+          ALERT_LOG(0,"#  # #    #### Patching for LOS3.1 ProFile");
+          ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
+          ALERT_LOG(0,"#### #    #### Patching for LOS3.1 ProFile");
+          ALERT_LOG(0,"#  # #    #    Patching for LOS3.1 ProFile");
+          ALERT_LOG(0,"#  # #### #### Patching for LOS3.1 ProFile");
+      }
   }
 
   los31_hle=0;
@@ -322,7 +361,7 @@ void apply_los31_hacks(void) {
 extern void init_terminal_serial_port(int port); // create console terminalwx window in src/host/wxui/z8530-terminal.cpp
 extern void lisa_console_output(uint8 c);        // single char output directly as VT100 in src/host/wxui/z8530-terminal.cpp
 extern void lpw_console_output(char *text);      // output a whole string and translate SOROC->vt100 of whole string in src/host/wxui/z8530-terminal.cpp
-extern void  lpw_console_output_c(char c);       // output with SOROC->vt100 of a single char rather than string in src/host/wxui/z8530-terminal.cpp
+extern void lpw_console_output_c(char c);        // output with SOROC->vt100 of a single char rather than string in src/host/wxui/z8530-terminal.cpp
 
 void hle_monitor_intercept(void) {
     switch(PC) {

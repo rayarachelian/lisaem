@@ -94,9 +94,9 @@ switch( ((ipc->sreg>>3) & 1) | ((ipc->sreg>>6) & 2) )
  {
   case 0: GENDBG("0: data,word");// data, word
     r=((sint16)DATAREG((ipc->sreg>>4 )&7)  +  ((sint32)(ipc->src))   );  //lisaem1.2.x
-    DEBUG_LOG(10,"idxvsrc:0:data,word D%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)DATAREG((ipc->sreg>>4)&7) ,(long)r,(long)r,(long)ipc->src,(long)ipc->dst);
-    DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %04lx+%08lx",(unsigned long int)r,(long)r,
-             (unsigned long int)(((sint32)(sint16)DATAREG(ipc->sreg&7))),((unsigned long int)((sint32)(ipc->src))) );
+    //DEBUG_LOG(10,"idxvsrc:0:data,word D%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)DATAREG((ipc->sreg>>4)&7) ,(long)r,(long)r,(long)ipc->src,(long)ipc->dst);
+    //DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %04lx+%08lx",(unsigned long int)r,(long)r,
+    //         (unsigned long int)(((sint32)(sint16)DATAREG(ipc->sreg&7))),((unsigned long int)((sint32)(ipc->src))) );
     return r;
 
   case 1: GENDBG("1: data,long");// data, long
@@ -105,23 +105,23 @@ switch( ((ipc->sreg>>3) & 1) | ((ipc->sreg>>6) & 2) )
 
     r=((sint32)DATAREG((ipc->sreg>>4)&7)  +   ((sint32)(ipc->src) ));
 
-    DEBUG_LOG(10,"idxvsrc:1:data,long D%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)DATAREG((ipc->sreg>>4)&7) ,(long)r,(long)r,(long)ipc->src,(long)ipc->dst);
-    DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %08lx+%08lx",(long)r,(long)r,
-             (unsigned long)((sint32)DATAREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src) )  );
+    //DEBUG_LOG(10,"idxvsrc:1:data,long D%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)DATAREG((ipc->sreg>>4)&7) ,(long)r,(long)r,(long)ipc->src,(long)ipc->dst);
+    //DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %08lx+%08lx",(long)r,(long)r,
+    //         (unsigned long)((sint32)DATAREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src) )  );
     return r;
 
   case 2: GENDBG("2: addr,word"); // addr, word
     r=((sint16)ADDRREG((ipc->sreg>>4)&7))  +  ((sint32)(ipc->src))   ;
-    DEBUG_LOG(10,"idxvsrc:2:addr,word A%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (unsigned long)ADDRREG((ipc->sreg  )&7),(long)r,(unsigned long)r,(unsigned long)ipc->src,(unsigned long)ipc->dst);
-    DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %04lx+%08lx",(unsigned long)r,(long)r,
-              (long)((sint16)ADDRREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src) )  );
+    //DEBUG_LOG(10,"idxvsrc:2:addr,word A%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (unsigned long)ADDRREG((ipc->sreg  )&7),(long)r,(unsigned long)r,(unsigned long)ipc->src,(unsigned long)ipc->dst);
+    //DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %04lx+%08lx",(unsigned long)r,(long)r,
+    //          (long)((sint16)ADDRREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src) )  );
     return r;
   case 3: GENDBG("3: addr,long"); // addr, long
     r=((sint32)ADDRREG((ipc->sreg>>4)&7)  +  ((sint32)(ipc->src))  );
-    DEBUG_LOG(10,"idxvsrc:3:addr,long A%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)ADDRREG((ipc->sreg)&7),(long)r,(long)r,(unsigned long)ipc->src,(unsigned long)ipc->dst);
+    //DEBUG_LOG(10,"idxvsrc:3:addr,long A%ld=%08lx r:%08lx (%ld) src:%08lx dst:%08lx",(long)((ipc->sreg>>4)&7), (long)ADDRREG((ipc->sreg)&7),(long)r,(long)r,(unsigned long)ipc->src,(unsigned long)ipc->dst);
 
-    DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %08lx+%08lx",(long)r,(long)r,
-      (long)((sint32)ADDRREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src)  ) );
+    //DEBUG_LOG(10,"idxval_src=%08lx (%ld) = %08lx+%08lx",(long)r,(long)r,
+    //  (long)((sint32)ADDRREG(ipc->sreg&7)),(unsigned long)((sint32)(ipc->src)  ) );
     return r;
   }
   return 0;

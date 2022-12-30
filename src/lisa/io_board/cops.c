@@ -723,7 +723,7 @@ void via1_ora(uint8 data,uint8 regnum)
             if ( copsqueuelen+8>MAXCOPSQUEUE) {fprintf(buglog,"\n\n\n\n     COPS OVERFLOW! CAN'T SET DATE!\n\n\n"); }
             if ( copsqueuelen+7<MAXCOPSQUEUE)  // if the queue isn't full that is...
       			{
-              ALERT_LOG(0,"sending clock.\n");
+              ALERT_LOG(0,"sending clock.");
 
 
 

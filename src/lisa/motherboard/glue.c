@@ -366,7 +366,7 @@ int check_running_lisa_os(void)
             DEBUG_LOG(0,"Lisa Office System v1:%08x v2:%08x",v1,v2);
             return running_lisa_os;
        }
-  else
+   else
    if  ( ((v1 & 0x00ff0000) ==0x00ec0000  && (v2 & 0x00fff000)==0x00ec0000) ||         // LisaTest - this one might be wrong!
          ((v1 & 0x000ff000) ==0x000ec000  && (v2 & 0x000ff000)==0x000ec000)  )         // LisaTest for Peripherals v1=000ec92a v2=000eca7a
        {//                 v1:000ec92a                       v2:000eca7a
@@ -378,7 +378,7 @@ int check_running_lisa_os(void)
             return running_lisa_os;
        }
    else                   // 000ff000                          000fff00
-   if  ( ((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500) ||         // Monitor OS (No mouse used)
+   if  (((v1 & 0x000ff000) ==0x000d5000  && (v2 & 0x000fff00)==0x000e2500) ||         // Monitor OS (No mouse used)
         ((v1 & 0x00fff000) ==0x001c2000  && (v2 & 0x00ffff00)==0x001c2500) ||         // this is a clue - address has changed!!!! maybe that's why LOS crashes!
         ((v1 & 0x00fff000) ==0x00142000  && (v2 & 0x00fff000)==0x00142000) ||
         ((v1 & 0x00fff000) ==0x00162000  && (v2 & 0x00fff000)==0x00162000) )
@@ -397,10 +397,10 @@ int check_running_lisa_os(void)
          ((v1 & 0x00fff000) ==0x00156000  && (v2 & 0x00fff000)==0x00156000) ||         // MacWorks XL 4.5 v1=00156206 v2=00156384; test1,2,3: 50555445, 400022d8, 91fc0000| 23:27:31.1 1242627682
          ((v1 & 0x00fff000) ==0x001c4000  && (v2 & 0x00fff000)==0x001c4000) || 
          ((v1 & 0x00fff000) ==0x00164000  && (v2 & 0x00fff000)==0x00164000) ||
-         (bootblockchecksum==0xce0ca734  || bootblockchecksum==0xce0cbba3) ||         // MWXL3.0, MWXL4.5 floppy
-         (bootblockchecksum==0xb66c2a5d                                  ) ||         // MW+II v2.3.0 floppy
-         (bootblockchecksum==0x703fe7ba                                  ) ||         // MWXL 3.0 profile boot block
-         (bootblockchecksum==0xce0cb94e                                  )            // MW1.018 for system 6
+         (bootblockchecksum==0xce0ca734  || bootblockchecksum==0xce0cbba3 ) ||         // MWXL3.0, MWXL4.5 floppy
+         (bootblockchecksum==0xb66c2a5d                                   ) ||         // MW+II v2.3.0 floppy
+         (bootblockchecksum==0x703fe7ba                                   ) ||         // MWXL 3.0 profile boot block
+         (bootblockchecksum==0xce0cb94e                                   )            // MW1.018 for system 6
         )
        {
            //if (lisa_os_mouse_x_ptr!=0x0000082e) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to 82e",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);

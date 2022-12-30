@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <machine.h>
+#include <string.h>
 
 uint16 get_sn_stored_checksum_bytes(uint8 *sn2)   {
       //fprintf(OUT,"sn2[24]=\n%02x, sn2[25]=%02x, sn3[26]=%02x\n",sn2[24], sn2[25], sn2[26]);
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
 
    //fprintf(OUT,"14:%c 15:%c 16:%c 17:%c len:%d\n\n",argv[1][14], argv[1][15],argv[1][16], argv[1][17], strlen(argv[1]));
    if (tolower(argv[1][ 0])=='f'  &&  tolower(argv[1][ 1])=='f' && 
-       tolower(argv[1][14])=='f'  &&  tolower(argv[1][15])=='f' && strlen(argv[1])==32 ) {
+       tolower(argv[1][14])=='f'  &&  tolower(argv[1][15])=='f' && strlen((const char *)(argv[1]))==32 ) {
        for  (i=0; i<32; i+=2) {
            uint8 c1=tolower(argv[1][i]), c2=tolower(argv[1][i+1]);
            

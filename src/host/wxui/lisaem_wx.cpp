@@ -1761,8 +1761,30 @@ extern "C"  void dumpallscreenshot(void)
             dumpram(name);
             debug_screenshot();
 }
-
 #endif
+
+// this expression ( openfile.char_str(wxConvUTF8) ) returns a null string for say, 'Système de Bureau 2.0F I.dc42'
+// breaking access on EU and other non-USA paths, including in Windows where the username 
+// contains one of these UTF chars, same is likely true of ProFile paths stored in the user's home directory.
+// returns: error 84: Invalid or incomplete multibyte or wide character
+//
+// error 84: Invalid or incomplete multibyte or wide character
+//
+// So have to do this crazy thing here, by opening wxFFile first, getting back the same filename, and converting that
+// to UTF8, to get around "error 84: Invalid or incomplete multibyte or wide character" - not sure why this is so!
+char *GetCFileNamePath(wxString openfile) {
+      wxString i(openfile);
+      static char f[16384];
+      wxFFile wff;
+      if  ( wff.Open(i,"r") ) {
+             strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
+             ALERT_LOG(0,"wff C string: :::%s:::",f);
+             wff.Close();
+      }
+      return f;
+}
+
+
 
 void LisaEmFrame::Update_Status(long elapsed,long idleentry)
 {
@@ -1783,23 +1805,29 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="KHz";}
     if (vidhz>1000) {vidhz=vidhz/1000.0; s="MHz";}
 
-    text.Printf(_T("CPU: %1.2f%s want:%1.2fMHz tick:%d, video refresh:%1.2f%s %c contrast:%02x %s %x%x:%x%x:%x%x.%x @%d/%08x clk_cycles:%lld"),
-                mhzactual,c,throttle,emulation_tick,
-                vidhz,s,  (videoramdirty ? 'd':' '),
-                contrast,
+
+    text.Printf(_T("CPU: %1.2f%s @%d/%08x cycles:%lld %s %x%x:%x%x:%x%x.%x  %s %s "),
+                mhzactual,c,
+                context,pc24,
+                cpu68k_clocks,
                 debug_log_enabled ? "TRACELOG":"",
+                
                 lisa_clock.hours_h,lisa_clock.hours_l,
                 lisa_clock.mins_h,lisa_clock.mins_l,
                 lisa_clock.secs_h,lisa_clock.secs_l,
                 lisa_clock.tenths,
-                context,pc24,cpu68k_clocks);
+                
+                floppy_access_block,
+                profile_access_block
+                );
 
     SetStatusBarText(text);
     screen_paint_update=0;
 
     // only issue is that this is called only on startup
-    if ( !(counter) ) update_menu_checkmarks(); // meh, there's some bugs in wxWidgets 3.1.1 and earlier on GTK where Radio buttons don't get updated, i.e. scale menu
+    if ( !(counter) ) {update_menu_checkmarks(); floppy_access_block[0]=0; profile_access_block[0]=0;}
     counter++; counter&=7;
+
     // these are independant of the execution loops on purpose, so that way we get a 2nd opinion as it were.
     last_runtime_sample=elapsed;
     last_runtime_cpu68k_clx=cpu68k_clocks;
@@ -1818,8 +1846,8 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
 
         if (on_start_floppy != "" )
         {
-            char s[1024];
-            strncpy(s,on_start_floppy.mb_str(wxConvUTF8),1023 );
+            char s[16384];
+            strncpy(s,GetCFileNamePath(on_start_floppy),16384);
             floppy_insert(s);
             wxMilliSleep(100);  // wait for insert sound to complete to prevent crash.
             my_lisaframe->floppy_to_insert=_T("");
@@ -2001,8 +2029,9 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
 
         if  (cpu68k_clocks<10 && floppy_to_insert.Len())            // deferred floppy insert.
             {
-              const wxCharBuffer s = CSTR(floppy_to_insert);
-              int i=floppy_insert((char *)(const char *)s);
+              char s[16384];
+              strncpy(s,GetCFileNamePath(floppy_to_insert),16384);
+              int i=floppy_insert(s);
               floppy_to_insert=_T("");
               if (i) eject_floppy_animation();
             }
@@ -2909,10 +2938,16 @@ void LisaEmApp::LisaSkinConfig(void)
 
 wxSize get_size_prefs(void);
 
+static char floppy_access_block_s[32];
+static char profile_access_block_s[32];
+
 // Initialize the application
 bool LisaEmApp::OnInit()
 {
     if (!wxApp::OnInit()) return false;      // call default behaviour (mandatory)
+
+    floppy_access_block=floppy_access_block_s;
+    profile_access_block=profile_access_block_s;
 
     wxStandardPathsBase& stdp = wxStandardPaths::Get();
     wxString defaultconfig=stdp.GetUserConfigDir();
@@ -6752,28 +6787,12 @@ if  (sound_effects_on)
 
 void LisaEmFrame::OnFLOPPY(wxCommandEvent& WXUNUSED(event)) {OnxFLOPPY();}
 
+
 void LisaEmFrame::insert_floppy_anim(wxString openfile)
 {
     if (!openfile.Len()) return;
-
-    // this expression ( openfile.char_str(wxConvUTF8) ) returns a null string for say, 'Système de Bureau 2.0F I.dc42'
-    // breaking access on EU and other non-USA paths, including in Windows where the username 
-    // contains one of these UTF chars, same is likely true of ProFile paths stored in the user's home directory.
-    // returns: error 84: Invalid or incomplete multibyte or wide character
-    //
-    // error 84: Invalid or incomplete multibyte or wide character
-    //
-    // So have to do this crazy thing here, by opening wxFFile first, getting back the same filename, and converting that
-    // to UTF8, to get around "error 84: Invalid or incomplete multibyte or wide character" - not sure why this is so!
-
-    wxString i(openfile);
     char f[16384];
-    wxFFile wff;
-    if  ( wff.Open(i,"r") ) {
-           strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
-           ALERT_LOG(0,"wff C string: :::%s:::",f);
-           wff.Close();
-    }
+    strncpy(f,GetCFileNamePath(openfile),16384);
 
     if (my_lisaframe->running) {
         ALERT_LOG(0,"Inserting floppy:::%s:::",  f  );
@@ -7380,6 +7399,10 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
 
     ALERT_LOG(0,"Welcome status")
 
+
+    floppy_access_block[0]=0;
+    profile_access_block[0]=0;
+
     char *t=get_welcome_fortune();
     SetStatusText(t);
     soundplaying=0;
@@ -7789,14 +7812,9 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
           else return; // invalid via index
         }
 
-        wxString ii(*file);
+
         char f[16384];
-        wxFFile wff;
-        if  ( wff.Open(ii,"r") ) {
-               strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
-               ALERT_LOG(0,"wff C string: :::%s:::",f);
-               wff.Close();
-        }
+        strncpy(f,GetCFileNamePath(*file),16384);
 
         t=strncpy(tmp,f,MAXPATHLEN-1);
         ALERT_LOG(0, "Attempting to attach VIA#%d to profile %s", v, tmp);
@@ -8023,14 +8041,8 @@ int romlessboot_pick(void) //returns 0=profile, 1=floppy
       if (!my_lisaframe->floppy_to_insert.Len()) return -1;  // if the user hasn't picked a floppy, abort.
 
       // have to do this crazy thing to get around an issue, see void LisaEmFrame::insert_floppy_anim(wxString openfile)
-      wxString ii(my_lisaframe->floppy_to_insert);
       char f[16384];
-      wxFFile wff;
-      if  ( wff.Open(ii,"r") ) {
-             strncpy(f,wff.GetName().char_str(wxConvUTF8),16383);
-             ALERT_LOG(0,"wff C string: :::%s:::",f);
-             wff.Close();
-      }
+      strncpy(f,GetCFileNamePath(my_lisaframe->floppy_to_insert),16384);
 
       int i=floppy_insert(f);
       wxMilliSleep(100);  // wait for insert sound to complete to prevent crash.
@@ -8075,6 +8087,9 @@ int initialize_all_subsystems(void)
 
     if (my_lisaframe->running) {ALERT_LOG(0,"Already running!"); 
                                 return 0;}
+
+    floppy_access_block=floppy_access_block_s;
+    profile_access_block=profile_access_block_s;
 
     ALERT_LOG(0,"Initializing all subsystems...")
     #ifdef DEBUGLOG_ON_START

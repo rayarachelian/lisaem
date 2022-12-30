@@ -2,6 +2,23 @@
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
+
+This does not work, only use just incase I kick the bucket to debug
+
+2022.12.18-12.24 - in hospital, very sick
+
+
+
+2022.11.22 added LOS 2.0 HLE ProFile read/write block, but when HLE is turned
+           on LOS 2.0 booting from ProFile resets to Boot ROM. (It times out
+           in a procedure named FLUSHFIL(e?) and then reboots.)
+
+
+...
+           [ very sick, low energy, lots of pain ]
+...
+
+
 2022.10.30 - fixup ROM stitching for 341-017x named boot ROMs.
 
 2022.10.28 - fixup reboot issues

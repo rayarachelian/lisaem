@@ -155,12 +155,9 @@ void fixromchk(void)
     if (cheat_ram_test)
     {
 
-       /* Only apply these patches if we're fairly sure it's the 2.H ROM */
-
-       /*
+       /* Only apply these patches if we're fairly sure it's the 2.H ROM
         * Patch the check in MEMTST2 to decide how many tests to run based on
-        * warmstart/coldstart to instead jump straight to TSTDONE always.
-        */
+        * warmstart/coldstart to instead jump straight to TSTDONE always.            */
 
        ALERT_LOG(0,"H ROM patched with ram-test cheats")
 

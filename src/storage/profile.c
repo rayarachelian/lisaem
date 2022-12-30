@@ -303,6 +303,8 @@ void do_profile_read(ProFileType *P, uint32 block)
     if (!P                 ) {ALERT_LOG(0,"ProfileType P is null!"); return;}    // no image is opened!
     if (!P->DC42.sectorsize) {ALERT_LOG(0,"Profile sector size is 0!"); return;}
 
+    if ( block==0x00ffffff || block==0x00fffffe ) snprintf(profile_access_block,32,"Pro R:SpareTable/ID");
+    else                                          snprintf(profile_access_block,32,"Pro R:%06d",block);
 
 //    if (block==0x00ffffff || block<30)
 //      ALERT_LOG(0,"Slot 1 ID:%04x, Slot 2 ID:%04x, Slot 3 ID:%04x, via:%d blk:%d",
@@ -330,7 +332,7 @@ void do_profile_read(ProFileType *P, uint32 block)
 	}
 
 
-    if ( block==0x00ffffff)  {get_profile_spare_table(P); return;} // return Profile spare table
+    if ( block==0x00ffffff )  {get_profile_spare_table(P); return;} // return Profile spare table
 
 
     if (P->DC42.numblocks==0 && P->DC42.sectorsize) P->DC42.numblocks=  (P->DC42.datasizetotal/P->DC42.sectorsize);
@@ -406,6 +408,8 @@ void do_profile_write(ProFileType *P,uint32 block)
     if (!P->DC42.sectorsize) {ALERT_LOG(0,"Profile sector size is 0!");              return;}
 
     if (block<0x00f00000) block=deinterleave5(block);
+
+    snprintf(profile_access_block,32,"Pro W:%06d",block);
 
     DEBUG_LOG(0,"ProFile write request block #%ld 0x%08x deinterleaved:%ld 0x%08x\n",block,block,oblock,oblock);
 
@@ -645,7 +649,6 @@ void ProfileReset(ProFileType *P)
 #define EVENT_WRITE_ORA (event==2)
 #define EVENT_WRITE_ORB (event==3)
 #define EVENT_WRITE_NUL (event==4)
-
 
 char *profile_event_names[5]=
      {
@@ -938,14 +941,13 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          #endif
 		
          // uniplus loader hax - weirdly this expects BSY to be down before it sends CMD!
-         if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) {
+         if ( running_lisa_os==0 && reg68k_pc==0x00062a38 && context==1 && P->indexwrite==10 && P->indexread==4) 
+         {
              DEBUG_LOG(0,"UniPlus Loader hax, faking BSYLine=0");
              SET_PROFILE_LOOP_NO_PREDELAY(TENTH_OF_A_SECOND); 
              P->BSYLine=0; return;
          }
 
-        // LOS 2.0French behaves differently for some oddball reason.
-         //if (!  (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ))  
          CHECK_PROFILE_LOOP_TIMEOUT;
          
          if ( (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING) && 
@@ -957,10 +959,9 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
          }
          else 
             if (P->BSYLine!=2) {         // wait a bit before flopping busy, but if Lisa sends a byte, accept it
-              //if (! (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 )  ) // LOS2.0 FR is different
                if ( TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )  && !(EVENT_WRITE_ORA) ) //was 1/100th HUN_THOUSANDTH_OF_A_SEC 49152, 2021.03.23 add /100
                   {
-                      DEBUG_LOG(0,"State:4 - wasting 1/10,000,000th of a sec, BSYLine=0");
+                      DEBUG_LOG(0,"State:4 - wasting 1/10,000,000th of a sec, BSYLine=0 %ld",(TIMEPASSED_PROFILE_LOOP( (HUN_THOUSANDTH_OF_A_SEC/100) )) );
                       P->BSYLine=0;
                       return;
                   }
@@ -1184,10 +1185,7 @@ case GET_CMDBLK_STATE:           // 4          // now copy command bytes into co
 
 
     case ACCEPT_DATA_FOR_WRITE_STATE:    // 7    // handle write/write+verify - read bytes from lisa into buffer
-
-         // LOS2.0F is different
-         //if ( ! (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ) )
-            CHECK_PROFILE_LOOP_TIMEOUT;
+         CHECK_PROFILE_LOOP_TIMEOUT;
 
          P->BSYLine=0;
 
@@ -1409,35 +1407,40 @@ case WAIT_3rd_0x55_STATE:              // 8    // wait for 0x55 again
 
     case SEND_STATUS_BYTES_STATE:              //12              // Let Lisa read the status/data
 
-         #ifdef DEBUG                          // don't fill up the log with useless shit
-         if (!(EVENT_WRITE_NUL))
-          DEBUG_LOG(0,"State:12, post write - allow Lisa to read the status and data  - pointer:%d",P->indexread);
-         #endif
+         DEBUG_LOG(0,"State:12, post write - allow Lisa to read the status and data  - pointer:%d BSY:%d CMD:%d",P->indexread,P->BSYLine,P->CMDLine);
 
          if (  !  (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20 ) ) CHECK_PROFILE_LOOP_TIMEOUT;
 
          // this needs to be turned on for LOS 2.0, *BUT* not 3.x! 
          if (running_lisa_os==LISA_UNIPLUS_RUNNING || running_lisa_os == LISA_UNIPLUS_SUNIX_RUNNING || running_lisa_os == LISA_XENIX_RUNNING  ||
-             (running_lisa_os==LISA_OFFICE_RUNNING && running_lisa_os_version==0x20) ) //2022.10.14
+             (running_lisa_os==LISA_OFFICE_RUNNING  && running_lisa_os_version==0x20) ) //2022.10.14 - not for LOS3.x, causes profile reset to be sent
              via[P->vianum].via[IFR] |=VIA_IRQ_BIT_CA1; // 2021.06.06 - force IFR BSY/CA1 bit on
 
          P->BSYLine=0;
 
-         if (EVENT_WRITE_NUL || EVENT_READ_IRB) return;
+         if (EVENT_WRITE_NUL || EVENT_READ_IRB) {DEBUG_LOG(0,"event null or read IRB, skipping."); return;}
 
          if (!P->CMDLine)
          {
+            DEBUG_LOG(0,"CMDLine set, if event read IRA, will return data")
             if (EVENT_READ_IRA)
             {
              P->VIA_PA=P->DataBlock[P->indexread++]; if (P->indexread>3) P->indexread=0;
              P->last_a_accs=0;
              SET_PROFILE_LOOP_TIMEOUT(FIFTH_OF_A_SECOND);   // reset timeout  // was FIFTH_OF_A_SECOND
-             DEBUG_LOG(0,"Returning %02x from index:%d",P->VIA_PA,P->indexread-1);
+             DEBUG_LOG(0,"State 12 Returning %02x from index:%d",P->VIA_PA,P->indexread);
+             
+             if (P->indexread==3)  P->StateMachineStep=IDLE_STATE;
             }
+            else
+            {
+             DEBUG_LOG(0,"State 12 CMDLine - but not READ_IRA, index:%d event:%s",P->indexread,profile_event_names[event]);
+            }
+            
          }
          else
          {
-             DEBUG_LOG(0,"Going back to idle since Lisa set CMDLine");
+             DEBUG_LOG(0,"ZZZZZZZZZZ zzzzz State 12 Going back to idle since Lisa set CMDLine, index:%d event:%s",P->indexread,profile_event_names[event]);
              P->StateMachineStep=IDLE_STATE;
          }
 

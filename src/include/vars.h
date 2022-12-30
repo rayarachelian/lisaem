@@ -977,6 +977,7 @@ int check_running_lisa_os(void);
 GLOBAL(int,mouse_x_tolerance,0);
 GLOBAL(int,mouse_y_tolerance,0);
 
+
 GLOBAL(int,mouse_x_halfing_tolerance,1);
 GLOBAL(int,mouse_y_halfing_tolerance,1);
 
@@ -1008,6 +1009,9 @@ typedef struct _lisa_clock
 } t_lisa_clock;
 
 DECLARE(t_lisa_clock,lisa_clock);
+
+GLOBAL(char, *floppy_access_block,NULL);
+GLOBAL(char, *profile_access_block,NULL);
 
 GLOBAL(int32,lisa_alarm,0);
 GLOBAL(uint8,lisa_clock_set_idx,0);

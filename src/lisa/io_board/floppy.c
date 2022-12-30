@@ -699,6 +699,8 @@ static void do_floppy_read(DC42ImageType *F)
 
         sectornumber=getsectornum(F, floppy_ram[SIDE], floppy_ram[TRACK], floppy_ram[SECTOR]);
 
+        snprintf(floppy_access_block,32,"Floppy R:%04d",sectornumber);
+
         #ifdef DEBUG
         if (sectornumber!=queuedsectornumber && queuedsectornumber>0)
         {
@@ -797,6 +799,7 @@ static void do_floppy_read(DC42ImageType *F)
 
         if ( sectornumber==-1)            { DEBUG_LOG(0,"Invalid floppy write sector %ld",sectornumber);                      RWTS_IRQ_SIGNAL(FLOP_STAT_INVSEC); return;}
 
+        snprintf(floppy_access_block,32,"Floppy W:%04d",sectornumber);
 
         #ifdef DEBUG
         if (sectornumber!=queuedsectornumber  && queuedsectornumber>0)

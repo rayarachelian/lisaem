@@ -578,10 +578,7 @@ if (profileboot==0)
 }
 else
 {
-
   //lisaram[0x80183]=1;
- 
-
   reg68k_regs[ 1]=0x80000000; 
   reg68k_regs[ 9]=0x0001FFF4;
   reg68k_regs[10]=0x00020000;
@@ -750,22 +747,12 @@ void romless_proread(void)
   if (  P==NULL       ) {ALERT_LOG(0,"ProFile Pointer for via:%d is null",vianum);      return;}
   if ((&P->DC42)==NULL) {ALERT_LOG(0,"ProFile DC42 for via:%d Pointer is null",vianum); return;}
 
-//  #ifdef DEBUG
-//    if (sectornumber==2055 && running_lisa_os==LISA_OFFICE_RUNNING) debug_on("los-hle");   //2021.03.31
-//  #endif
-
   DEBUG_LOG(0,"about to read sector:%d (pre-deinterleave) on via:%d",sectornumber,vianum);
 
   P->DataBlock[512+4]=0xff; // premark non aaaa
   P->DataBlock[512+5]=0xff;
 
-  //if (P->DC42.fd<3 || P->DC42.fh==NULL) {ALERT_LOG(0,"Profile file handle or descriptor does not exist"); return;}
-
-//  if (sectornumber<50)   ALERT_LOG(0,"Slot 1 ID:%04x, Slot 2 ID:%04x, Slot 3 ID:%04x",
-//           lisa_ram_safe_getword(1,0x298), lisa_ram_safe_getword(1,0x29a), lisa_ram_safe_getword(1,0x29c) ) 
-
   if (sectornumber<0x00f00000)   sectornumber=deinterleave5(sectornumber);
-
   if (sectornumber>0x00fffff0)  
     {
        if (sectornumber==0x00ffffff)  // get_structure_identity_table(P); // 20191107 - disabling until widget code works
@@ -829,6 +816,8 @@ void romless_proread(void)
   via[2].ProFile->last_a_accs=0x00;
 
   reg68k_regs[0]=0;  
+  reg68k_regs[1]=0; // 2022,11,23  
+
   reg68k_sr.sr_struct.c=0;
 
   storebyte(0x01B4,0);
@@ -923,7 +912,7 @@ if ((reg68k_pc & 0x00ff0000)==0x00fe0000)
                                        los_error_code((signed long int)(reg68k_regs[0] & 0x0000ffff)),
                                              reg68k_regs[8+3] ? (char *)(&lisaram[CHK_MMU_TRANS(reg68k_regs[8+3])]) : "" );                 
                        messagebox(str, "OS BOOT Aborted");
-                         cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
+                       cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
                        lisa_powered_off();
                        return 1;
                      } 
@@ -931,7 +920,7 @@ if ((reg68k_pc & 0x00ff0000)==0x00fe0000)
     case 0x00fe0080: {
                        messagebox("OS has reset the Lisa", "OS BOOT Aborted");
                        lisa_powered_off();
-                         cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
+                       cpu68k_clocks=cpu68k_clocks_stop; regs.stop=1;
                        return 1;
                      } 
     case 0x00fe0736: {
