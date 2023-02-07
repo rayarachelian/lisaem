@@ -2,13 +2,13 @@
 # that require ./configure && make.  You really
 # should use the build.sh script directly.
 
-all:    src/host/wxui/lisaem_wx.cpp
-        pwd
-        /bin/ls -l
-	./build.sh build 
+all:	src/host/wxui/lisaem_wx.cpp
+	pwd
+	/bin/ls -l
+	./build.sh build
 
 build:   src/host/wxui/lisaem_wx.cpp
-	./build.sh build 
+	./build.sh build
 
 clean:   src/host/wxui/lisaem_wx.cpp
 	./build.sh clean
