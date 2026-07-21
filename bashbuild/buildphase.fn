@@ -31,10 +31,10 @@
 #             source file, and will produce an output file with the same
 #             base name. i.e.:
 #
-#             src/lisa/io_board/floppy:src/include/vars.h:src/include/floppy.h
+#             src/lisa/io_board/floppy.c:src/include/vars.h
 #
 #             indicates floppy.c will be compiled to floppy.o if any of
-#             floppy.c, floppy.h or vars.h has changed since the last time
+#             floppy.c or vars.h has changed since the last time
 #             that floppy.o was compiled (or if floppy.o does not exist)
 #             when INEXT="c" and OUTEXT="o"
 #

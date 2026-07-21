@@ -1,0 +1,78 @@
+name: Build and package LisaEm for Windows
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        required: true
+        type: string
+      today:
+        required: true
+        type: string
+      version_in_file_name:
+        required: true
+        type: string
+
+defaults:
+  run:
+    # "--login" carries over env. variables from one "run" command to the next.
+    # "--norc" means "do not execute ~/.bashrc .
+    # "-eo pipefail" causes the shell to exit immediately if any simple command fails 
+    # (exits with a non-zero status). The exit status of a pipeline
+    # (a sequence of commands connected by |) is:
+    # the status of the rightmost command to exit with a non-zero status, 
+    # or zero if all commands succeed.
+    shell: bash --login --norc -eo pipefail {0}
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: windows-latest
+
+    steps:
+      - name: Avoid \r\n line endings
+        run: git config --global core.autocrlf input
+
+      - name: Check-out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Cygwin
+        uses: cygwin/cygwin-install-action@master
+        with:
+          # Provide a list of Cygwin packages to install
+          packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make zip
+
+      - name: Run a simple echo command in Cygwin to test the installation
+        run: echo "Cygwin $(cygcheck -c cygwin) is installed!"
+
+      - name: List the checked out LisaEm files (the top folder only)
+        run: ls -la "$(cygpath '${{ github.workspace }}')"
+
+      - name: Download WxWidgets from the web and build it
+        run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
+
+      - name: Verify that wxWidgets is available
+        run: which wx-config && wx-config --list
+
+      - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
+        # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
+        run: echo "VER=${{ inputs.version_id }}" >> "$(cygpath -u "$GITHUB_ENV")" && echo "RELEASEDATE=${{ inputs.today }}" >> "$(cygpath -u "$GITHUB_ENV")"
+
+      - name: Build and package LisaEm
+        run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build package
+
+      - name: List the generated artifacts
+        run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
+
+      - name: Rename the artifact file to include version and date
+        run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_in_file_name }}-Windows_x86_64.zip"
+
+      - name: Print the artifact file name using Windows-native cmd
+        run: dir "${{ github.workspace }}\pkg"
+        shell: cmd
+        
+      - name: Upload the artifact file
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: "pkg/LisaEm-${{ inputs.version_in_file_name }}-Windows_x86_64.zip"

@@ -1,6 +1,9 @@
 Here's a list of some of the current known issues, there are likely many others. Please report them on
 the LisaList2 forum, or github issues.
 
+* ROMless - ROMless mode has some bug resulting in an 'IPC is null!' error when attempting to boot from floppy or ProFile.
+  Recommend downloading the H ROM, joining hi and lo into a boot.ROM, and configuring Preferences accordingly.
+
 * Windows - unicode chars in paths to Profile disks fail to work properly so the hard drive won't be found. Stick to all ASCII paths.
   If this is not possible because your user name contains UTF8, etc. please store your disk images in something like C:\LisaDisks, etc.
   (an ASCII only path) this is not an issue for macos, I suspect this is some wxwidgets string conversion issue that will take a significant

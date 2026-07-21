@@ -59,15 +59,45 @@ function windres() {
 true 
 }
 
+
+# Note by @TorZidan: 
+# Here is a typical content of the generated debian package:
+# dpkg --info pkg/LisaEm-1.2.7-RC4-2022.04.01-ubuntu-24.04-amd64.deb 
+#  new Debian package, version 2.0.
+#  size 3871750 bytes: control archive=357 bytes.
+#      325 bytes,     8 lines      control
+#  Package: LisaEm
+#  Version: 1.2.7-RC4-2022.04.01
+#  Architecture: amd64
+#  Maintainer: Ray Arachelian <jeremysalwen>
+#  Depends: gtk3, gdk-pixbuf2, libpangocairo, libgtk, libcario, libpangoft2, libpango1, libtiff, libglib
+#  Installed-Size: 10848
+#  Homepage: https://lisaem.sunder.net
+#  Description: The first fully functional Lisa Emulator™
+#
+# There are numberous problems here, which I (@TorZidan) have decided to leave as is:
+# - The package name "LisaEm" should be all-lowercase. But renaming it to "lisaem" may break existing installations.
+#   It is still doable, by adding 2 more fields:  Replaces: LisaEm (<< 1.2.7~rc4) , Breaks: LisaEm (<< 1.2.7~rc4)
+# - The version "1.2.7-RC4-2022.04.01" should be e.g. "1.2.7~rc4-2022.04.01", so that
+#   the release version "1.2.7-2022.04.01" will be newer (currently it is older) than this.
+# - The "Depends" field has incorrect, outdated values.
+# - The package files are being installed in "/usr/local/bin" and "/usr/local/share/", which is not standard, see them with "dpkg -c <filename>
 function makedebpkgcontrol() {
 size=$(du -sk "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}" | cut -f1)
 
 CONTROL="$1/control"
 machine="$(echo $MACHINE | sed -e 's/x86_64/amd64/g' )" # DEBs prefer amd64 in architecture.
 
+# The debian package version must start with a digit
+# and the allowed characters are: digits, letters, .+-~:
+DEBVERSION="${VER}"
+if [[ -z "$VER" ]] || [[ "$VER" == "undefined" ]] || [[ "$VER" == "continuous-"* ]]; then
+   DEBVERSION="0-${VER}"
+fi
+
 cat >"$CONTROL" <<ENDDEBCONTROLEND || exit $?
 Package: ${SOFTWARE}
-Version: ${VER}${DEBSUFFIX}
+Version: ${DEBVERSION}
 Architecture: ${machine}
 Maintainer: ${AUTHOR} <${AUTHEMAIL}>
 Depends: $DEBDEPENDS
@@ -83,19 +113,16 @@ chmod 600 "$CONTROL" || exit $?
 function LinuxDebianPackage() {
   if [[ -z "$( which dpkg-deb 2>/dev/null )" ]]; then return 0; fi
 
-  SUFFIX=""
-  [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]] && export DEBSUFFIX="-${STABILITY}-${RELEASEDATE}"
-
   pushd "${XTLD}/pkg" >/dev/null 2>/dev/null || exit $? 
   mkdir -pm755 build/tmp
   cd build/tmp || exit $?
 
-  # output package here
-  export DEBNAME="${XTLD}/pkg/${SOFTWARE}-${VER}${DEBSUFFIX}.deb"
+  # The generated Debian package file name. It will be further renamed when building it on Github Actions.
+  export DEBNAME="${XTLD}/pkg/${SOFTWARE}_amd64.deb"
 
   echo "  + $DEBNAME" 1>&2
 
-  DEBSTAGE="${XTLD}/pkg/build/tmp/deb/${SOFTWARE}-${VER}${DEBSUFFIX}"
+  DEBSTAGE="${XTLD}/pkg/build/tmp/deb/${SOFTWARE}"
 
   mkdir -pm755 "$DEBSTAGE/DEBIAN"
 
@@ -114,17 +141,12 @@ function LinuxDebianPackage() {
   (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${DEBSTAGE}" && tar xpf -)
   #echo "to           $DEBSTAGE $(du -sh $DEBSTAGE)" 1>&2
 
-  if [[ -f /etc/os-release ]]; then
-     machine="$(echo $MACHINE | sed -e 's/x86_64/amd64/g' )" # DEBs prefer amd64 in architecture.
-     export DEBNAME="${SOFTWARE}-${VER}${DEBSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${machine}.deb"
-  fi
-
   makedebpkgcontrol "$DEBSTAGE/DEBIAN"
 
   # build the package
   cd "${XTLD}/pkg/build/tmp/deb" || exit $?
 
-  dpkg-deb --build ${SOFTWARE}-${VER}${DEBSUFFIX} "${XTLD}/pkg/$DEBNAME" 2>&1 >"${XTLD}/pkg/${DEBNAME}.log" || exit $?
+  dpkg-deb --build ${SOFTWARE} "$DEBNAME" 2>&1 >"${DEBNAME}.log" || exit $?
 
   # create hashes
   if [[ -f "$DEBNAME" ]]; then
@@ -203,12 +225,10 @@ function LinuxRPMPackage() {
 
   pushd . >/dev/null 2>/dev/null
 
-  [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]] && export RPMSUFFIX="-${STABILITY}-${RELEASEDATE}"
-
   if [[ -f /etc/os-release ]]; then
-     export  RPMNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.rpm"
-     export SPECNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.spec"
-     export TARNAME="${SOFTWARE}-${VER}${RPMSUFFIX}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.tar"
+     export  RPMNAME="${SOFTWARE}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.rpm"
+     export SPECNAME="${SOFTWARE}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.spec"
+     export TARNAME="${SOFTWARE}-${OSREL_ID}-${OSREL_VERSION_ID}-${MACHINE}.tar"
   fi
 
   RPMPATH="$XTLD/pkg/build/$RPMNAME"
@@ -227,7 +247,7 @@ function LinuxRPMPackage() {
 
   (cd "${XTLD}/pkg/build/tmp/${COMPANY}"
        # wants  LisaEm-1.2.7_PRE_RC4_UNSTABLE_2021.10.11
-       TARROOT="${SOFTWARE}-${VER}$( echo ${RPMSUFFIX}| sed -e's/-/_/g' )"
+       TARROOT="${SOFTWARE}"
        mv "${SOFTWARE}" "${TARROOT}"
        tar cpJf "${TARTARGET}.xz" "${TARROOT}"
        mv "${TARROOT}" "${SOFTWARE}"
@@ -249,20 +269,84 @@ function LinuxRPMPackage() {
   popd >/dev/null 2>/dev/null
 }
 
+# Creates a "pkg/LisaEm_Linux_x86_64.AppImage" standalone executable file that can be run on any Linux OS of the same architecture (e.g. x86_64, arm64).
+# It requires the 'appimagetool' to be manually downloaded into subfolder 'scripts', e.g. for x86_64 Linux OS:
+# sudo apt install libfuse2
+# cd scripts
+# wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+# mv appimagetool-x86_64.AppImage appimagetool
+# chmod +x appimagetool
+#
+function LinuxAppImage() {
+  [[ ! -f "${XTLD}/scripts/appimagetool" ]] && { echo "The 'appimagetool' tool was not found in folder ${XTLD}/scripts . Will not create an '.AppImage' file. To fix this, please download the appropriate file for the $MACHINE platform from https://github.com/AppImage/appimagetool/releases/ , rename it to 'appimagetool', make it executable, and rerun."; return 0; }
+  [[ ! -x "${XTLD}/scripts/appimagetool" ]] && { echo "The 'appimagetool' tool was found in folder ${XTLD}/scripts, but is not executable. Will not create an '.AppImage' file. To fix this, please run 'chmod +x appimagetool', then rerun."; return 0; }
+  echo "  + AppImage ${SOFTWARE}" 1>&2
+
+  pushd . >/dev/null 2>/dev/null
+
+  APPDIR="${XTLD}/pkg/build/tmp/${SOFTWARE}.AppDir"
+  APPIMAGE_NAME="${SOFTWARE}_Linux_${MACHINE}.AppImage"
+
+  # Clean up
+  rm -f ${XTLD}/pkg/*.AppImage
+  rm -rf "${APPDIR}"
+  mkdir -p "${APPDIR}"
+
+  if [[ ! -d "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" ]]; then
+     echo "Folder ${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/ is missing" 1>&2
+     exit 1
+  fi
+
+  # Copy contents from folder ${XTLD}/pkg/build/tmp/Sunder.NET/LisaEm into folder ${XTLD}/pkg/build/tmp/${SOFTWARE}.AppDir
+  (cd "${XTLD}/pkg/build/tmp/${COMPANY}/${SOFTWARE}/" && tar cpf - .) | (cd "${APPDIR}" && tar xpf -)
+
+  cd "${APPDIR}" || exit 1
+
+  # Create the desktop file
+  cat > "${SOFTWARE}.desktop" <<EOF
+[Desktop Entry]
+Name=${SOFTWARE}
+Exec=lisaem
+Icon=lisaem
+Type=Application
+Categories=System;Emulator;
+Comment=${DESCRIPTION}
+EOF
+  # This is the icon of the AppImage
+  cp -f ${XTLD}/resources/lisaem.png lisaem.png
+
+  # Create file AppRun
+  # When the ".AppImage" is executed, the Linux OS will extract it and "mount it" into a subfolder, e.g. "/tmp/.mount_LisaEmpomfmN", then the file AppRun will be run, which runs the "lisaem" executable (in subfolder usr/local/bin)
+  cat > AppRun <<EOF
+#!/bin/sh
+SELF=\$(readlink -f "\$0")
+# echo "SELF=\${SELF}" 1>&2
+HERE=\${SELF%/*}
+# echo "HERE=\${HERE}" 1>&2
+# We shouldn't need anything in our PATH (or in any other env. variable) in order to run the lisaem binary
+# However, we need the PATH below to be able to successfully open URLs (e.g. the ones in the "Help" menu) in a web browser.
+PATH=/usr/local/bin:/usr/bin
+# The lisaem binary is (should be) in subfolder usr/local/bin (along with the lisaem CLI tools)
+exec "\${HERE}/usr/local/bin/lisaem" "\$@"
+EOF
+  chmod +x AppRun
+
+  # echo "Running appimagetool from within folder $(pwd) ..." 1>&2
+  # Generate the .AppImage file, e.g. a file named pkg/LisaEm_Linux_x86_64.AppImage
+  ARCH="$MACHINE" ${XTLD}/scripts/appimagetool "${APPDIR}" "${XTLD}/pkg/${APPIMAGE_NAME}" >"${XTLD}/pkg/${APPIMAGE_NAME}.log" 2>&1
+
+  # Cleanup
+  cd ..
+  rm -rf "${APPDIR}"
+
+  popd >/dev/null 2>/dev/null
+}
+
 
 # Failed to load plugin: properties failed to load for lisaem: Additional properties are not allowed ('prepare', 'snap' were unexpected)
 function makeSnapCraftYAMLandTar() {
 
 targetlocal="$1"
-
-if [[ "$STABILITY" != "RELEASE" ]] && [[ "$STABILITY" != "PRODUCTION" ]]; then
-   export SNAPSUFFIX="-${STABILITY}-${RELEASEDATE}"
-   sv="${VER}${SNAPSUFFIX}"
-   snapver="${sv:0:31}"
-   snapstability="devel"
-else
-   snapstability="stable"
-fi
 
 BASE="core$(echo $OSREL_VERSION_ID | cut -f1 -d'.')"
 [[ -z "$BASE" ]] && BASE="core20"
@@ -270,10 +354,10 @@ BASE="core$(echo $OSREL_VERSION_ID | cut -f1 -d'.')"
 cat <<ENDOFSNAPCRAFTYAML >snapcraft.yaml
 name: ${LCNAME} # you probably want to 'snapcraft register <name>'
 base: $BASE
-version: '${snapver}'
+version: ${VER}
 summary: ${DESCRIPTION}
 description: ${DESCRIPTION}
-grade: ${snapstability}
+grade: stable
 confinement: ${SNAPCONFINEMENT}
 compression: lzo
 plugs:
@@ -335,7 +419,7 @@ function LinuxSnapPackage() {
   cd "${SNAPPARENT}"
   snapcraft clean >/dev/null 2>/dev/null
   if snapcraft 2>&1 >snapcraft-build.log; then
-     mv "$HOME/snap-${COMPANY}-${SOFTWARE}/${LCNAME}_${VER}"*.snap "${XTLD}/pkg/" 2>/dev/null >/dev/null
+     mv "$HOME/snap-${COMPANY}-${SOFTWARE}/${LCNAME}"*.snap "${XTLD}/pkg/" 2>/dev/null >/dev/null
      snapcraft clean >/dev/null 2>/dev/null
      rm -rf "$HOME/snap-${COMPANY}-${SOFTWARE}"
   else

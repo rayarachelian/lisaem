@@ -1,0 +1,105 @@
+# Generate Linux .AppImage and .deb build artifacts for 64-bit Linux OS.
+# When running a continuous build, skip generating the .deb package, for the following reason:
+# The "dpkg" debian package installer compares the version in the .deb package with the currently installed version,
+# to decide if the .deb package is newer or not, and ignores (skips installing) older packages.
+# The continuous builds don't have a good version identifier that would compare well to other (continuous and release) builds.
+#
+name: Build and package LisaEm for Linux
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        required: true
+        type: string
+      today:
+        required: true
+        type: string
+      version_in_file_name:
+        required: true
+        type: string
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    steps:
+      - name: Avoid \r\n line endings
+        run: git config --global core.autocrlf input
+      
+      - name: Check-out the repository
+        uses: actions/checkout@v4
+
+      - name: List the checked out LisaEm files (the top folder only)
+        run: ls -la .
+
+      - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
+        run: |
+          echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
+          echo "Exported environment variable VER=${{ inputs.version_id }}"
+          echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
+          echo "Exported environment variable RELEASEDATE=${{ inputs.today }}"
+        
+      - name: Install libraries that are needed to build wxWidgets
+        # Note: "libfuse2" below is needed by the appimagetool that packages LisaEm into an .AppImage file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtiff6 libtiff-dev build-essential libgtk-3-dev libfuse2
+          
+      - name: Download, build and install wxWidgets
+        run: |
+          ./scripts/build-wx3.2.1-gtk.sh
+          # Add wxWidgets to PATH
+          echo "/usr/local/wx3.2.1-gtk/bin" >> $GITHUB_PATH
+          
+      - name: Verify that wxWidgets is available
+        run: which wx-config && wx-config --list
+
+      - name: Download appimagetool
+        run: |
+          cd scripts
+          wget https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          mv appimagetool-x86_64.AppImage appimagetool
+          chmod +x appimagetool
+          cd ..
+
+      - name: Build and package LisaEm
+        run: |
+          ./build.sh clean build package
+
+      - name: List the generated artifacts
+        run: |
+          ls -l ./bin/lisaem
+          ls -l ./pkg/LisaEm_Linux_x86_64.AppImage
+          ls -l ./pkg/LisaEm_amd64.deb
+          
+      - name: Rename artifact files to include version and date
+        run: |
+          # Use the variables passed from the master to name the artifact files
+          
+          APPIMAGE_FILENAME="pkg/LisaEm-${{ inputs.version_in_file_name }}-Linux_x86_64.AppImage"
+          mv pkg/LisaEm_Linux_x86_64.AppImage "$APPIMAGE_FILENAME"
+
+          # Parse the ubuntu version (e.g. 24.04) into an env var OSREL_VERSION_ID
+          eval $(sed -e 's/^/export OSREL_/g' /etc/os-release )
+          DEBPKG_FILENAME="pkg/LisaEm-${{ inputs.version_in_file_name }}-Ubuntu-${OSREL_VERSION_ID}_amd64.deb"
+          mv pkg/LisaEm_amd64.deb "$DEBPKG_FILENAME"
+
+          if [[ "${{ inputs.version_id }}" == "continuous-"* ]]; then
+            # Include only the .AppImage package (skipping the .deb package) in continuous builds
+            echo "ARTIFACT_PATHS=$APPIMAGE_FILENAME" >> $GITHUB_ENV
+          else
+            # Include both .AppImage and .deb packages in release builds
+            {
+              echo "ARTIFACT_PATHS<<EOF"
+              echo "$APPIMAGE_FILENAME"
+              echo "$DEBPKG_FILENAME"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: ${{ env.ARTIFACT_PATHS }}

@@ -34,8 +34,7 @@ fi
    SOFTWARE="termwx"                       # name of the software (can contain upper case)
      LCNAME="termwx"                       # lower case name used for the directory
 DESCRIPTION="TermWX"                       # description of the package
-        VER="1.0"                          # just the version number
-  STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+        VER="1.0"                          # the version number
 RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Jeremy Salwen"                # name of the author
   AUTHEMAIL="jeremysalwen"                 # email address for this software
@@ -45,12 +44,10 @@ RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
 
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
@@ -145,14 +142,13 @@ do
 
  uninstall)
            if [[ -n "$DARWIN" ]]; then
-             echo Uninstall commands not yet implemented.
+             echo Uninstall commands not implemented.
              exit 1
            fi
 
            if [[ -n "$CYGWIN" ]]; then
-              [ -n "$PREFIX" ]    && echo Deleting $PREFIX    && rm -rf $PREFIX
-              [ -n "$PREFIXLIB" ] && echo Deleting $PREFIXLIB && rm -rf $PREFIXLIB
-              exit 0
+             echo Uninstall commands not implemented.
+             exit 1
            fi
 
            #Linux, etc.
@@ -338,13 +334,19 @@ cd ..
 ###########################################################################
 
 if [[ -n "$INSTALL" ]]; then
-      cd ../lib/
-      echo Installing TerminalWX lib $VERSION
-      mkdir -pm755 "$PREFIX/lib"
-      cp terminalwx-$VERSION.a "$PREFIX/lib/"
-      [ -n "$DARWIN" ] && cp terminalwx.${VERSION}.dylib "$PREFIX/lib/"
-      cd "$PREFIX/lib"
-      ln -s terminalwx-$VERSION.a terminalwx.a
+      # Needs to be run as "root" to succeed:
+      if [[ $EUID -eq 0 ]]; then
+          echo Installing TerminalWX lib $VERSION to $PREFIX/lib
+          # echo "Current folder is $(pwd)"
+          cd lib/
+          mkdir -pm755 "$PREFIX/lib"
+          cp terminalwx-$VERSION.a "$PREFIX/lib/"
+          [ -n "$DARWIN" ] && cp terminalwx.${VERSION}.dylib "$PREFIX/lib/"
+          cd "$PREFIX/lib"
+          ln -s terminalwx-$VERSION.a terminalwx.a
+      else
+          echo "Skipping installation of TerminalWX lib: not running as root."
+      fi
 fi
 echo
 [[ -z "$NOBANNER" ]] && echo "terminalwx build done"

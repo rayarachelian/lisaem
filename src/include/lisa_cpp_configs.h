@@ -24,27 +24,25 @@
 *                                                                                      *
 \**************************************************************************************/
 
-
-#define EMULATION_TICK 100   // this should be higher than the one below
-#define EMULATION_TIME 75    // to allow other processing such as mouse events
+#define EMULATION_TICK 100 // this should be higher than the one below
+#define EMULATION_TIME 75  // to allow other processing such as mouse events
 
 // How many changes on the display before refreshing the entire display instead of the updated area?
 // want to keep this value small, otherwise a clear desktop or such will be very slow.  The idea here
 // is to avoid full repaints on small changes, such as the mouse moving.
 //
 
-
 // minimum skinned window size, this is smaller on purpose so that it will work with 12"
 // notebook displays
 #define IWINSIZEX 1020
 #define IWINSIZEY 720
 
-#define IWINSIZE IWINSIZEX,IWINSIZEY
+#define IWINSIZE IWINSIZEX, IWINSIZEY
 
 // the size of the skin
 #define ISKINSIZEX 1485
 #define ISKINSIZEY 1031
-#define ISKINSIZE  ISKINSIZEX,ISKINSIZEY
+#define ISKINSIZE ISKINSIZEX, ISKINSIZEY
 
 #define FLOPPY_LEFT 1099
 #define FLOPPY_TOP 481
@@ -89,26 +87,22 @@
 #include <wx/stdpaths.h>
 #include <wx/choicdlg.h>
 
-
 #include "machine.h"
 #include "keyscan.h"
 
 // Bridge to C portions of the emulator.
 extern "C"
 {
- #include "vars.h"
- int32 reg68k_external_execute(int32 clocks);
- void unvars(void);
-
+#include "vars.h"
+    int32 reg68k_external_execute(int32 clocks);
+    void unvars(void);
 }
-
 
 #include "LisaConfig.h"
 #include "LisaConfigFrame.h"
 
 #include "lisawin.h"
 #include "lisaemframe.h"
-
 
 // sounds, images, etc.
 #include "lisaem_static_resources.h"
@@ -118,12 +112,8 @@ extern "C"
 #include <sys/param.h>
 #endif
 
-
-
 #define MAXLOOPS 250
-
 
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024
 #endif
-

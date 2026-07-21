@@ -27,34 +27,31 @@ else
 fi
 
 ###########################################################################################
-# if you're making your own package using the src.build system, you'll want to set
-# these variables.  These will help populate the appropriate fields in packages.
+# Some of these variables can be overwritten from env variables.
+# Below, VER="${VER:-undefined}" means: use the VER env. variable if it is defined, otherwise use the default value of "undefined" (undefined version).
+# Similarly, the RELEASEDATE env. variavble will be used, or (if not set), it will use "today's date".
 ###########################################################################################
      SOFTWARE="LisaEm"                    # name of the software (can contain upper case)
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
-          VER="1.2.7"                     # just the version number
-    STABILITY="RC4"                       # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
-                                          # RELEASE/PRODUCTION - PRE-* keep short
+          VER="${VER:-undefined}"         # the version number
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2022.04.01"                # release date.  must be YYYY.MM.DD
-       AUTHOR="Ray Arachelian"            # name of the author
-    AUTHEMAIL="ray@arachelian.com"        # email address for this software
+  RELEASEDATE="${RELEASEDATE:-$(date +%Y.%m.%d)}" # release date.  must be YYYY.MM.DD
+       AUTHOR="Friends of Ray Arachelian" # name of the author
+    AUTHEMAIL="lisaem@arcanebyte.com"     # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
           URL="https://lisaem.sunder.net" # url to website of package
-COPYRIGHTYEAR="2022"
+COPYRIGHTYEAR="2026"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
 LICENSESHORT="GPL"                        # for use in RPM packages
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
@@ -132,18 +129,18 @@ function CLEAN() {
             CLEANARTIFACTS "*.o" "*.a" "*.so" "*.dylib" "*.exe" get-uintX-types "cpu68k-?.c" def68k gen68k hashes.txt "slot.*.sh" build-warnings.txt windres_private.res
             subbuild src/lib/libGenerator --no-banner clean
 
-	    # TerminalWx isn't something I intend to develop, but rather just use, so disable its warnings
-	    export OWARNINGS="$WARNINGS"
-	    export OCFLAGS="$CFLAGS"
-	    export OCPPFLAGS="$CPPFLAGS"
-	    export OCXXFLAGS="$CXXFLAGS"
+            # TerminalWx isn't something I intend to develop, but rather just use, so disable its warnings
+            export OWARNINGS="$WARNINGS"
+            export OCFLAGS="$CFLAGS"
+            export OCPPFLAGS="$CPPFLAGS"
+            export OCXXFLAGS="$CXXFLAGS"
 
             subbuild src/lib/TerminalWx   --no-banner clean
 
-	    export CFLAGS="$OCFLAGS"
-	    export CPPFLAGS="$OCPPFLAGS"
-	    export CXXFLAGS="$OCXXFLAGS"
-	    unset  OWARNINGS OCFLAGS OCPPFLAGS OCXXFLAGS
+            export CFLAGS="$OCFLAGS"
+            export CPPFLAGS="$OCPPFLAGS"
+            export CXXFLAGS="$OCXXFLAGS"
+            unset  OWARNINGS OCFLAGS OCPPFLAGS OCXXFLAGS
 
             subbuild src/lib/libdc42      --no-banner clean
             subbuild src/tools            --no-banner clean
@@ -245,14 +242,23 @@ for j in $@; do
   --pkg-prefix=*) export PKGPREFIX="${i:9}" ;;
 
 
-  pkg|package)  if ! is_pkg_available; then
-                    echo "This is only implemented on macos, Windows 10, Linux, Open/FreeBSD, and OpenIndiana currently" 1>&2
+  pkg|package)  
+                # The "package" command sets INSTALL=1, WITHPKG="yes" for supported platforms, 
+                # which invokes the "install" codepath, with the target folder set to "lisaem/pkg/build/tmp".
+                # The WITHPKG="yes" triggers an extra step that packages the files in that folder.
+                # The "install" code for Windows requires Admininstative privileges, to write into "C:\Program Files\...".
+                # Even though "package" does not need Admininstative privileges, it is hard to enable/enforce that check
+                # only for "install" and not for "package". 
+                # TO DO: Rewrite the "package" command, to be completely separate from "install"; the code will be much cleaner.
+                if ! is_pkg_available; then
+                    echo "This is only implemented on macos, Windows, Linux, FreeBSD, and OpenIndiana currently" 1>&2
                     exit 1
                 fi
 
+                # Sets INSTALL=1 for platforms that support packaging:
                 do_fake_install_for_pkg
                 export WITHPKG="yes"
-                AskCygWinSudo
+                package_check_sudo_pass
                 ;;
 
   install)  install_check_sudo_pass
@@ -265,8 +271,7 @@ for j in $@; do
             fi
 
             if  [[ -n "$CYGWIN"    ]]; then
-                [[ -n "$PREFIX"    ]] && echo Deleting $PREFIX    && rm -rf $PREFIX
-                [[ -n "$PREFIXLIB" ]] && echo Deleting $PREFIXLIB && rm -rf $PREFIXLIB
+                echo "Uninstall command is not implemented on Windows. To uninstall LisaEm, please manually delete folder C:\Program Files\\${COMPANY}\\${SOFTWARE}."
                 exit 0
             fi
 
@@ -536,6 +541,7 @@ export  PHASE1LIST="\
         src/lisa/io_board/z8530-telnetd   \
         src/lisa/io_board/z8530-pty       \
         src/lisa/io_board/z8530-tty       \
+        src/lisa/io_board/z8530-shell     \
         src/lisa/io_board/via6522         \
         src/lisa/cpu_board/irq            \
         src/lisa/cpu_board/mmu            \
@@ -734,7 +740,9 @@ export PERCENTJOB=0 NUMJOBSINPHASE=15
 export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $CFLAGS $ARCH $INC -c :INFILE:.c -o :OUTFILE:.o"
 LIST1=$(WAIT="" INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiled COMPILELIST ${PHASE1LIST} )
 
-if [[ $(echo "$PHASE1LIST" | wc -w ) -ne  $(echo "$LIST1" | wc -w )  ]]; then
+EXPECTED_COUNT=$(echo "$PHASE1LIST" | wc -w)
+ACTUAL_COUNT=$(echo "$LIST1" | wc -w)
+if [[ "$EXPECTED_COUNT" -ne "$ACTUAL_COUNT" ]]; then
     echo "Stopping due to failure..." 1>&2
     exit 12
 fi
@@ -922,12 +930,12 @@ if  [[ -f "$LISANAME" ]]; then
            mv ${TOOLLIST} "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
 
            # create a tools only package
-           macospkg "net.sunder.lisaem" "../../pkg/lisaem-cli-tools-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-cli-tools-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            mkdir -pm755     ./pkg/Applications || exit $?
            mv ../${SOFTWARE}.app ./pkg/Applications || exit $?
 
            # create a LisaEm package
-           macospkg "net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            # put things back and clean up
            mv pkg/usr/local/bin/*  "${TLD}/bin/${MACOSX_MAJOR_VER}/"
            mv pkg/Applications/*   "${TLD}/bin"
@@ -950,8 +958,8 @@ if  [[ -f "$LISANAME" ]]; then
       if [[ -n "$INSTALL" ]]; then
   
         if [[ -n "$CYGWIN" ]]; then
-              # PREFIX+PREFIXLIB will go to: "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
-              # these are set in the bashbuild {OS}.sys file
+              # PREFIX will go to: "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
+              # it is set in the bashbuild/Windows.sys file
               ACTION="Installing"
 
               if  [[ -n "$WITHPKG" ]]; then
@@ -959,14 +967,15 @@ if  [[ -f "$LISANAME" ]]; then
                   ACTION="Packaging"
               fi
 
-              echo "* ${ACTION} skins in $PREFIXLIB/${SOFTWARE}"
-              mkdir -pm755 "$PREFIX"
-              (cd "${XTLD}/resources"; tar cpf - skins) | (cd "$PREFIX"; tar xpf - )
-              echo "* ${ACTION} lisaem.exe and tools binaries in $PREFIX"
-              mkdir "${PREFIX}/bin"
+              echo "Creating folder ${PREFIX}"
+              mkdir -pm755 "${PREFIX}"
+              echo "* ${ACTION} skins into ${PREFIX}"
+              cp -r "${XTLD}/resources/skins" "${PREFIX}"			  
+              echo "* ${ACTION} lisaem.exe and tools binaries into ${PREFIX}"
+              mkdir -pm755 "${PREFIX}/bin"
               cp "${XTLD}/bin/"*.exe "${PREFIX}/bin"
-              mv "${PREFIX}/bin/lisaem.exe" "$PREFIX"
-              echo -n "  Done ${ACTION} to ${PREFIX}"
+              mv "${PREFIX}/bin/lisaem.exe" "${PREFIX}"
+              echo "  Done ${ACTION} to ${PREFIX}"
 
               create_packages_for_os
 
@@ -1029,7 +1038,7 @@ if  [[ -f "$LISANAME" ]]; then
       else # debug under cygwin
         cp lisaem.exe "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}" || exit 1
         cd ../resources
-        tar cpf - skins | ( cd "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"; tar xpf - )
+        cp -r "skins" "${PREFIX}"
         cd "/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}" || exit 1
         echo "run -p" >gdb-run
         $GDB ./lisaem.exe -x gdb-run

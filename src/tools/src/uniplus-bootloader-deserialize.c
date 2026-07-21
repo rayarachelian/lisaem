@@ -20,7 +20,7 @@ int checkandpatch(DC42ImageType *F, int n) {
      uint8 sec[512];
      uint8 *fsec;
      
-     fsec=dc42_read_sector_data(F,n);
+     fsec = F->read_sector_data(F,n);
      memcpy(sec,fsec,512);
 
      if (sec[0x90]==0x2f && sec[0x91]==0x3c && sec[0x92]==0x00 && sec[0x93]==0x06 && 
@@ -31,7 +31,7 @@ int checkandpatch(DC42ImageType *F, int n) {
        sec[0x94]=0x4e;  sec[0x95]=0x71;  sec[0x96]=0x4e; sec[0x97]=0x71;
        sec[0x98]=0x4e;  sec[0x99]=0x71;  sec[0x9a]=0x4e; sec[0x9b]=0x71;
        printf("Found check and patched at sector %d\n",n);
-       dc42_write_sector_data(F,n,sec);
+       F->write_sector_data(F,n,sec);
        return 1;
      }
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
      ret=dc42_auto_open(&F, argv[i], "wb");
      if (!ret) deserialize(&F);
      else      fprintf(stderr,"Could not open image %s because %s\n",argv[i],F.errormsg);
-     dc42_close_image(&F);
+     F.close_image(&F);
   }
 
   return 0;

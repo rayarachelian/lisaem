@@ -20,35 +20,33 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 
 #include "src/terminalwx.h"
 
-class TerminalWxFrame: public wxFrame
+class TerminalWxFrame : public wxFrame
 {
-    public:
+public:
+    TerminalWxFrame(wxWindow *parent, wxWindowID id = -1);
+    virtual ~TerminalWxFrame();
 
-        TerminalWxFrame(wxWindow* parent,wxWindowID id = -1);
-        virtual ~TerminalWxFrame();
+private:
+    //(*Handlers(TerminalWxFrame)
+    void OnQuit(wxCommandEvent &event);
+    void OnAbout(wxCommandEvent &event);
+    void OnClose(wxCloseEvent &event);
+    void OnCustom1Paint(wxPaintEvent &event);
+    //*)
 
-    private:
+    //(*Identifiers(TerminalWxFrame)
+    static const long ID_TERM;
+    static const long idMenuQuit;
+    static const long idMenuAbout;
+    static const long ID_STATUSBAR1;
+    //*)
 
-        //(*Handlers(TerminalWxFrame)
-        void OnQuit(wxCommandEvent& event);
-        void OnAbout(wxCommandEvent& event);
-        void OnClose(wxCloseEvent& event);
-        void OnCustom1Paint(wxPaintEvent& event);
-        //*)
+    //(*Declarations(TerminalWxFrame)
+    wxStatusBar *StatusBar1;
+    TerminalWx *Term1;
+    //*)
 
-        //(*Identifiers(TerminalWxFrame)
-        static const long ID_TERM;
-        static const long idMenuQuit;
-        static const long idMenuAbout;
-        static const long ID_STATUSBAR1;
-        //*)
-
-        //(*Declarations(TerminalWxFrame)
-        wxStatusBar* StatusBar1;
-        TerminalWx* Term1;
-        //*)
-
-        DECLARE_EVENT_TABLE()
+    DECLARE_EVENT_TABLE()
 };
 
 #endif // TERMINALWXMAIN_H

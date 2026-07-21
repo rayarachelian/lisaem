@@ -1,21 +1,13 @@
 # Scripts Directory
 
-Some sample scripts as to how to build wxWidgets 3.x for LisaEm as well as
-1. A script to add the interim build.sh links (see README.md inside bashbuild)
-2. Sample Cygwin install scripts to help install Cygwin properly with the right
-   packages (you must right click on this script and run from Administrative shell
-   for it to work properly. If Cygwin's installer comes up interactively, you skipped
-   that, and it will fail to work. This expects to run from E:\ and that the
-   Cygwin's SETUP.EXE files for 32/64 bit are named as expected by the script
-   and are already downloaded.
-   So you should edit these scripts for your particular environment and check to
-   see that they don't do anything you don't want. It's expected that you understand
-   and can edit these scripts before using them! These scripts are quick hacks
-   meant to allow me to setup windows inside Virtual Box quickly, they're not
-   production grade, but only provided incase they're useful to you to use to
-   create your own build environment for LisaEm.
+Some sample scripts as to how to build wxWidgets 3.x for LisaEm as well as:
+
+1. A script to add the interim build.sh links (see README.md inside bashbuild).
+2. A sample Cygwin install script cygwin-install.bat to help install Cygwin
+   properly on Windows, with the right set of packages. See more details
+   [here](../HowToBuildOnWindows.md).
 3. A script to remove the lisaem preferences hidden inside ~/Library on macosx
-   (this might fail under Mojave/Catalina due to gatecreeper)
+   (this might fail under Mojave/Catalina due to gatecreeper).
 
 When building on macos x, it's possible to build wxWidgets and LisaEm using
 just the command line tools, but it doesn't always work properly and you can

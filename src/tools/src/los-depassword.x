@@ -26,14 +26,14 @@ void depassword(DC42ImageType *F)
          for (int sec=32; (unsigned)sec<F->numblocks; sec++)
          {
                char name[64];
-               ftag=dc42_read_sector_tags(F,sec);
+               ftag=F->read_sector_tags(F,sec);
 
                if (ftag[4]==0xff)         // extent tags have tag 4 as ff
                {
                    uint32 fileid=(uint16)(ftag[4]<<8)|(ftag[5]);
                    fileid=(uint32)(0x10000-fileid) & 0xffff;
 
-                   fsec=dc42_read_sector_data(F,sec);
+                   fsec=F->read_sector_data(F,sec);
 
                    if  (fsec[0x62]!=0) {
 
@@ -68,7 +68,7 @@ void depassword(DC42ImageType *F)
 		                   buf[0x62+7]=0; // zero out password
 		                   buf[0x62+8]=0; // zero out password
 
-                       dc42_write_sector_data(F,sec,buf); // write the sector back to the image
+                       F->write_sector_data(F,sec,buf); // write the sector back to the image
 
 		               } // password length >0
 
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
      ret=dc42_auto_open(&F, argv[i], "wb");
      if (!ret) depassword(&F);
      else      fprintf(stderr,"Could not open image %s because %s\n",argv[i],F.errormsg);
-     dc42_close_image(&F);
+     F.close_image(&F);
   }
 
 return 0;

@@ -1,36 +1,30 @@
-![LisaEm Logo](resources/lisaem-banner.png)
+# LisaEm - An Apple Lisa Emulator
 
-### Copyright © 2022 by Ray Arachelian, All Rights Reserved.
-### Released under the terms of the GNU Public License v3.
+[![Build (Ubuntu 24.04)](https://github.com/arcanebyte/lisaem/actions/workflows/workflow.yaml/badge.svg?branch=master)](https://github.com/arcanebyte/lisaem/actions/workflows/workflow.yaml)
+
+Copyright © 1998-2022 by Ray Arachelian, All Rights Reserved.  
+Copyright © 2023-2026 by Friends of Ray Arachelian.  
+Released under the terms of the [GNU Public License v3](https://www.gnu.org/licenses/gpl-3.0.txt).
 
 ------------------------------------------------------------------------------
-# Lisa Emulator Source Build README
+# Helpful Links
  
-* [https://lisaem.sunder.net/]() 
-* [https://lisafaq.sunder.net]() 
-* [https://lisalist2.com]() 
-* [https://github.com/rayarachelian/lisaem]()
+* [https://lisaem.sunder.net/](https://lisaem.sunder.net/)
+* [https://lisafaq.sunder.net/](https://lisafaq.sunder.net/)
+* [https://lisalist2.com](https://lisalist2.com)
+* [https://github.com/arcanebyte/lisaem](https://github.com/arcanebyte/lisaem)
 
 ------------------------------------------------------------------------------
 
 ## What is this thing?
 
-You're looking at the repository for the source code for LisaEm 1.2.7 RC4 2022.04.01
+You're looking at the repository for the source code for the Lisa Emulator Project (LisaEm). 
 
 LisaEm is a emulator that runs on a wide variety of modern and somewhat old systems by means of the wxWidgets framework, implementing an emulation of the (in)famous Apple Lisa Computer. The Apple Lisa computer is the predecessor of the Mac and the "inspiration" of many GUI environments from Windows 1.x to GEOS, GEM, VisiOn, etc. 
 
 Many of the original ideas of the modern GUI, including copy and paste, were first envisioned in the Apple Lisa, so it's a historically very important machine. The seeds of these ideas were first found in the Xerox Alto, but the Lisa took them to their next logical step.
 
 This document contains a few brief updates that are also found in the ChangeLog file, as well as some information on how to compile wxWidgets and LisaEm.
-
-(The updates will go away once the bugs are removed as ChangeLog is better suited for them.)
-
-## How do you pronounce LisaEm
-
-The "Em" at the end of LisaEm is short for emulator, so therefore you say "Lisa" followed by the first syllable in Emulator, "Em", or if you're a native English speaker, sound out the letter M.
-so: lee·suh·em,  \ ˈlē·sə·em \
-
-Nomenclature wise, LisaEm is in line with the other Lisa related things such as Lisa Pascal Workshop, or Lisa Office System, or LisaWrite, or LisaList.
 
 ## Command Line Options
 
@@ -50,46 +44,46 @@ Usage: lisaem [-h] [-p] [-q] [-f <str>] [-d] [-F[-]] [-z <double>] [-s[-]] [-c <
   -k, --kiosk           kiosk mode (suitable for RPi Lisa case)
   -o, --originctr       skinless mode: center video(-o) vs topleft(-o-)
 ```
-## 2022.04.01
 
-Added TerminalWx console + preferences.
+## Tested Host Operating Systems
 
-If you're using text based OS such as Monitor, LPW, UniPlus, (and eventually Xenix), if you enable the console TerminalWx window, you'll get a small terminal window that opens up along with the main window.
-The purpose of this is to allow you to capture text output, or upload a text file, etc. rather than use the more limited graphical window.
+The following table outlines successful builds against the respective operating systems, architectures, and wxWidget versions:
 
-UniPlus now works on LisaEm, however, you'll need to use a pre-install Widget/ProFile image that you'd download to a modern machine using BLU and then convert it using the blu-to-dc42 too.
+| OS | Arch | wxWidgets | Status |
+|---|---|---|---|
+| macOS 13.4.1 | arm64 | 3.2.3 | Tested - OK |
+| macOS 13.6 | x86_64 | 3.2.3 | Tested - OK |
+| macOS 14.0 | arm64 | 3.2.4 | Tested - OK |
+| macOS 14.5 | arm64 | 3.2.5 | Tested - OK |
+| macOS 15.1.1 | arm64 | 3.2.6 | Tested - OK |
+| macOS 15.6.1 | arm64 | 3.2.9 | Tested - OK |
+| Windows 10 | x86_64 | N/A | Untested |
+| Ubuntu 22.04 | x86_64 | N/A | Untested |
 
-Speaking of, many new tools have now been added and updated as well. They are:
+To sustain development efforts, compatibility with legacy architectures (ie. PowerPC) and operating systems (ie. MacOS X < 10.12)
+is not guaranteed and support may be removed.
 
-```
-blu-to-dc42                    - convert a BLU image to DC42 for use in LisaEm
-dc42-add-tags                  - add tags to an image without them (does not fix missing tags)
-dc42-copy-boot-loader          - copy the boot sector and loader from one image to another
-dc42-copy-selected-sectors     - copy a list of sectors from one image to another
-dc42-diff                      - diff two disk images
-dc42-dumper                    - dump an image to text files
-dc42-resize-to-400k            - resize a short DC42 to 400K
-dc42-to-blu                    - convert a DC42 image to BLU so you can upload it back to a physical Lisa hard drive
-dc42-to-raw                    - convert a DC42 image to RAW format
-dc42-to-rraw                   - same but puts the tags at the ends of sectors rather than the start
-dc42-to-split-raw              - convert a disk image to split
-dc42-to-tar                    - untar a bunch of Xenix floppies to individual files
-decode-vsrom                   - given a video state ROM dump, decode the serial number stored within
-idefile-to-dc42                - convert an IDE:File image to Disk Copy format (written by Natalia Portillo)
-lisadiskinfo                   - get info about a disk image
-lisafsh-tool                   - Lisa File System shell tool - interactively work with a disk image (now with ReadLine support)
-lisa-serial-info               - info about your Lisa's serial #
-los-bozo-on                    - DRM Protect a Lisa Office System Tool
-los-deserialize                - Deserialize and UnDRM a (un)branded Lisa Office System Tool
-patchxenix                     - Patch Xenix for use with X/ProFile drives
-raw-to-dc42                    - convert raw disk images to DC42 for use with LisaEm
-rraw-to-dc42                   - convert reverse raw (tags at the end) disk images to DC42 for use with LisaEm
-uniplus-bootloader-deserialize - deserialize the UniPlus loader off a ProFile/Widget hard drive
-uniplus-set-profile-size       - don't use yet. This modifies the UniPlus kernel partition table sizes to use larger hard drives.
-```
+## Tested Emulated Operating Systems
 
-LisaFSH Tool now has readline support so tab expansion of commands and history are now available (for systems with GNU readline, history, ncurses)
+Below is a table of recently tested emulated operating systems. If you've successfully installed something listed (or not listed) here, please email or leave a note.
 
+| OS | Status | Notes |
+|---|---|---|
+| MacWorks XL 3.0 | Tested - OK | Hard disk support functional. Requires MW boot disk. |
+| MacWorks Plus 1.0.14 | Tested - Issues | Issues as of RC4 |
+| MacWorks Plus 10.0.18 | Tested - Issues | Issues as of RC4 |
+| MacWorks Plus II 2.5.0 | Tested - Unsupported | Does not boot. Requires PFG. |
+| Lisa Office System 1.x | Untested | |
+| Lisa Office System 2.x | Untested | |
+| Lisa Office System 3.x | Tested - Issues | Installer boots but fails to install Disk 1. Bails with 'Odd Address Exception' error in debug logs. |
+| Microsoft Xenix | Untested | |
+| UniSoft UniPlus Unix V | Untested | |
+| Lisa Workshop | Untested | |
+
+## 2025.03.15
+
+Due to wxWidgets limitations, the minimum macOS version for the latest LisaEm release has been hardcoded to macOS 14.5. If an older macOS release is
+required, please file an issue.
 
 ## 2021.01.15
 
@@ -106,53 +100,56 @@ Added a checkbox to disable mouse scaling under the display menu (if the mouse i
 If you see weird behavior on startup, try deleting both the main preferences as well as the specific Lisa preferences.
 
 ------------------------------------------------------------------------------
-## Special steps for Windows:
 
-If you wish to build for Windows, Cygwin, along with regular gcc and mingw is required.
+## Compiling LisaEm from sources
 
-Please examine these two Cygwin installation batch files which will setup the appropriate packages.
+### Compiling wxWidgets for your system
+LisaEm uses the wxWidgets library extensively. wxWidgets must be built and installed before building LisaEm from sources.
 
-* `cygwin-install64.bat` - for 64 bit systems (all modern ones today)
-* `cygwin-install32.bat` - for older machines
+The scripts directory contains several scripts that you could use to build wxWidgets for your system. We will generally link LisaEm statically, especially for macOS and Windows.
 
-They expect to live on the E:\ drive - this is because I use Virtualbox VMs for windows where the C:\ drive is for the OS, D:\ is the CDROM drive, and E:\ is the shared folder between my Linux machine and the VM.
-
-You'll need to first download the Cygwin installers and name them as follows:
-
-* `e:\setup-x86_64.exe` - for the 64 bit Cygwin installer
-* `e:\setup-x86.exe` - for the 32 bit Cygwin install
-
-As you'll need to right click on the appropriate one (32 bit vs 64 bit) and run as Administrator, it's highly recommended that you carefully examine what they do.
-
-[The Cygwin installer requires that it be run as Administrator when scripted, otherwise it goes interactive and does not properly select the packages passed to it on the command line, this is a limitation of Cygwin, take it up with them by filing bug reports.]
-
-These scripts expect to be run from the E:\ drive, and that you've downloaded the Setup.exe for Cygwin and have named it properly as the script expects. 
-
-If your system doesn't or can't match this, please edit the install scripts as needed. 
-
-This is recommended anyway, since you shouldn't trust anything that requires running as Administrator. Don't trust me because I'm trust worthy, trust me because you've personally verified that these scripts don't do anything malicious to your system. This should apply to anything you install on any machine. If you can't see the source code and verify for yourself that it does the right thing, you shouldn't be installing it.
-
-Next, open the Cygwin terminal (MinTTY), use the scripts in the scripts directory that build wxWidgets, and then add the bin directory from the wxWidgets build to your PATH, and then build LisaEm - all these steps are done from the Cygwin terminal.
-
-## Compiling wxWidgets for your system
-
-The scripts directory contains several scripts that you could use to build wxWidgets for your system. We will generally link LisaEm statically, especially for macOS x and 
+NOTE: Some of these scripts are referenced in OS-specific installation processes later in this document.
 
 ```
-scripts/build-wx3.0.2-elder-macosx.sh
-scripts/build-wx3.1.2-modern-macosx.sh
+scripts/build-wx3.2.9-modern-macosx.sh
 scripts/build-wx3.1.5-cygwin-windows.sh
-scripts/build-wx3.1.5-gtk.sh
-scripts/build-wx3.1.5-modern-macosx.sh
+scripts/build-wxwidgets-gtk.sh
 ```
 After wxWidgets is installed to `/usr/local/wxsomething`, add `/usr/local/wxsomething/bin` to your path before running the LisaEm build script.
 
+Example:
+
+```
+$ export PATH=$PATH:/usr/local/wx3.2.9-cocoa-macOS-15.1-x86_64,arm64
+
+# verify that wxWidgets is available:
+wx-config --list
+```
+
 ![building-wx-widgets](resources/1-clone-and-build-wx-widgets.gif)
 
+### Compiling LisaEm (Windows)
+We have detailed instructions [here](HowToBuildOnWindows.md).
 
-## Compiling LisaEm (for all platforms):
+### Compiling LisaEm (MacOS X)
 
-You will need wxWidgets 3.0.4-3.1.5 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
+Compiling on MacOS X (or macOS) requires upstream wxWidgets (not system provided). Use the included build scripts with the following directions:
+
+```
+$ git clone https://github.com/arcanebyte/lisaem
+$ cd lisaem
+$ scripts/build-wx3.2.9-modern-macosx.sh --enable-universal_binary=arm64,x86_64
+
+$ export PATH="/usr/local/wx3.2.9-cocoa-macOS-$(sw_vers -productVersion | cut -d. -f1-2)-x86_64,arm64/bin:$PATH"
+$ ./build.sh clean build
+$ sudo ./build.sh install 
+```
+
+The `LisaEm.app` application will be installed in the Applications folder.
+
+### Compiling LisaEm (for all other platforms):
+
+You will need wxWidgets 3.0.4-3.2.9 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
 
 You will want to install/compile wxWidgets **without** the shared library option, except perhaps on GTK systems, but if you do this, it will not be portable except to systems of the same kind and version.
 
@@ -160,21 +157,18 @@ Unlike most apps that use autotools, or cmake, LisaEm uses the [bashbuild](https
 
 After installing/compiling wxWidgets, ensure that wx-config is in your path, cd to the LisaEm source code directly and run:
 
+	```
 	./build.sh clean build
 	sudo ./build.sh install 
-
-(Don't use sudo on Cygwin, instead type in `./build.sh install` and you'll be prompted whether you wish to launch the command in an Administration MinTTY session, then the build will run from a second terminal window that runs within the Administrator context.)
+	```
 
 This will install the lisaem and lisafsh-tool binaries to /usr/local/bin, and will install skins and sound files to /usr/local/share/LisaEm/; on Windows it will be installed to C:\Program Files\Sunder.Net\LisaEm and /Applications for macOS.
 
 ![compiling lisaem](resources/2-build-lisaem.gif)
 
-
 ### Cross compiling
 
 Cross compiling is possible by passing the -arch=xxx option to the top level build.sh script. This is how PPC binaries are built on an i386 10.5 VM.
-
-(Sadly I could not get a wxWidgets 3.x compiled properly for macos x 10.4 - this would have been nice due to the ability of 10.4 to run classic macos 9 and earlier applications, which would have made a nice environment for running many classic apps, including Lisa Office Systems. If you find a way to get wxWidgets 3.0.2 or 3.0.4 on 10.4 please let me know.)
 
 ### Compressing binaries with UPX
 
@@ -194,7 +188,7 @@ Native OS provided copies of wxWidgets, such as those packaged with various Linu
 
 Binary distributions of LisaEm for macOS X provided on `dmg` images, will include multiple binaries for multiple CPU architectures such as PPC, PPC64, i386, and x86-64. While the macOS x `lipo` command can glue multiple architecture binaries together, it cannot let you package up multiple copies of a single architecture. To get around this, I've added an internal selector script `lisaem.sh` in the resources directory which is copied to `LisaEm.app/Contents/MacOS/lisaem.sh` - this scripts looks at your system and figures out what macOS version and CPU architecture you're running and then attempts to find the most likely binary suitable for your machine and runs that one.
 
-Because some macOS/Xcode versions are only compatible with certain versions of wxWidgets, for example, Mac OS X 10.8 (Mountain Lion) will use a copy of LisaEm compiled against wxWidgets 3.0.4, while macOS 10.15 (Catalina) will run a copy of LisaEm compiled against wxWidgets 3.1.5. You can use the "About LisaEm" menu item under the credits to see the version.
+Because some macOS/Xcode versions are only compatible with certain versions of wxWidgets, for example, Mac OS X 10.8 (Mountain Lion) will use a copy of LisaEm compiled against wxWidgets 3.0.4, while macOS 10.15 (Catalina) will run a copy of LisaEm compiled against wxWidgets 3.1.3. You can use the "About LisaEm" menu item under the credits to see the version.
 
 Additionally a `--delete-other-binaries` option is provided in the script, so if you run `/Applications/LisaEm.app/Contents/MacOS/lisaem.sh --delete-other-binaries` from iTerm or Terminal, it will delete the shipped binaries that are not appropriate to your system, saving you a few MB.
 

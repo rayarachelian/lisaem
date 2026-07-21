@@ -2,6 +2,19 @@
 Lisa Emulator Change History                         http://lisaem.sunder.net/
 ------------------------------------------------------------------------------
 
+2024.01.01 - RC5!
+           - Hopefully fixed issue with segfault on quit for macOS.
+
+2023.12.28 - Update wxWidgets build script to support 3.2.4. Verified macOS
+             14.0 (Sonoma) for arm64.
+
+2023.10.14 - Update wxWidgets build script to support 3.2.3. Verified macOS
+             13.6 (Ventura) for arm64 and x86_64.
+
+2023.01.27 - Update wxWidgets build script to support 3.2.1 and MacOS > 10.x.
+           - Created a tag for Ray's final RC4 release. The master branch will
+             now be the dev branch, and subsequent 'releases' will be tagged.
+
 2022.04.01 - RC4
 
 2022.03.31 - add alt-icons from Andrew Yaros posted here: 

@@ -17,24 +17,21 @@ function is_pkg_available() {
  return 0
 }
 
-# to build a package, should we do a fake install in pkg/build/tmp?
+# Sets INSTALL=1 for suported platforms, which will trigger the "install" command,
+# where the target folder will be set to "lisaem/pkg/build/tmp"
 function do_fake_install_for_pkg() {
  [[ -n "${LINUX}${OPENBSD}${FREEBSD}${SUNOS}" ]] && export INSTALL=1 && return 1
  return 0
 }
 
-function AskCygWinSudo() {
-  if  [[ -n "$CYGWIN" ]] && [[ -z "$HASPERMISSION" ]]; then
+# The command "package" basically sets INSTALL=1, WITHPKG="yes",
+# which triggers the "install" command, where the target folder will be set to
+# "lisaem/pkg/build/tmp"
+function package_check_sudo_pass() {
+  if  [[ -n "$CYGWIN" ]]; then
        export INSTALL=1
-       echo "NOTE: On Windows package will also install, but to the staging directory" 1>&2
-       echo "Command: $0 $@"                             1>&2
-       CygwinSudoRebuild build install package \
-       $( for i in $@; do
-          if [[ "$i" != "package" ]] && [[ "$i" != "install" ]] && [[ "$i" != "build" ]] && [[ "$i" != "pkg" ]]; then
-             echo "$i"
-          fi
-          done )
-       exit $?
+       export WITHPKG="yes"
+       CygwinSudoRebuild install
   fi
 }
 
@@ -42,7 +39,7 @@ function install_check_sudo_pass() {
   if  [[ -z "$CYGWIN" ]]; then
       [[ "`whoami`" != "root" ]] && echo "Need to be root to install. try: sudo ./build.sh $@" && exit 1
   else
-      [[ -z "$HASPERMISSION" ]] && CygwinSudoRebuild $@
+      [[ -z "$HASPERMISSION" ]] && CygwinSudoRebuild install
   fi
   export INSTALL=2
 }
@@ -55,6 +52,7 @@ function create_packages_for_os() {
          LinuxDebianPackage
          LinuxRPMPackage
          LinuxSnapPackage
+         LinuxAppImage
       fi
 
       [[ -n "$FREEBSD" ]] && FreeBSDPackage
@@ -67,10 +65,10 @@ function create_packages_for_os() {
 
       if  [[ -n "$CYGWIN" ]]; then
           [[ -z "$MACHINE" ]] && export MACHINE="$( uname -m )" 
-          PKGNAME="${XTLD}/pkg/LisaEm-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.zip"
+          PKGNAME="${XTLD}/pkg/LisaEm-win-${MACHINE}.zip"
           echo "Creating ZIP and/or NSIS (if available) Windows Package: $PKGNAME" 1>&2
-          cd "$PREFIX/../.." || exit 1
-          WinZIPPackage "$PKGNAME" "./${COMPANY}/${SOFTWARE}"
+          cd "$PREFIX/../../${COMPANY}" || exit 1
+          WinZIPPackage "$PKGNAME" "./${SOFTWARE}"
           WinNSISPackage
       fi
       elapsed=$(get_elapsed_time) && [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo

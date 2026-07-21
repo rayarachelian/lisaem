@@ -130,7 +130,7 @@ function SunOSPackage() {
   PKGPATH="${XTLD}/pkg/build/tmp/${CONAM}${LCNAME}/"
 
   # :TODO: find out package naming convention proper for OI, etc. this is reasonable, but not official
-  PKGNAME="${CONAM}${LCNAME}.${VERSION}.${OSBANNER}.${KINDARCH}.pkg"
+  PKGNAME="${CONAM}${LCNAME}.${OSBANNER}.${KINDARCH}.pkg"
 
   mkdir -pm755 "$PKGPATH"
   cd           "$PKGPATH"
@@ -143,7 +143,7 @@ function SunOSPackage() {
 
 cat >"${PKGPATH}/pkginfo" <<ENDSOLPKGEND
 PKG="${CONAM}${LCNAME}"
-NAME="${SOFTWARE} ${VERSION} $(isainfo | cut -f1 -d' ' ) ${BANNER}"
+NAME="${SOFTWARE} $(isainfo | cut -f1 -d' ' ) ${BANNER}"
 VERSION="${VERSION}"
 CATEGORY="${SUNOSCATEGORY}"
 ARCH="$(uname -m)"

@@ -62,7 +62,7 @@ function getcpus()
 # Creates both static and shared libraries.
 #
 # Parameters $1 target directory
-#	     $2 library name
+#            $2 library name
 #            $3 version tripplet.  i.e. 0.3.6
 #            $4 mode "static", "shared", or "both"
 #            $5 is a single string containing objects to merge.
@@ -123,7 +123,16 @@ fi
 function windres() {
 
 if [[ -n "$CYGWIN" ]]; then
-    export MINVER="`echo $VERSION| cut -f1 -d'-' | sed 's/\./,/g'`,0"
+    # The MINVER being produced below must contain 4 digits (Major, Minor, Build, Revision), e.g. "1,2,8,0"
+    # This works well only if the VER value is in format "x.x.x".
+    # Determine which variable to use for the version
+    if [[ -z "$VER" || "$VER" == "undefined" ]]; then
+        VERSION_SRC="$RELEASEDATE"
+    else
+        VERSION_SRC="$VER"
+    fi
+    # Cut everything after the first "-" (if any), then, tokenize replace "." with "," , then add ",0" :
+    export MINVER="`echo $VERSION_SRC| cut -f1 -d'-' | sed 's/\./,/g'`,0"
     cat >${XTLD}/resources/windres_private.rc <<END
 #include <windows.h> // include for version info constants
 
@@ -134,7 +143,6 @@ A ICON MOVEABLE PURE LOADONCALL DISCARDABLE "lisaem.ico"
 // THIS WILL MAKE THE PROGRAM USE THE COMMON CONTROLS
 // LIBRARY VERSION 6.0 (IF IT IS AVAILABLE)
 //
-1 24 "lisaem.exe.Manifest"
 
 1 VERSIONINFO
 FILEVERSION ${MINVER}
@@ -320,9 +328,9 @@ function WinNSISPackage() {
      # since makensis is windows, do not put path inside PKGNAME, instead cd into the staged dir
      # and then output the package through the script to some dirs back up.
 
-     PKGNAME="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.exe"
-     NSISSCRIPT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.nsi"
-     NSISOUTPUT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.log"
+     PKGNAME="${SOFTWARE}-win-${MACHINE}.exe"
+     NSISSCRIPT="${SOFTWARE}-win-${MACHINE}.nsi"
+     NSISOUTPUT="${SOFTWARE}-win-${MACHINE}.log"
 
      echo "Creating NSIS Windows Package: ${XTLD}/pkg/$PKGNAME" 1>&2
      mkdir -pm755 "${XTLD}/pkg/build/tmp"
@@ -351,8 +359,8 @@ function CygwinSudoRebuild() {
   if [[ -z "$(/bin/id | grep Administrator)" ]]; then
 
      if [[ -z "$YESTOALL" ]]; then
-        echo "To install, we need start Cygwin Shell with Administrative capabilities." 1>&2
-        echo "Enter yes to start this build script in an Administrative shell or hit ENTER to abort" 1>&2
+        echo "To install, we need to start Cygwin Shell with Administrative capabilities." 1>&2
+        echo "Type yes and then ENTER to start this build script in an Administrative shell or, hit ENTER to abort" 1>&2
         [[ -z "$CYGWINYES" ]] && read x
      else
         x="$YESTOALL"
@@ -363,24 +371,25 @@ function CygwinSudoRebuild() {
           echo '#!/usr/bin/env bash'
           echo "cd \"${XTLD}\""
           echo "export PATH=\"$PATH\""
-	  echo "export HASPERMISSION=yes"
+          echo "export HASPERMISSION=yes"
+          echo "export WITHPKG=\"$WITHPKG\""
           echo "./build.sh $@"
           echo "echo Press ENTER to close Admin shell window"
           echo "read x"
         ) >"$file"
        chmod 755 "$file"
        cygstart -w --action=runas mintty.exe -w max -h -e /usr/bin/bash "$file"
-         cat "$file"
+       cat "$file"
        echo "Completed in Admin mintty window" 1>&2
        #rm "$file"
        exit 0
      else
-       export INSTALL=""
        echo "Skipping install" 1>&2
+       exit 0
      fi
   else
      export HASPERMISSION="yes"
-     echo "In Admin mode"
+     echo "Running in Windows Administrator mode. Press Enter to continue."
      read x
   fi
 }
@@ -431,15 +440,13 @@ export CXXFLAGS="${CXXFLAGS} ${GCCCOLORIZED} ${CCOPTS} -fno-rtti"
 export CLICMD="-mconsole"
 export GUIAPP="-mwindows"
 
-# installing on Windows goes to C:\Program Files\... rather than packaging which goes under ${XTLD}/pkg/build/tmp/
-for i in $@; do
-  [[ "$i" == "install" ]] && PRE="/cygdrive/c/"
-done
-for i in $@; do
-  [[ "$i" == "package" ]] && PRE=""
-done
-
 if [[ -z "$PREFIX" ]]; then
-   export PREFIX="/cygdrive/c/${PRE}Program Files/${COMPANY}/${SOFTWARE}"
-   export PREFIXLIB="${PRE}Program Files/${COMPANY}/${SOFTWARE}/lib"
+   # Note: these variables are set to the same values as in ../build.sh :
+   COMPANY="Sunder.NET"                # company (vendor for sun pkg)
+   SOFTWARE="LisaEm"                   # name of the software (can contain upper case)
+
+   export PREFIX="/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}"
+
+   # This var is unused when building on Windows, but we set it anyways, for consistency with other platforms:
+   export PREFIXLIB="/cygdrive/c/Program Files/${COMPANY}/${SOFTWARE}/lib"
 fi

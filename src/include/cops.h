@@ -27,30 +27,29 @@
 *                                                                                      *
 \**************************************************************************************/
 
-
 #ifndef COPSHINCLUDED
 #define COPSHINCLUDED 1
 /* COPS VIA 6522 Ports */
 
-#define CORB      0xFCdd81             /* ORB/IRB on COPS 6522           */
-#define CIRB      0xFCdd81             /* ORB/IRB on COPS 6522           */
-#define CORA      0xFCdd83             /* ORa/IRA on COPS 6522           */
-#define CIRA      0xFCdd83             /* ORa/IRA on COPS 6522           */
-#define CDDRB     0xFCDD85
-#define CDDRA     0xFCDD87
-#define CT1CL     0xFCdd89
-#define CT1CH     0xFCdd8b
-#define CT1CL2    0xFCdd8d
-#define CT1CH2    0xFCdd8f
-#define CT2CL     0xFCdd91
-#define CT2CH     0xFCdd93
-#define CVIASR    0xFCdd95
-#define CVIAACR   0xFCdd97
-#define CVIAPCR   0xFCDD99
-#define CVIAIFR   0xFCdd9B
-#define CVIAIER   0xFCdd9d
-#define CORA1NH   0xFCDD9F
-#define CIRA1NH   0xFCDD9F
+#define CORB 0xFCdd81 /* ORB/IRB on COPS 6522           */
+#define CIRB 0xFCdd81 /* ORB/IRB on COPS 6522           */
+#define CORA 0xFCdd83 /* ORa/IRA on COPS 6522           */
+#define CIRA 0xFCdd83 /* ORa/IRA on COPS 6522           */
+#define CDDRB 0xFCDD85
+#define CDDRA 0xFCDD87
+#define CT1CL 0xFCdd89
+#define CT1CH 0xFCdd8b
+#define CT1CL2 0xFCdd8d
+#define CT1CH2 0xFCdd8f
+#define CT2CL 0xFCdd91
+#define CT2CH 0xFCdd93
+#define CVIASR 0xFCdd95
+#define CVIAACR 0xFCdd97
+#define CVIAPCR 0xFCDD99
+#define CVIAIFR 0xFCdd9B
+#define CVIAIER 0xFCdd9d
+#define CORA1NH 0xFCDD9F
+#define CIRA1NH 0xFCDD9F
 
 /* COPS Commands: */
 
@@ -99,38 +98,38 @@ Special Reset Codes:
 
 */
 
-#define COPS_RES_KBFAILURE        0xff    /* Keyboard COPS failure detected  */
-#define COPS_RES_IOFAILURE        0xfe    /* I/O Board COPS failure detected */
-#define COPS_RES_KBUNPLUGD        0xfd    /* Keyboard unplugged              */
-#define COPS_RES_CLOCKTIRQ        0xfc    /* clock timer interrupt           */
-#define COPS_RES_POWERKEY         0xfb    /* Soft Power Switch hit           */
+#define COPS_RES_KBFAILURE 0xff /* Keyboard COPS failure detected  */
+#define COPS_RES_IOFAILURE 0xfe /* I/O Board COPS failure detected */
+#define COPS_RES_KBUNPLUGD 0xfd /* Keyboard unplugged              */
+#define COPS_RES_CLOCKTIRQ 0xfc /* clock timer interrupt           */
+#define COPS_RES_POWERKEY 0xfb  /* Soft Power Switch hit           */
 
-#define COPS_CLOCK_0              0xe0    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_1              0xe1    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_2              0xe2    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_3              0xe3    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_4              0xe4    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_5              0xe5    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_6              0xe6    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_7              0xe7    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_8              0xe8    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_9              0xe9    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_a              0xea    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_b              0xeb    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_c              0xec    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_d              0xed    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_e              0xee    /* COPS year  followed by 5 bytes */
-#define COPS_CLOCK_f              0xef    /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_0 0xe0 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_1 0xe1 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_2 0xe2 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_3 0xe3 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_4 0xe4 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_5 0xe5 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_6 0xe6 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_7 0xe7 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_8 0xe8 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_9 0xe9 /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_a 0xea /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_b 0xeb /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_c 0xec /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_d 0xed /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_e 0xee /* COPS year  followed by 5 bytes */
+#define COPS_CLOCK_f 0xef /* COPS year  followed by 5 bytes */
 
 /* dd dh hm ms st - ddd day, hh-hour, mm min ss=second t=tenths of second   */
 
 /* Keyboard ID # produced whenever the keyboard cops is reset.  valid codes
    are  keytronix id,   apd  */
 
-#define COPS_KEYID_FRENCH         0xAD2d
-#define COPS_KEYID_GERMAN         0xAE2e
-#define COPS_KEYID_UK             0xAF2f
-#define COPS_KEYID_US             0xBF2f
+#define COPS_KEYID_FRENCH 0xAD2d
+#define COPS_KEYID_GERMAN 0xAE2e
+#define COPS_KEYID_UK 0xAF2f
+#define COPS_KEYID_US 0xBF2f
 
 /* mouse commands:
   format 0111ennn (binary)
@@ -195,28 +194,26 @@ by access to a particular address in I/O space.:
 /* Storage for the I/O address controls */
 extern uint32 diag1, diag2, seg1, seg2, setup, softmem, vertical, hardmem, videolatch, memerror, statusregister;
 
+#define DIAG1RESET 0xFCE000
+#define DIAG1SET 0xFCe002
+#define DIAG2RESET 0xFCe004
+#define DIAG2SET 0xFCe006
+#define SEG1RESET 0xFCe008
+#define SEG1SET 0xFCe00a
+#define SEG2RESET 0xFCe00c
+#define SEG2SET 0xFCe00e
+#define SETUPRESET 0xFCe010
+#define SETUPSET 0xFCe012
+#define SOFTMEMRESET 0xFCe014
+#define SOFTMEMSET 0xFCe016
+#define VERTICALRESET 0xFCe018
+#define VERTICALSET 0xFCe01a
+#define HARDMEMRESET 0xFCe01c
+#define HARDMEMSET 0xFCe01e
 
-#define DIAG1RESET      0xFCE000
-#define DIAG1SET        0xFCe002
-#define DIAG2RESET      0xFCe004
-#define DIAG2SET        0xFCe006
-#define SEG1RESET       0xFCe008
-#define SEG1SET         0xFCe00a
-#define SEG2RESET       0xFCe00c
-#define SEG2SET         0xFCe00e
-#define SETUPRESET      0xFCe010
-#define SETUPSET        0xFCe012
-#define SOFTMEMRESET    0xFCe014
-#define SOFTMEMSET      0xFCe016
-#define VERTICALRESET   0xFCe018
-#define VERTICALSET     0xFCe01a
-#define HARDMEMRESET    0xFCe01c
-#define HARDMEMSET      0xFCe01e
-
-#define VIDEOLATCH      0xFCE800
-#define MEMERRLATCH     0xFCF000
-#define STATUSREGISTER  0xFCF800
-
+#define VIDEOLATCH 0xFCE800
+#define MEMERRLATCH 0xFCF000
+#define STATUSREGISTER 0xFCF800
 
 /*
 
@@ -230,45 +227,45 @@ vector.
 
 */
 
-#define IRQRESETINITIALSSP         0x000000,0
-#define IRQRESETINITIALPC          0x000004,0
-#define IRQBUSERROR                0x000008,0
-#define IRQADDRESSERROR            0x00000C,0
-#define IRQLLLEGALINSTRUCTION      0x000010,0
-#define IRQZERODIVIDE              0x000014,0
-#define IRQCHKINSTRUCTION          0x000018,0
-#define IRQTRAPV                   0x00001C,0
-#define IRQPRIVILIDGEVIOLATION     0x000020,0
-#define IRQTRACE                   0x000024,0
-#define IRQALINETRAP               0x000028,0
-#define IRQFLINETRAP               0x00002C,0
-#define IRQUNKNOWN                 0x000030,0x00005F
-#define IRQSPURIOUS                0x000060,0
-#define IRQOTHERINTERNALIRQ        0x000064,0
-#define IRQKEYBOARDIRQ             0x000068,0
-#define IRQSLOT2AUTOVECTOR         0x00006C,0
-#define IRQSLOT1AUTOVECTOR         0x000070,0
-#define IRQSLOT0AUTOVECTOR         0x000074,0
-#define IRQRS232                   0x000078,0
-#define IRQNMI                     0x00007C,0
-#define IRQTRAPVECTORS             0x000080,0x000BF
-#define IRQUNASSIGNED              0x0000C0,0x000Cf
-#define IRQUSERINTERRUPT           0x000100,0x003FF
+#define IRQRESETINITIALSSP 0x000000, 0
+#define IRQRESETINITIALPC 0x000004, 0
+#define IRQBUSERROR 0x000008, 0
+#define IRQADDRESSERROR 0x00000C, 0
+#define IRQLLLEGALINSTRUCTION 0x000010, 0
+#define IRQZERODIVIDE 0x000014, 0
+#define IRQCHKINSTRUCTION 0x000018, 0
+#define IRQTRAPV 0x00001C, 0
+#define IRQPRIVILIDGEVIOLATION 0x000020, 0
+#define IRQTRACE 0x000024, 0
+#define IRQALINETRAP 0x000028, 0
+#define IRQFLINETRAP 0x00002C, 0
+#define IRQUNKNOWN 0x000030, 0x00005F
+#define IRQSPURIOUS 0x000060, 0
+#define IRQOTHERINTERNALIRQ 0x000064, 0
+#define IRQKEYBOARDIRQ 0x000068, 0
+#define IRQSLOT2AUTOVECTOR 0x00006C, 0
+#define IRQSLOT1AUTOVECTOR 0x000070, 0
+#define IRQSLOT0AUTOVECTOR 0x000074, 0
+#define IRQRS232 0x000078, 0
+#define IRQNMI 0x00007C, 0
+#define IRQTRAPVECTORS 0x000080, 0x000BF
+#define IRQUNASSIGNED 0x0000C0, 0x000Cf
+#define IRQUSERINTERRUPT 0x000100, 0x003FF
 
+NMI Interrupts can come from : Power Failure, Hard / Soft memory error, keyboard reset.
 
+                                                                            Level 1 irq : hard disk interface /
+                                                                            parallel port,
+                               floppy,
+                               video.
 
-NMI Interrupts can come from:  Power Failure, Hard/Soft memory error, keyboard reset.
+                                   Pwer Reset Vector isnt shown because it is in ROM which is not accessed except in special i /
+                                   o space durring powerup processing.
 
-Level 1 irq: hard disk interface/parallel port, floppy, video.
+                                   Error Processing :
 
-Pwer Reset Vector isnt shown because it is in ROM which is not
-accessed except in special i/o space durring powerup processing.
+    (page 2 - 28 hw manual 83)
 
-
-Error Processing:
-
-(page 2-28 hw manual 83)
-
-*/
+                                   * /
 
 #endif

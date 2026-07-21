@@ -32,28 +32,27 @@
 \**************************************************************************************/
 
 // C++ include for fliflo functions so they can be used in terminalwx.cpp
-extern "C" {
-
-typedef struct
+extern "C"
 {
-  uint32 size;
-  uint8 *buffer;
-  uint32 start;
-  uint32 end;
-} FLIFLO_QUEUE_t;
 
+  typedef struct
+  {
+    uint32 size;
+    uint8 *buffer;
+    uint32 start;
+    uint32 end;
+  } FLIFLO_QUEUE_t;
 
-int    fliflo_buff_is_full(FLIFLO_QUEUE_t *b);
-int    fliflo_buff_has_data(FLIFLO_QUEUE_t *b);
-int    fliflo_buff_is_empty(FLIFLO_QUEUE_t *b);
-uint32 fliflo_buff_size(FLIFLO_QUEUE_t *b);
-uint32 fliflo_buff_percent_full(FLIFLO_QUEUE_t *b);
-int    fliflo_buff_add(FLIFLO_QUEUE_t *b,uint8 data);
-uint8  fliflo_buff_pop(FLIFLO_QUEUE_t *b);
-uint8  fliflo_buff_get(FLIFLO_QUEUE_t *b);
-uint8  fliflo_buff_peek(FLIFLO_QUEUE_t *b);
-uint8  fliflo_buff_peek_end(FLIFLO_QUEUE_t *b);
-int    fliflo_buff_create(FLIFLO_QUEUE_t *b, uint32 size);
-void   fliflo_buff_destroy(FLIFLO_QUEUE_t *b);
-
+  int fliflo_buff_is_full(FLIFLO_QUEUE_t *b);
+  int fliflo_buff_has_data(FLIFLO_QUEUE_t *b);
+  int fliflo_buff_is_empty(FLIFLO_QUEUE_t *b);
+  uint32 fliflo_buff_size(FLIFLO_QUEUE_t *b);
+  uint32 fliflo_buff_percent_full(FLIFLO_QUEUE_t *b);
+  int fliflo_buff_add(FLIFLO_QUEUE_t *b, uint8 data);
+  uint8 fliflo_buff_pop(FLIFLO_QUEUE_t *b);
+  uint8 fliflo_buff_get(FLIFLO_QUEUE_t *b);
+  uint8 fliflo_buff_peek(FLIFLO_QUEUE_t *b);
+  uint8 fliflo_buff_peek_end(FLIFLO_QUEUE_t *b);
+  int fliflo_buff_create(FLIFLO_QUEUE_t *b, uint32 size);
+  void fliflo_buff_destroy(FLIFLO_QUEUE_t *b);
 }

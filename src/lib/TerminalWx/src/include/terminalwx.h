@@ -29,7 +29,6 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
  *
  */
 
-
 /**
  *  Terminal Widget
  *
@@ -43,23 +42,23 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 class TerminalWx : public wxTerm
 {
 public:
-    TerminalWx(wxWindow* parent, wxWindowID id,  int port,
-                  const wxPoint& pos = wxDefaultPosition,
-                  int width = 80, int height = 24,
-                  const wxString& name = "TerminalWx",
-                  int fontsize = 10, char *fontname = "Courier New");
-    virtual ~TerminalWx();
-    //virtual void OnUserInput(wxString);
-    virtual void DisplayChars(const wxString& text);
-    virtual void DisplayCharsUnsafe(const wxString& text);
-    int portnum;
+  TerminalWx(wxWindow *parent, wxWindowID id, int port,
+             const wxPoint &pos = wxDefaultPosition,
+             int width = 80, int height = 24,
+             const wxString &name = "TerminalWx",
+             int fontsize = 10, char *fontname = "Courier New");
+  virtual ~TerminalWx();
+  // virtual void OnUserInput(wxString);
+  virtual void DisplayChars(const wxString &text);
+  virtual void DisplayCharsUnsafe(const wxString &text);
+  int portnum;
 
 protected:
 private:
-  void OnTerminalInput(TerminalInputEvent&);
-  virtual void SendBack(int len, char* data);
-  virtual void SendBack(char* data);
-//  DECLARE_EVENT_TABLE()
+  void OnTerminalInput(TerminalInputEvent &);
+  virtual void SendBack(int len, char *data);
+  virtual void SendBack(char *data);
+  //  DECLARE_EVENT_TABLE()
 };
 
 #endif // TERMINALWX_H

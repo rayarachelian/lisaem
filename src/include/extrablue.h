@@ -1,1 +1,1 @@
-#define EXTRABLUE 25  
+#define EXTRABLUE 25

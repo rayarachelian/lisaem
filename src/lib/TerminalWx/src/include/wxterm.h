@@ -8,7 +8,6 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 
 */
 
-
 #ifndef INCLUDE_WXTERM
 #define INCLUDE_WXTERM
 
@@ -26,78 +25,77 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 #include <wx/string.h>
 #include <wx/window.h>
 
-#define wxEVT_COMMAND_TERM_RESIZE        wxEVT_USER_FIRST + 1000
-#define wxEVT_COMMAND_TERM_NEXT          wxEVT_USER_FIRST + 1001
+#define wxEVT_COMMAND_TERM_RESIZE wxEVT_USER_FIRST + 1000
+#define wxEVT_COMMAND_TERM_NEXT wxEVT_USER_FIRST + 1001
 
-#define EVT_TERM_RESIZE(id, fn) { wxEVT_COMMAND_TERM_RESIZE, id, -1, (wxObjectEventFunction) (wxEventFunction) (wxCommandEventFunction) &fn, (wxObject *)NULL },
+#define EVT_TERM_RESIZE(id, fn) {wxEVT_COMMAND_TERM_RESIZE, id, -1, (wxObjectEventFunction)(wxEventFunction)(wxCommandEventFunction) & fn, (wxObject *)NULL},
 
 class wxTerm : public wxWindow, public GTerm
 {
   int
-    m_init,
-    m_width,
-    m_height,
-    m_selx1,
-    m_sely1,
-    m_selx2,
-    m_sely2,
-    m_curX,
-    m_curY,
-    m_curFG,
-    m_curBG,
-    m_curFlags,
-    m_curState,
-    m_curBlinkRate,
-    m_fontsize;
+      m_init,
+      m_width,
+      m_height,
+      m_selx1,
+      m_sely1,
+      m_selx2,
+      m_sely2,
+      m_curX,
+      m_curY,
+      m_curFG,
+      m_curBG,
+      m_curFlags,
+      m_curState,
+      m_curBlinkRate,
+      m_fontsize;
 
   char *m_fontname;
-
 
   int m_charsInLine;
   int m_linesDisplayed;
 
   unsigned char
-    m_curChar;
+      m_curChar;
 
   bool
-    m_selecting,
-    m_marking;
+      m_selecting,
+      m_marking;
 
   bool m_inUpdateSize;
 
   wxColour
-    m_vt_colors[16],
-    m_pc_colors[16],
-    *m_colors;
+      m_vt_colors[16],
+      m_pc_colors[16],
+      *m_colors;
 
   wxPen
-    m_vt_colorPens[16],
-    m_pc_colorPens[16],
-    *m_colorPens;
+      m_vt_colorPens[16],
+      m_pc_colorPens[16],
+      *m_colorPens;
 
   wxFont
-    m_normalFont,
-    m_underlinedFont,
-    m_boldFont,
-    m_boldUnderlinedFont;
+      m_normalFont,
+      m_underlinedFont,
+      m_boldFont,
+      m_boldUnderlinedFont;
 
   wxDC
-    *m_curDC;
+      *m_curDC;
 
   wxMemoryDC
-    m_memDC;
+      m_memDC;
 
   wxBitmap
-    *m_bitmap;
+      *m_bitmap;
 
   FILE
-    *m_printerFN;
+      *m_printerFN;
 
   char
-    *m_printerName;
+      *m_printerName;
 
   wxTimer
-    m_timer;
+      m_timer;
 
 public:
   enum BOLDSTYLE
@@ -110,32 +108,31 @@ public:
   int m_charWidth,
       m_charHeight;
 
-
 private:
   BOLDSTYLE
-    m_boldStyle;
+  m_boldStyle;
 
   typedef struct
   {
     wxKeyCode
-      keyCode;
+        keyCode;
 
     int
-      VTKeyCode;
+        VTKeyCode;
   } TermKeyMap;
 
   static TermKeyMap keyMapTable[];
 
 public:
-  wxTerm(wxWindow* parent, wxWindowID id,
-               const wxPoint& pos = wxDefaultPosition,
-               int width = 80, int height = 24,
-               const wxString& name = "wxTerm",
-               int fontsize = 10, char *fontname="Courier New");
+  wxTerm(wxWindow *parent, wxWindowID id,
+         const wxPoint &pos = wxDefaultPosition,
+         int width = 80, int height = 24,
+         const wxString &name = "wxTerm",
+         int fontsize = 10, char *fontname = "Courier New");
 
   virtual ~wxTerm();
 
-  bool SetFont(const wxFont& font);
+  bool SetFont(const wxFont &font);
 
   void GetDefVTColors(wxColor colors[16], wxTerm::BOLDSTYLE boldStyle = wxTerm::DEFAULT);
   void GetVTColors(wxColour colors[16]);
@@ -157,8 +154,8 @@ public:
   void SelectAll();
 
   void UpdateSize();
-  //void UpdateSize(int &termheight, int &linesReceived);
-  //void UpdateSize(wxSizeEvent &event);
+  // void UpdateSize(int &termheight, int &linesReceived);
+  // void UpdateSize(wxSizeEvent &event);
 
   /*
   **  GTerm stuff
@@ -170,21 +167,21 @@ public:
 
   virtual void MoveChars(int sx, int sy, int dx, int dy, int w, int h);
   virtual void ClearChars(int bg_color, int x, int y, int w, int h);
-//  virtual void SendBack(int len, char *data);
+  //  virtual void SendBack(int len, char *data);
   virtual void ModeChange(int state);
   virtual void Bell();
   virtual void ResizeTerminal(int w, int h);
   virtual void RequestSizeChange(int w, int h);
 
   virtual void ProcessInput(int len, unsigned char *data);
-//  virtual void ProcessOutput(int len, unsigned char *data);
+  //  virtual void ProcessOutput(int len, unsigned char *data);
 
   virtual void SelectPrinter(char *PrinterName);
   virtual void PrintChars(int len, unsigned char *data);
 
   virtual void UpdateRemoteSize(int width, int height);
-  int GetTermWidth(){return m_charsInLine;}
-  int GetTermHeight(){return m_linesDisplayed;}
+  int GetTermWidth() { return m_charsInLine; }
+  int GetTermHeight() { return m_linesDisplayed; }
 
 private:
   int MapKeyCode(int keyCode);
@@ -192,19 +189,19 @@ private:
   void DoDrawCursor(int fg_color, int bg_color, int flags,
                     int x, int y, unsigned char c);
 
-  void OnChar(wxKeyEvent& event);
-  void OnKeyDown(wxKeyEvent& event);
-  void OnPaint(wxPaintEvent& event);
-  void OnLeftDown(wxMouseEvent& event);
-  void OnLeftUp(wxMouseEvent& event);
-  void OnMouseMove(wxMouseEvent& event);
-  void OnTimer(wxTimerEvent& event);
+  void OnChar(wxKeyEvent &event);
+  void OnKeyDown(wxKeyEvent &event);
+  void OnPaint(wxPaintEvent &event);
+  void OnLeftDown(wxMouseEvent &event);
+  void OnLeftUp(wxMouseEvent &event);
+  void OnMouseMove(wxMouseEvent &event);
+  void OnTimer(wxTimerEvent &event);
   void OnSize(wxSizeEvent &event);
 
   void OnGainFocus(wxFocusEvent &event);
   void OnLoseFocus(wxFocusEvent &event);
 
-  //private wxScrollBar* m_scrollbar;
+  // private wxScrollBar* m_scrollbar;
 
   DECLARE_EVENT_TABLE()
 };

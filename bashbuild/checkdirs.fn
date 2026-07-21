@@ -10,21 +10,8 @@ function CHECKDIRS {
   for i in $@; do [[ ! -d ./$i ]] && missing="$i $missing"; done
 
   if [[ -n "$missing" ]]; then
-    ( echo "Please run this script from the top level directory. i.e."
-      echo
-      echo "tar xjpvf ${BUILDDIR}.tar.bz2"
-      echo "tar xJpvf ${BUILDDIR}.tar.xz"
-      echo "cd ${BUILDDIR}"
-      echo "./build.sh"
-      echo ""
-      echo "It's also possible that the developer forgot to add"
-      echo "a file to this dir, and when pushed to git, the empty"
-      echo "but required dir was not included, in which case"
-      echo "you can fix it by creating the directory yourself."
-      echo
-      echo "(Could not find $missing" 
-      echo "from $(/bin/pwd)"  ) 1>&2
-      exit 1
+    ( echo "Could not find required folder $missing in $(/bin/pwd) !"  ) 1>&2
+    exit 1
   fi
 
 }
@@ -35,15 +22,7 @@ function CHECKFILES {
   for i in $@; do [[ ! -f ./$i ]] && missing="$i $missing";done
 
   if [[ -n "$missing" ]]; then
-    ( echo "Please run this script from the top level directory. i.e."
-      echo
-      echo "tar xjpvf ${BUILDDIR}.tar.bz2"
-      echo "tar xJpvf ${BUILDDIR}.tar.xz"
-      echo "cd ${BUILDDIR}"
-      echo "./build.sh"
-      echo ""
-      echo "(Could not find $missing.)"
-      echo "from $(/bin/pwd)"   ) 1>&2
+    ( echo "Could not find required file $missing in $(/bin/pwd) !"  ) 1>&2
       exit 1
   fi
 }

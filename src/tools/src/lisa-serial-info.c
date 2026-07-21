@@ -18,7 +18,12 @@ uint8 serialnum240[32];
 void get_lisa_serialnumber(uint8 *serialnumber240)
 {
 
-uint32 plant; uint32 year; uint32 day; uint32 sn; uint32  prefix; uint32 net;
+  uint32 plant;
+  uint32 year;
+  uint32 day;
+  uint32 sn;
+  uint32 prefix;
+  uint32 net;
   /*
 https://www.applefritter.com/content/apple-lisa-serial-number-info
 Number of the Nibble in Hex 01 23 45 678 9ABC D EF
@@ -62,8 +67,8 @@ c. Nibbles 3 thru 7 are the AppleNet number (NNNNN).
 mine:     ff028308104050ff0010163504700000
 theirs:   ff02080202004030ff00100412029000
                               ^^^^
-    0x0f,0x0f,0x00,0x02,0x08,0x03,0x00,0x08,0x01,0x00,0x04,0x00,0x05,0x00,0x0f,0x0f,  // 250 
-    0x00,0x00,0x01,0x00,0x01,0x06,0x03,0x05,0x00,0x04,0x07,0x00,0x00,0x00,0x00,0x00,  // 260 
+    0x0f,0x0f,0x00,0x02,0x08,0x03,0x00,0x08,0x01,0x00,0x04,0x00,0x05,0x00,0x0f,0x0f,  // 250
+    0x00,0x00,0x01,0x00,0x01,0x06,0x03,0x05,0x00,0x04,0x07,0x00,0x00,0x00,0x00,0x00,  // 260
 
 
 plant 38 year 00 day 0f0 0654
@@ -91,82 +96,75 @@ floppy.c:deserialize:1581:Disk signed by Lisa SN: 1 06 63
 
 
 */
-        plant  =                                       ((serialnumber240[0x02] & 0x0f)<< 4) | ( serialnumber240[0x03] & 0x0f);
-        year   =                                       ((serialnumber240[0x04] & 0x0f)<< 4) | ( serialnumber240[0x05] & 0x0f);
-        day    =   ((serialnumber240[0x06] & 0x0f)<< 8) | ((serialnumber240[0x07] & 0x0f)<< 4) | ( serialnumber240[0x08] & 0x0f);
-        sn     =   ((serialnumber240[0x09] & 0x0f)<<12) | ((serialnumber240[0x0a] & 0x0f)<< 8) | ((serialnumber240[0x0b]<<4) & 0x0f) |
-                                                                                            (serialnumber240[0x0c]     & 0x0f);
-// applenet
-        prefix =   ((serialnumber240[0x10] & 0x0f)<< 8) | ((serialnumber240[0x11] & 0x0f)<< 4) |  (serialnumber240[0x12] & 0x0f);
-        net    =   ((serialnumber240[0x13] & 0x0f)<<16) | ((serialnumber240[0x14] & 0x0f)<<12) | ((serialnumber240[0x15] & 0x0f)<<8) |
-                                                       ((serialnumber240[0x16] & 0x0f)<< 4) |  (serialnumber240[0x17] & 0x0f);
+  plant = ((serialnumber240[0x02] & 0x0f) << 4) | (serialnumber240[0x03] & 0x0f);
+  year = ((serialnumber240[0x04] & 0x0f) << 4) | (serialnumber240[0x05] & 0x0f);
+  day = ((serialnumber240[0x06] & 0x0f) << 8) | ((serialnumber240[0x07] & 0x0f) << 4) | (serialnumber240[0x08] & 0x0f);
+  sn = ((serialnumber240[0x09] & 0x0f) << 12) | ((serialnumber240[0x0a] & 0x0f) << 8) | ((serialnumber240[0x0b] << 4) & 0x0f) |
+       (serialnumber240[0x0c] & 0x0f);
+  // applenet
+  prefix = ((serialnumber240[0x10] & 0x0f) << 8) | ((serialnumber240[0x11] & 0x0f) << 4) | (serialnumber240[0x12] & 0x0f);
+  net = ((serialnumber240[0x13] & 0x0f) << 16) | ((serialnumber240[0x14] & 0x0f) << 12) | ((serialnumber240[0x15] & 0x0f) << 8) |
+        ((serialnumber240[0x16] & 0x0f) << 4) | (serialnumber240[0x17] & 0x0f);
 
+  printf("serial240: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+         serialnumber240[0], serialnumber240[1], serialnumber240[2], serialnumber240[3],
+         serialnumber240[4], serialnumber240[5], serialnumber240[6], serialnumber240[7],
+         serialnumber240[8], serialnumber240[9], serialnumber240[10], serialnumber240[11],
+         serialnumber240[12], serialnumber240[13], serialnumber240[14], serialnumber240[15]);
+  printf("serial250: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+         serialnumber240[16], serialnumber240[17], serialnumber240[18], serialnumber240[19],
+         serialnumber240[20], serialnumber240[21], serialnumber240[22], serialnumber240[23],
+         serialnumber240[24], serialnumber240[25], serialnumber240[26], serialnumber240[27],
+         serialnumber240[28], serialnumber240[29], serialnumber240[30], serialnumber240[31]);
 
-       printf ("serial240: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                     serialnumber240[ 0], serialnumber240[ 1], serialnumber240[ 2], serialnumber240[ 3],
-                     serialnumber240[ 4], serialnumber240[ 5], serialnumber240[ 6], serialnumber240[ 7],
-                     serialnumber240[ 8], serialnumber240[ 9], serialnumber240[10], serialnumber240[11],
-                     serialnumber240[12], serialnumber240[13], serialnumber240[14], serialnumber240[15]
-                  );
-       printf("serial250: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                     serialnumber240[16], serialnumber240[17], serialnumber240[18], serialnumber240[19],
-                     serialnumber240[20], serialnumber240[21], serialnumber240[22], serialnumber240[23],
-                     serialnumber240[24], serialnumber240[25], serialnumber240[26], serialnumber240[27],
-                     serialnumber240[28], serialnumber240[29], serialnumber240[30], serialnumber240[31]
-                  );
-
-       printf("Lisa SN: plant:%x born on year:0x%x (%d) day:0x%x (%d) sn:0x%x (%d) applenet %x-%x\n\n",
-                   plant, year, year, day, day, 
-                   sn, sn, prefix, net);
-
+  printf("Lisa SN: plant:%x born on year:0x%x (%d) day:0x%x (%d) sn:0x%x (%d) applenet %x-%x\n\n",
+         plant, year, year, day, day,
+         sn, sn, prefix, net);
 }
-
-
-
 
 int main(int argc, char *argv[])
 {
-  long i,j,k;
+  long i, j, k;
 
-  char *temp=NULL;
+  char *temp = NULL;
 
-  temp=malloc(8);
-  strncpy(temp,"0xff",8);
+  temp = malloc(8);
+  strncpy(temp, "0xff", 8);
   //            0123
-      puts("  ---------------------------------------------------------------------------");
-      puts("    Lisa Serial Number Information Tool v0.0.1       http://lisaem.sunder.net");
-      puts("  ---------------------------------------------------------------------------");
-      puts("          Copyright (C) 2020, Ray A. Arachelian, All Rights Reserved.");
-      puts("              Released under the GNU Public License, Version 2.0");
-      puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
-      puts("  ---------------------------------------------------------------------------\n");
+  puts("  ---------------------------------------------------------------------------");
+  puts("    Lisa Serial Number Information Tool v0.0.1       http://lisaem.sunder.net");
+  puts("  ---------------------------------------------------------------------------");
+  puts("          Copyright (C) 2020, Ray A. Arachelian, All Rights Reserved.");
+  puts("              Released under the GNU Public License, Version 2.0");
+  puts("    There is absolutely no warranty for this program. Use at your own risk.  ");
+  puts("  ---------------------------------------------------------------------------\n");
 
-  if (argc<=1)
+  if (argc <= 1)
   {
-      puts("");
-      puts("  This program can be fed your Lisa's serial number that you can find via");
-      puts("  service mode and give you back information about it. To get this value,");
-      puts("  try to boot off the floppy drive without having a floppy inserted, and press");
-      puts("  Command-S to enter Service Mode. Then press 1 for display and enter 240 for");
-      puts("  the address and 40 for the count. Copy all the alternate byte values down.");
-      puts("  It will start with ff at 240. i.e. 0f0f 0002 0803 0106 0200 0205 0600 0f0f");
-      puts("  should be copied as ff028316202560ff. The next line contains the AppleNet ID");
-      puts("");
-      puts("  Usage:   lisa-serial-info hex-string-from-service-mode");
-      puts("  i.e.     lisa-serial-info ff028316202560ff0010420404600000"); 
-      puts("                            ^^ Lisa SN #  ^^AppleNet ID #\n");
-      exit(0);
+    puts("");
+    puts("  This program can be fed your Lisa's serial number that you can find via");
+    puts("  service mode and give you back information about it. To get this value,");
+    puts("  try to boot off the floppy drive without having a floppy inserted, and press");
+    puts("  Command-S to enter Service Mode. Then press 1 for display and enter 240 for");
+    puts("  the address and 40 for the count. Copy all the alternate byte values down.");
+    puts("  It will start with ff at 240. i.e. 0f0f 0002 0803 0106 0200 0205 0600 0f0f");
+    puts("  should be copied as ff028316202560ff. The next line contains the AppleNet ID");
+    puts("");
+    puts("  Usage:   lisa-serial-info hex-string-from-service-mode");
+    puts("  i.e.     lisa-serial-info ff028316202560ff0010420404600000");
+    puts("                            ^^ Lisa SN #  ^^AppleNet ID #\n");
+    exit(0);
   }
 
-  for (i=1; i<argc; i++)
+  for (i = 1; i < argc; i++)
   {
-    memset(serialnum240,0,32);
-    for (j=0; ((size_t)j<strlen(argv[i]) && j<32); j++)
+    memset(serialnum240, 0, 32);
+    for (j = 0; ((size_t)j < strlen(argv[i]) && j < 32); j++)
     {
-      temp[2]='0';
-      temp[3]=argv[i][j];
-      k=strtol(temp, NULL, 16);
-      serialnum240[j]=k;
+      temp[2] = '0';
+      temp[3] = argv[i][j];
+      k = strtol(temp, NULL, 16);
+      serialnum240[j] = k;
     }
     get_lisa_serialnumber(serialnum240);
   }

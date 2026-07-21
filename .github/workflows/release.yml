@@ -1,0 +1,94 @@
+name: Master Release Workflow
+
+on:
+  push:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+permissions:
+  contents: write
+
+jobs:
+  # Logic to determine if we use the Release Tag or the Commit ID as the produced build number
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      # The version_id and today will be passed to the LisaEm build script as env variables,
+      # so that they will appear in the LisaEm's Help->About menu.
+      version_id: ${{ steps.vars.outputs.version_id }}
+      today: ${{ steps.vars.outputs.today }}
+      # The version in the file name will start with today's date for continuous builds, so that they will be ordered nicely chronologically in the release page
+      version_in_file_name: ${{ steps.vars.outputs.version_in_file_name }}
+    steps:
+      - name: Set Variables
+        id: vars
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # Get Today's Date
+          TODAY=$(date +'%Y.%m.%d')
+          echo "today=$TODAY" >> $GITHUB_OUTPUT
+          
+          # Check if this is a release or a push
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION_ID="${{ github.event.release.tag_name }}"
+            echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "version_in_file_name=$VERSION_ID-$TODAY" >> $GITHUB_OUTPUT
+          else
+            # A continuous build. Use the commit id. Example: version_id=continuous-3e51852
+            VERSION_ID="continuous-${GITHUB_SHA::7}"
+            echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "version_in_file_name=continuous-$TODAY-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          fi
+
+  # Call the Child Workflows
+  
+  build-linux:
+    needs: setup
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      version_id: ${{ needs.setup.outputs.version_id }}
+      today: ${{ needs.setup.outputs.today }}
+      version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
+
+  build-windows:
+    needs: setup
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      version_id: ${{ needs.setup.outputs.version_id }}
+      today: ${{ needs.setup.outputs.today }}
+      version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
+
+  build-macos:
+    needs: setup
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      version_id: ${{ needs.setup.outputs.version_id }}
+      today: ${{ needs.setup.outputs.today }}
+      version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
+      
+  # Final job to collect artifacts and post to the release page
+  publish:
+    needs: [setup, build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'push'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'push' && 'continuous' || github.event.release.tag_name }}
+          name: ${{ github.event_name == 'push' && 'Continuous Build' || github.event.release.name }}
+          prerelease: ${{ github.event_name == 'push' || github.event.release.prerelease == true }}
+          files: |
+            **/*.deb
+            **/*.AppImage
+            **/*.exe
+            **/*.zip
+            **/*.dmg
+            **/*.pkg
+            **/*.app
+

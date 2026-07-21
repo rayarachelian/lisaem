@@ -68,9 +68,8 @@ extern unsigned char *power_on_xpm[];
 
 extern int how_many_bits[];
 
-
 // Remove this from actual project
-//extern unsigned char screenshot[];
+// extern unsigned char screenshot[];
 
 extern char *wx_keysyms[];
 extern long wx_keyvals[];

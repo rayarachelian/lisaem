@@ -24,41 +24,40 @@
 #include <stdint.h>
 #include <machine.h>
 
-//#if defined( __GNUC__ )
-//    #ifdef __MINGW32__
-//        #define HQX_CALLCONV __stdcall
-//    #else
-//        #define HQX_CALLCONV
-//    #endif
-//#else
-    #define HQX_CALLCONV
-//#endif
+// #if defined( __GNUC__ )
+//     #ifdef __MINGW32__
+//         #define HQX_CALLCONV __stdcall
+//     #else
+//         #define HQX_CALLCONV
+//     #endif
+// #else
+#define HQX_CALLCONV
+// #endif
 //
-//#if defined(_WIN32)
-//    #ifdef DLL_EXPORT
-//        #define HQX_API __declspec(dllexport)
-//    #else
-//        #define HQX_API __declspec(dllimport)
-//    #endif
-//#else
-    #define HQX_API
-//#endif
+// #if defined(_WIN32)
+//     #ifdef DLL_EXPORT
+//         #define HQX_API __declspec(dllexport)
+//     #else
+//         #define HQX_API __declspec(dllimport)
+//     #endif
+// #else
+#define HQX_API
+// #endif
 
 // #ifndef uint32
-// 
+//
 //     #define uint8   uint8_t
 //     #define uint16  uint16_t
 //     #define uint32  uint32_t
 //     #define uint64  uint64_t
-// 
+//
 //     #define int8    int8_t
 //     #define int16   int16_t
 //     #define int32   int32_t
 //     #define int64   int64_t
-// 
+//
 // #endif
 
-
 HQX_API void HQX_CALLCONV hqxInit(void);
-HQX_API void HQX_CALLCONV hq3x_32_rb(int startx, int starty, int width, int height, int rowbytes,  wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness );
+HQX_API void HQX_CALLCONV hq3x_32_rb(int startx, int starty, int width, int height, int rowbytes, wxBitmap *mybitmap, int Xres, int Yres, uint32 brightness);
 #endif

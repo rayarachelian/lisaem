@@ -52,9 +52,6 @@ function FreeBSDPackage() {
 
   pushd . >/dev/null 2>/dev/null
 
-  SUFFIX=""
-  [[ "${STABILITY}" != "RELEASE" ]] && [[ "${STABILITY}" != "PRODUCTION" ]] && export SUFFIX="-${STABILITY}-${RELEASEDATE}"
-
   export STAGEDIR="${XTLD}/pkg/build/tmp/freebsd/"
   export MANIFEST="${XTLD}/pkg/build/tmp/freebsd/+MANIFEST"
 
@@ -63,7 +60,7 @@ function FreeBSDPackage() {
 
 cat >"${MANIFEST}" <<ENDFBSDMANIFESTEND
 name: ${LCNAME}
-version: "${VER}${SUFFIX}"
+version: "${VER}
 origin: ${FREEBSDORIGIN}
 comment: "${DESCRIPTION}"
 desc: "${DESCRIPTION}"

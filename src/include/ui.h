@@ -8,4 +8,3 @@ void ui_log_critical(const char *text, ...);
 void ui_log_request(const char *text, ...);
 void ui_err(const char *text, ...);
 void ui_error(const char *text, ...);
-

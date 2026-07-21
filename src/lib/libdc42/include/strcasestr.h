@@ -9,31 +9,40 @@
 *                                                                                      *
 \**************************************************************************************/
 
-
 #ifndef strcasestr
 #ifndef __STRCASESTR__
 #define __STRCASESTR__
 // tolower requires this
 #include <ctype.h>
 
-char *strcasestr(const char *haystack, const char *needle) {
- 
+char *strcasestr(const char *haystack, const char *needle)
+{
+
   const char *s, // s=search pointer starts at r goes to the end
-             *n, // pointer to needle - starts at needle and goes to its end.
-             *r; // return pointer, also main ptr, starts at s, gets returned on match
-                
-  long count=0;
+      *n,        // pointer to needle - starts at needle and goes to its end.
+      *r;        // return pointer, also main ptr, starts at s, gets returned on match
 
-  r=haystack;
+  long count = 0;
 
-  while (*r) {
-    s=r; count=0; n=needle; // start a new search at new location r
-    while (tolower(*s) == tolower(*n) && *s && *n) {s++; n++; count++;}
-    if (*n==0 && count) {
-	    return (char *)(void *)r;
-	    // if we hit the end of the needle and found at least 1
-	    // have to do this idiotic cast through void * or else will
-	    // get an invalid conversion error when stripping const
+  r = haystack;
+
+  while (*r)
+  {
+    s = r;
+    count = 0;
+    n = needle; // start a new search at new location r
+    while (tolower(*s) == tolower(*n) && *s && *n)
+    {
+      s++;
+      n++;
+      count++;
+    }
+    if (*n == 0 && count)
+    {
+      return (char *)(void *)r;
+      // if we hit the end of the needle and found at least 1
+      // have to do this idiotic cast through void * or else will
+      // get an invalid conversion error when stripping const
     }
     r++; // keep going until the end of the haystack
   }

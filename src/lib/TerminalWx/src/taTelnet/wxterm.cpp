@@ -9,14 +9,14 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 */
 
 #ifdef __GNUG__
-    #pragma implementation "wxterm.h"
+#pragma implementation "wxterm.h"
 #endif
 
 // For compilers that support precompilation, includes "wx/wx.h".
 #include "wx/wxprec.h"
 
 #ifdef __BORLANDC__
-    #pragma hdrstop
+#pragma hdrstop
 #endif
 
 #include <wx/timer.h>
@@ -35,369 +35,370 @@ License: wxWindows License Version 3.1 (See the file license3.txt)
 #include "../GTerm/gterm.hpp"
 #include "wxterm.h"
 
-#define CURSOR_BLINK_DEFAULT_TIMEOUT	300
-#define CURSOR_BLINK_MAX_TIMEOUT	2000
+#define CURSOR_BLINK_DEFAULT_TIMEOUT 300
+#define CURSOR_BLINK_MAX_TIMEOUT 2000
 
-/* 
+/*
 ** quick+dirty right trim C string - scan the string, l=last non-space character., c=current character. runs in O(n)
 ** modifies the passed string in-place. Not for unicode strings.
 */
-char *rtrim(char *s) {
-  char *c=s, *l=s;
+char *rtrim(char *s)
+{
+  char *c = s, *l = s;
 
-  while   (! *c) {
-          if (*c!=' ' && *c!=9) l=c; // find last non-space/tab character
-          c++;
+  while (!*c)
+  {
+    if (*c != ' ' && *c != 9)
+      l = c; // find last non-space/tab character
+    c++;
   }
 
-  l++;                               // move off the last character
-  if (*l==' ' || *l==9) *l=0;        // ensure it's white space incase it's at the end of the string, and then mark end of string.
+  l++; // move off the last character
+  if (*l == ' ' || *l == 9)
+    *l = 0; // ensure it's white space incase it's at the end of the string, and then mark end of string.
 
   return s;
 }
-
 
 /*
 **  Keycode translation tables
 */
 wxTerm::TermKeyMap wxTerm::keyMapTable[] =
-{
-  { WXK_BACK, GTerm::KEY_BACK },
-  { WXK_TAB, GTerm::KEY_TAB },
-  { WXK_RETURN, GTerm::KEY_RETURN },
-  { WXK_ESCAPE, GTerm::KEY_ESCAPE },
-  { WXK_SPACE, GTerm::KEY_SPACE },
-  { WXK_LEFT, GTerm::KEY_LEFT },
-  { WXK_UP, GTerm::KEY_UP },
-  { WXK_RIGHT, GTerm::KEY_RIGHT },
-  { WXK_DOWN, GTerm::KEY_DOWN },
-//  { WXK_DIVIDE, GTerm::KEY_DIVIDE },
-//  { WXK_MULTIPLY, GTerm::KEY_MULTIPLY },
-//  { WXK_SUBTRACT, GTerm::KEY_SUBTRACT },
-//  { WXK_ADD, GTerm::KEY_ADD },
-  { WXK_HOME, GTerm::KEY_HOME },
-  { WXK_END, GTerm::KEY_END },
-  { WXK_PAGEUP, GTerm::KEY_PAGEUP },
-  { WXK_PAGEDOWN, GTerm::KEY_PAGEDOWN },
-  { WXK_INSERT, GTerm::KEY_INSERT },
-  { WXK_DELETE, GTerm::KEY_DELETE },
-//  { WXK_NEXT, GTerm::KEY_NEXT },
-//  { WXK_PRIOR, GTerm::KEY_PRIOR },
-//  { WXK_NUMPAD0, GTerm::KEY_NUMPAD0 },
-//  { WXK_NUMPAD1, GTerm::KEY_NUMPAD1 },
-//  { WXK_NUMPAD2, GTerm::KEY_NUMPAD2 },
-//  { WXK_NUMPAD3, GTerm::KEY_NUMPAD3 },
-//  { WXK_NUMPAD4, GTerm::KEY_NUMPAD4 },
-//  { WXK_NUMPAD5, GTerm::KEY_NUMPAD5 },
-//  { WXK_NUMPAD6, GTerm::KEY_NUMPAD6 },
-//  { WXK_NUMPAD7, GTerm::KEY_NUMPAD7 },
-//  { WXK_NUMPAD8, GTerm::KEY_NUMPAD8 },
-//  { WXK_NUMPAD9, GTerm::KEY_NUMPAD9 },
-//  { WXK_DECIMAL, GTerm::KEY_NUMPAD_DECIMAL },
-  { WXK_F1, GTerm::KEY_F1 },
-  { WXK_F2, GTerm::KEY_F2 },
-  { WXK_F3, GTerm::KEY_F3 },
-  { WXK_F4, GTerm::KEY_F4 },
-  { WXK_F5, GTerm::KEY_F5 },
-  { WXK_F6, GTerm::KEY_F6 },
-  { WXK_F7, GTerm::KEY_F7 },
-  { WXK_F8, GTerm::KEY_F8 },
-  { WXK_F9, GTerm::KEY_F9 },
-  { WXK_F10, GTerm::KEY_F10 },
-  { WXK_F11, GTerm::KEY_F11 },
-  { WXK_F12, GTerm::KEY_F12 },
-  { (wxKeyCode)0, GTerm::KEY_NULL }
-};
+    {
+        {WXK_BACK, GTerm::KEY_BACK},
+        {WXK_TAB, GTerm::KEY_TAB},
+        {WXK_RETURN, GTerm::KEY_RETURN},
+        {WXK_ESCAPE, GTerm::KEY_ESCAPE},
+        {WXK_SPACE, GTerm::KEY_SPACE},
+        {WXK_LEFT, GTerm::KEY_LEFT},
+        {WXK_UP, GTerm::KEY_UP},
+        {WXK_RIGHT, GTerm::KEY_RIGHT},
+        {WXK_DOWN, GTerm::KEY_DOWN},
+        //  { WXK_DIVIDE, GTerm::KEY_DIVIDE },
+        //  { WXK_MULTIPLY, GTerm::KEY_MULTIPLY },
+        //  { WXK_SUBTRACT, GTerm::KEY_SUBTRACT },
+        //  { WXK_ADD, GTerm::KEY_ADD },
+        {WXK_HOME, GTerm::KEY_HOME},
+        {WXK_END, GTerm::KEY_END},
+        {WXK_PAGEUP, GTerm::KEY_PAGEUP},
+        {WXK_PAGEDOWN, GTerm::KEY_PAGEDOWN},
+        {WXK_INSERT, GTerm::KEY_INSERT},
+        {WXK_DELETE, GTerm::KEY_DELETE},
+        //  { WXK_NEXT, GTerm::KEY_NEXT },
+        //  { WXK_PRIOR, GTerm::KEY_PRIOR },
+        //  { WXK_NUMPAD0, GTerm::KEY_NUMPAD0 },
+        //  { WXK_NUMPAD1, GTerm::KEY_NUMPAD1 },
+        //  { WXK_NUMPAD2, GTerm::KEY_NUMPAD2 },
+        //  { WXK_NUMPAD3, GTerm::KEY_NUMPAD3 },
+        //  { WXK_NUMPAD4, GTerm::KEY_NUMPAD4 },
+        //  { WXK_NUMPAD5, GTerm::KEY_NUMPAD5 },
+        //  { WXK_NUMPAD6, GTerm::KEY_NUMPAD6 },
+        //  { WXK_NUMPAD7, GTerm::KEY_NUMPAD7 },
+        //  { WXK_NUMPAD8, GTerm::KEY_NUMPAD8 },
+        //  { WXK_NUMPAD9, GTerm::KEY_NUMPAD9 },
+        //  { WXK_DECIMAL, GTerm::KEY_NUMPAD_DECIMAL },
+        {WXK_F1, GTerm::KEY_F1},
+        {WXK_F2, GTerm::KEY_F2},
+        {WXK_F3, GTerm::KEY_F3},
+        {WXK_F4, GTerm::KEY_F4},
+        {WXK_F5, GTerm::KEY_F5},
+        {WXK_F6, GTerm::KEY_F6},
+        {WXK_F7, GTerm::KEY_F7},
+        {WXK_F8, GTerm::KEY_F8},
+        {WXK_F9, GTerm::KEY_F9},
+        {WXK_F10, GTerm::KEY_F10},
+        {WXK_F11, GTerm::KEY_F11},
+        {WXK_F12, GTerm::KEY_F12},
+        {(wxKeyCode)0, GTerm::KEY_NULL}};
 
 static unsigned char
-  xCharMap[] =
-  {
-    0, // 0
-    1, // 1
-    2, // 2
-    3, // 3
-    1, // 4
-    5, // 5
-    6, // 6
-    7, // 7
-    8, // 8
-    9, // 9
-    10, // 10
-    11, // 11
-    12, // 12
-    13, // 13
-    14, // 14
-    15, // 15
-    62, // 16
-    60, // 17
-    18, // 18
-    19, // 19
-    20, // 20
-    21, // 21
-    22, // 22
-    23, // 23
-    24, // 24
-    25, // 25
-    26, // 26
-    27, // 27
-    28, // 28
-    29, // 29
-    94, // 30
-    31, // 31
-    32, // 32
-    33, // 33
-    34, // 34
-    35, // 35
-    36, // 36
-    37, // 37
-    38, // 38
-    39, // 39
-    40, // 40
-    41, // 41
-    42, // 42
-    43, // 43
-    44, // 44
-    45, // 45
-    46, // 46
-    47, // 47
-    48, // 48
-    49, // 49
-    50, // 50
-    51, // 51
-    52, // 52
-    53, // 53
-    54, // 54
-    55, // 55
-    56, // 56
-    57, // 57
-    58, // 58
-    59, // 59
-    60, // 60
-    61, // 61
-    62, // 62
-    63, // 63
-    64, // 64
-    65, // 65
-    66, // 66
-    67, // 67
-    68, // 68
-    69, // 69
-    70, // 70
-    71, // 71
-    72, // 72
-    73, // 73
-    74, // 74
-    75, // 75
-    76, // 76
-    77, // 77
-    78, // 78
-    79, // 79
-    80, // 80
-    81, // 81
-    82, // 82
-    83, // 83
-    84, // 84
-    85, // 85
-    86, // 86
-    87, // 87
-    88, // 88
-    89, // 89
-    90, // 90
-    91, // 91
-    92, // 92
-    93, // 93
-    94, // 94
-    95, // 95
-    96, // 96
-    97, // 97
-    98, // 98
-    99, // 99
-    100, // 100
-    101, // 101
-    102, // 102
-    103, // 103
-    104, // 104
-    105, // 105
-    106, // 106
-    107, // 107
-    108, // 108
-    109, // 109
-    110, // 110
-    111, // 111
-    112, // 112
-    113, // 113
-    114, // 114
-    115, // 115
-    116, // 116
-    117, // 117
-    118, // 118
-    119, // 119
-    120, // 120
-    121, // 121
-    122, // 122
-    123, // 123
-    124, // 124
-    125, // 125
-    126, // 126
-    127, // 127
-    128, // 128
-    129, // 129
-    130, // 130
-    131, // 131
-    132, // 132
-    133, // 133
-    134, // 134
-    135, // 135
-    136, // 136
-    137, // 137
-    138, // 138
-    139, // 139
-    140, // 140
-    141, // 141
-    142, // 142
-    143, // 143
-    144, // 144
-    145, // 145
-    146, // 146
-    147, // 147
-    148, // 148
-    149, // 149
-    150, // 150
-    151, // 151
-    152, // 152
-    153, // 153
-    154, // 154
-    155, // 155
-    156, // 156
-    157, // 157
-    158, // 158
-    159, // 159
-    160, // 160
-    161, // 161
-    162, // 162
-    163, // 163
-    164, // 164
-    165, // 165
-    166, // 166
-    167, // 167
-    168, // 168
-    169, // 169
-    170, // 170
-    171, // 171
-    172, // 172
-    173, // 173
-    174, // 174
-    175, // 175
-    2, // 176
-    2, // 177
-    2, // 178
-    25, // 179
-    22, // 180
-    22, // 181
-    22, // 182
-    12, // 183
-    12, // 184
-    22, // 185
-    25, // 186
-    12, // 187
-    11, // 188
-    11, // 189
-    11, // 190
-    12, // 191
-    14, // 192
-    23, // 193
-    24, // 194
-    21, // 195
-    18, // 196
-    15, // 197
-    21, // 198
-    21, // 199
-    14, // 200
-    13, // 201
-    23, // 202
-    24, // 203
-    21, // 204
-    18, // 205
-    15, // 206
-    23, // 207
-    23, // 208
-    24, // 209
-    24, // 210
-    14, // 211
-    14, // 212
-    13, // 213
-    13, // 214
-    15, // 215
-    15, // 216
-    11, // 217
-    13, // 218
-    0, // 219
-    220, // 220
-    221, // 221
-    222, // 222
-    223, // 223
-    224, // 224
-    225, // 225
-    226, // 226
-    227, // 227
-    228, // 228
-    229, // 229
-    230, // 230
-    231, // 231
-    232, // 232
-    233, // 233
-    234, // 234
-    235, // 235
-    236, // 236
-    237, // 237
-    238, // 238
-    239, // 239
-    240, // 240
-    241, // 241
-    242, // 242
-    243, // 243
-    244, // 244
-    245, // 245
-    246, // 246
-    247, // 247
-    248, // 248
-    249, // 249
-    250, // 250
-    251, // 251
-    252, // 252
-    253, // 253
-    254, // 254
-    255  // 255
-  };
+    xCharMap[] =
+        {
+            0,   // 0
+            1,   // 1
+            2,   // 2
+            3,   // 3
+            1,   // 4
+            5,   // 5
+            6,   // 6
+            7,   // 7
+            8,   // 8
+            9,   // 9
+            10,  // 10
+            11,  // 11
+            12,  // 12
+            13,  // 13
+            14,  // 14
+            15,  // 15
+            62,  // 16
+            60,  // 17
+            18,  // 18
+            19,  // 19
+            20,  // 20
+            21,  // 21
+            22,  // 22
+            23,  // 23
+            24,  // 24
+            25,  // 25
+            26,  // 26
+            27,  // 27
+            28,  // 28
+            29,  // 29
+            94,  // 30
+            31,  // 31
+            32,  // 32
+            33,  // 33
+            34,  // 34
+            35,  // 35
+            36,  // 36
+            37,  // 37
+            38,  // 38
+            39,  // 39
+            40,  // 40
+            41,  // 41
+            42,  // 42
+            43,  // 43
+            44,  // 44
+            45,  // 45
+            46,  // 46
+            47,  // 47
+            48,  // 48
+            49,  // 49
+            50,  // 50
+            51,  // 51
+            52,  // 52
+            53,  // 53
+            54,  // 54
+            55,  // 55
+            56,  // 56
+            57,  // 57
+            58,  // 58
+            59,  // 59
+            60,  // 60
+            61,  // 61
+            62,  // 62
+            63,  // 63
+            64,  // 64
+            65,  // 65
+            66,  // 66
+            67,  // 67
+            68,  // 68
+            69,  // 69
+            70,  // 70
+            71,  // 71
+            72,  // 72
+            73,  // 73
+            74,  // 74
+            75,  // 75
+            76,  // 76
+            77,  // 77
+            78,  // 78
+            79,  // 79
+            80,  // 80
+            81,  // 81
+            82,  // 82
+            83,  // 83
+            84,  // 84
+            85,  // 85
+            86,  // 86
+            87,  // 87
+            88,  // 88
+            89,  // 89
+            90,  // 90
+            91,  // 91
+            92,  // 92
+            93,  // 93
+            94,  // 94
+            95,  // 95
+            96,  // 96
+            97,  // 97
+            98,  // 98
+            99,  // 99
+            100, // 100
+            101, // 101
+            102, // 102
+            103, // 103
+            104, // 104
+            105, // 105
+            106, // 106
+            107, // 107
+            108, // 108
+            109, // 109
+            110, // 110
+            111, // 111
+            112, // 112
+            113, // 113
+            114, // 114
+            115, // 115
+            116, // 116
+            117, // 117
+            118, // 118
+            119, // 119
+            120, // 120
+            121, // 121
+            122, // 122
+            123, // 123
+            124, // 124
+            125, // 125
+            126, // 126
+            127, // 127
+            128, // 128
+            129, // 129
+            130, // 130
+            131, // 131
+            132, // 132
+            133, // 133
+            134, // 134
+            135, // 135
+            136, // 136
+            137, // 137
+            138, // 138
+            139, // 139
+            140, // 140
+            141, // 141
+            142, // 142
+            143, // 143
+            144, // 144
+            145, // 145
+            146, // 146
+            147, // 147
+            148, // 148
+            149, // 149
+            150, // 150
+            151, // 151
+            152, // 152
+            153, // 153
+            154, // 154
+            155, // 155
+            156, // 156
+            157, // 157
+            158, // 158
+            159, // 159
+            160, // 160
+            161, // 161
+            162, // 162
+            163, // 163
+            164, // 164
+            165, // 165
+            166, // 166
+            167, // 167
+            168, // 168
+            169, // 169
+            170, // 170
+            171, // 171
+            172, // 172
+            173, // 173
+            174, // 174
+            175, // 175
+            2,   // 176
+            2,   // 177
+            2,   // 178
+            25,  // 179
+            22,  // 180
+            22,  // 181
+            22,  // 182
+            12,  // 183
+            12,  // 184
+            22,  // 185
+            25,  // 186
+            12,  // 187
+            11,  // 188
+            11,  // 189
+            11,  // 190
+            12,  // 191
+            14,  // 192
+            23,  // 193
+            24,  // 194
+            21,  // 195
+            18,  // 196
+            15,  // 197
+            21,  // 198
+            21,  // 199
+            14,  // 200
+            13,  // 201
+            23,  // 202
+            24,  // 203
+            21,  // 204
+            18,  // 205
+            15,  // 206
+            23,  // 207
+            23,  // 208
+            24,  // 209
+            24,  // 210
+            14,  // 211
+            14,  // 212
+            13,  // 213
+            13,  // 214
+            15,  // 215
+            15,  // 216
+            11,  // 217
+            13,  // 218
+            0,   // 219
+            220, // 220
+            221, // 221
+            222, // 222
+            223, // 223
+            224, // 224
+            225, // 225
+            226, // 226
+            227, // 227
+            228, // 228
+            229, // 229
+            230, // 230
+            231, // 231
+            232, // 232
+            233, // 233
+            234, // 234
+            235, // 235
+            236, // 236
+            237, // 237
+            238, // 238
+            239, // 239
+            240, // 240
+            241, // 241
+            242, // 242
+            243, // 243
+            244, // 244
+            245, // 245
+            246, // 246
+            247, // 247
+            248, // 248
+            249, // 249
+            250, // 250
+            251, // 251
+            252, // 252
+            253, // 253
+            254, // 254
+            255  // 255
+};
 
 BEGIN_EVENT_TABLE(wxTerm, wxWindow)
-  EVT_PAINT						(wxTerm::OnPaint)
-  EVT_CHAR						(wxTerm::OnChar)
-  EVT_LEFT_DOWN				(wxTerm::OnLeftDown)
-  EVT_LEFT_UP					(wxTerm::OnLeftUp)
-  EVT_MOTION					(wxTerm::OnMouseMove)
-  EVT_TIMER						(-1, wxTerm::OnTimer)
+EVT_PAINT(wxTerm::OnPaint)
+EVT_CHAR(wxTerm::OnChar)
+EVT_LEFT_DOWN(wxTerm::OnLeftDown)
+EVT_LEFT_UP(wxTerm::OnLeftUp)
+EVT_MOTION(wxTerm::OnMouseMove)
+EVT_TIMER(-1, wxTerm::OnTimer)
 #if 0
   EVT_KEY_DOWN(wxTerm::OnKeyDown)
 #endif
 
-  EVT_SIZE            (wxTerm::OnSize)
-  EVT_SET_FOCUS				(wxTerm::OnGainFocus)
-  EVT_KILL_FOCUS			(wxTerm::OnLoseFocus)
+EVT_SIZE(wxTerm::OnSize)
+EVT_SET_FOCUS(wxTerm::OnGainFocus)
+EVT_KILL_FOCUS(wxTerm::OnLoseFocus)
 END_EVENT_TABLE()
 
-wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
-               const wxPoint& pos,
+wxTerm::wxTerm(wxWindow *parent, wxWindowID id,
+               const wxPoint &pos,
                int width, int height,
-               const wxString& name,
-               int fontsize, char *fontname):
-  wxWindow(parent, id, pos, wxSize(-1, -1), wxWANTS_CHARS, name),
-  GTerm(width, height)
+               const wxString &name,
+               int fontsize, char *fontname) : wxWindow(parent, id, pos, wxSize(-1, -1), wxWANTS_CHARS, name),
+                                               GTerm(width, height)
 {
   int i;
 
-  m_fontsize=fontsize;
-  m_fontname=fontname;
+  m_fontsize = fontsize;
+  m_fontname = fontname;
 
   m_inUpdateSize = false;
   m_init = 1;
@@ -414,7 +415,7 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
   m_curY = -1;
   m_curBlinkRate = CURSOR_BLINK_DEFAULT_TIMEOUT;
   m_timer.SetOwner(this);
-  if(m_curBlinkRate)
+  if (m_curBlinkRate)
     m_timer.Start(m_curBlinkRate);
 
   m_boldStyle = COLOR;
@@ -426,10 +427,10 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
   SetBackgroundColour(m_colors[0]);
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_vt_colorPens[i] = wxPen(m_vt_colors[i], 1, wxSOLID);
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_pc_colorPens[i] = wxPen(m_pc_colors[i], 1, wxSOLID);
 
   m_colorPens = m_vt_colorPens;
@@ -439,7 +440,6 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
   m_printerFN = 0;
   m_printerName = 0;
-
 
   m_normalFont = GetFont();
   m_underlinedFont = GetFont();
@@ -451,18 +451,16 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
   m_bitmap = 0;
 
-
-  //ResizeTerminal(width, height);
-  //SetVirtualSize(m_charWidth * 80, m_charHeight * 100);
-  //SetScrollRate(m_charWidth, m_charHeight);
+  // ResizeTerminal(width, height);
+  // SetVirtualSize(m_charWidth * 80, m_charHeight * 100);
+  // SetScrollRate(m_charWidth, m_charHeight);
 
   m_init = 0;
 
   SetCursor(wxCursor(wxCURSOR_IBEAM));
 
-
-  wxString wfontname=wxString(fontname, wxConvLocal, 2048);
-  wxFont monospacedFont(m_fontsize, wxMODERN, wxNORMAL, wxNORMAL, false, wfontname ); //"Courier New");
+  wxString wfontname = wxString(fontname, wxConvLocal, 2048);
+  wxFont monospacedFont(m_fontsize, wxMODERN, wxNORMAL, wxNORMAL, false, wfontname); //"Courier New");
 
   SetFont(monospacedFont);
 
@@ -474,7 +472,7 @@ wxTerm::wxTerm(wxWindow* parent, wxWindowID id,
 
 wxTerm::~wxTerm()
 {
-  if(m_bitmap)
+  if (m_bitmap)
   {
     m_memDC.SelectObject(wxNullBitmap);
     delete m_bitmap;
@@ -491,17 +489,16 @@ wxTerm::~wxTerm()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SetBoldStyle(wxTerm::BOLDSTYLE boldStyle)
+void wxTerm::SetBoldStyle(wxTerm::BOLDSTYLE boldStyle)
 {
-//  wxColour colors[16];
+  //  wxColour colors[16];
 
-  if(boldStyle == DEFAULT)
+  if (boldStyle == DEFAULT)
     boldStyle = COLOR;
 
   m_boldStyle = boldStyle;
-//  GetDefVTColors(colors, m_boldStyle);
-//  SetVTColors(colors);
+  //  GetDefVTColors(colors, m_boldStyle);
+  //  SetVTColors(colors);
   Refresh();
 }
 
@@ -515,8 +512,7 @@ wxTerm::SetBoldStyle(wxTerm::BOLDSTYLE boldStyle)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-bool
-wxTerm::SetFont(const wxFont& font)
+bool wxTerm::SetFont(const wxFont &font)
 {
   m_init = 1;
 
@@ -547,41 +543,40 @@ wxTerm::SetFont(const wxFont& font)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::GetDefVTColors(wxColour colors[16], wxTerm::BOLDSTYLE boldStyle)
+void wxTerm::GetDefVTColors(wxColour colors[16], wxTerm::BOLDSTYLE boldStyle)
 {
-  if(boldStyle == DEFAULT)
+  if (boldStyle == DEFAULT)
     boldStyle = m_boldStyle;
 
-  if(boldStyle != COLOR)
+  if (boldStyle != COLOR)
   {
-    colors[0] = wxColour(0, 0, 0);                             // black
-    colors[1] = wxColour(255, 0, 0);                           // red
-    colors[2] = wxColour(0, 255, 0);                           // green
-    colors[3] = wxColour(255, 0, 255);                         // yellow
-    colors[4] = wxColour(0, 0, 255);                           // blue
-    colors[5] = wxColour(255, 255, 0);                         // magenta
-    colors[6] = wxColour(0, 255, 255);                         // cyan
-    colors[7] = wxColour(255, 255, 255);                       // white
-    colors[8] = wxColour(0, 0, 0);                             // black
-    colors[9] = wxColour(255, 0, 0);                           // red
-    colors[10] = wxColour(0, 255, 0);                          // green
-    colors[11] = wxColour(255, 0, 255);                        // yellow
-    colors[12] = wxColour(0, 0, 255);                          // blue
-    colors[13] = wxColour(255, 255, 0);                        // magenta
-    colors[14] = wxColour(0, 255, 255);                        // cyan
-    colors[15] = wxColour(255, 255, 255);                      // white
+    colors[0] = wxColour(0, 0, 0);        // black
+    colors[1] = wxColour(255, 0, 0);      // red
+    colors[2] = wxColour(0, 255, 0);      // green
+    colors[3] = wxColour(255, 0, 255);    // yellow
+    colors[4] = wxColour(0, 0, 255);      // blue
+    colors[5] = wxColour(255, 255, 0);    // magenta
+    colors[6] = wxColour(0, 255, 255);    // cyan
+    colors[7] = wxColour(255, 255, 255);  // white
+    colors[8] = wxColour(0, 0, 0);        // black
+    colors[9] = wxColour(255, 0, 0);      // red
+    colors[10] = wxColour(0, 255, 0);     // green
+    colors[11] = wxColour(255, 0, 255);   // yellow
+    colors[12] = wxColour(0, 0, 255);     // blue
+    colors[13] = wxColour(255, 255, 0);   // magenta
+    colors[14] = wxColour(0, 255, 255);   // cyan
+    colors[15] = wxColour(255, 255, 255); // white
   }
   else
   {
-    colors[0] = wxColour(0, 0, 0);                             // black
-    colors[1] = wxColour(170, 0, 0);                           // red
-    colors[2] = wxColour(0, 170, 0);                           // green
-    colors[3] = wxColour(170, 0, 170);                         // yellow
-    colors[4] = wxColour(0, 0, 170);                           // blue
-    colors[5] = wxColour(170, 170, 0);                         // magenta
-    colors[6] = wxColour(0, 170, 170);                         // cyan
-    colors[7] = wxColour(192, 192, 192);                       // white
+    colors[0] = wxColour(0, 0, 0);       // black
+    colors[1] = wxColour(170, 0, 0);     // red
+    colors[2] = wxColour(0, 170, 0);     // green
+    colors[3] = wxColour(170, 0, 170);   // yellow
+    colors[4] = wxColour(0, 0, 170);     // blue
+    colors[5] = wxColour(170, 170, 0);   // magenta
+    colors[6] = wxColour(0, 170, 170);   // cyan
+    colors[7] = wxColour(192, 192, 192); // white
 //    colors[7] = wxColour(170, 170, 170);                       // white
 #if 0
     colors[8] = wxColour(85, 85, 85);                          // bold black
@@ -593,14 +588,14 @@ wxTerm::GetDefVTColors(wxColour colors[16], wxTerm::BOLDSTYLE boldStyle)
     colors[14] = wxColour(85, 255, 255);                       // bold cyan
     colors[15] = wxColour(255, 255, 255);                      // bold white
 #else
-    colors[8] = wxColour(85, 85, 85);                          // bold black
-    colors[9] = wxColour(255, 0, 0);                         // bold red
-    colors[10] = wxColour(0, 255, 0);                        // bold green
-    colors[11] = wxColour(255, 0, 255);                       // bold yellow
-    colors[12] = wxColour(0, 0, 255);                        // bold blue
-    colors[13] = wxColour(255, 255, 0);                       // bold magenta
-    colors[14] = wxColour(0, 255, 255);                       // bold cyan
-    colors[15] = wxColour(255, 255, 255);                      // bold white
+    colors[8] = wxColour(85, 85, 85);     // bold black
+    colors[9] = wxColour(255, 0, 0);      // bold red
+    colors[10] = wxColour(0, 255, 0);     // bold green
+    colors[11] = wxColour(255, 0, 255);   // bold yellow
+    colors[12] = wxColour(0, 0, 255);     // bold blue
+    colors[13] = wxColour(255, 255, 0);   // bold magenta
+    colors[14] = wxColour(0, 255, 255);   // bold cyan
+    colors[15] = wxColour(255, 255, 255); // bold white
 #endif
   }
 }
@@ -615,13 +610,12 @@ wxTerm::GetDefVTColors(wxColour colors[16], wxTerm::BOLDSTYLE boldStyle)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::GetVTColors(wxColour colors[16])
+void wxTerm::GetVTColors(wxColour colors[16])
 {
   int
-    i;
+      i;
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     colors[i] = m_vt_colors[i];
 }
 
@@ -635,20 +629,19 @@ wxTerm::GetVTColors(wxColour colors[16])
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SetVTColors(wxColour colors[16])
+void wxTerm::SetVTColors(wxColour colors[16])
 {
   int
-    i;
+      i;
 
   m_init = 1;
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_vt_colors[i] = colors[i];
 
-  if(!(GetMode() & PC))
+  if (!(GetMode() & PC))
     SetBackgroundColour(m_vt_colors[0]);
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_vt_colorPens[i] = wxPen(m_vt_colors[i], 1, wxSOLID);
   m_init = 0;
 
@@ -665,8 +658,7 @@ wxTerm::SetVTColors(wxColour colors[16])
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::GetDefPCColors(wxColour colors[16])
+void wxTerm::GetDefPCColors(wxColour colors[16])
 {
 #if 0
   /*
@@ -692,14 +684,14 @@ wxTerm::GetDefPCColors(wxColour colors[16])
   /*
   **  These are much better
   */
-  colors[0]  = wxColour(0, 0, 0);                            // black
-  colors[1]  = wxColour(0, 0, 170);                          // blue
-  colors[2]  = wxColour(0, 170, 0);                          // green
-  colors[3]  = wxColour(0, 170, 170);                        // cyan
-  colors[4]  = wxColour(170, 0, 0);                          // red
-  colors[5]  = wxColour(170, 0, 170);                        // magenta
-  colors[6]  = wxColour(170, 170, 0);                        // brown
-  colors[7]  = wxColour(170, 170, 170);                      // white
+  colors[0] = wxColour(0, 0, 0);       // black
+  colors[1] = wxColour(0, 0, 170);     // blue
+  colors[2] = wxColour(0, 170, 0);     // green
+  colors[3] = wxColour(0, 170, 170);   // cyan
+  colors[4] = wxColour(170, 0, 0);     // red
+  colors[5] = wxColour(170, 0, 170);   // magenta
+  colors[6] = wxColour(170, 170, 0);   // brown
+  colors[7] = wxColour(170, 170, 170); // white
 #if 0
   colors[8]  = wxColour(85, 85, 85);                         // gray
   colors[9]  = wxColour(85, 85, 255);                        // lt blue
@@ -710,14 +702,14 @@ wxTerm::GetDefPCColors(wxColour colors[16])
   colors[14] = wxColour(255, 255, 85);                       // yellow
   colors[15] = wxColour(255, 255, 255);                      // white
 #else
-  colors[8]  = wxColour(50, 50, 50);                         // gray
-  colors[9]  = wxColour(0, 0, 255);                          // lt blue
-  colors[10] = wxColour(0, 255, 0);                          // lt green
-  colors[11] = wxColour(0, 255, 255);                        // lt cyan
-  colors[12] = wxColour(255, 0, 0);                          // lt red
-  colors[13] = wxColour(255, 0, 255);                        // lt magenta
-  colors[14] = wxColour(255, 255, 0);                        // yellow
-  colors[15] = wxColour(255, 255, 255);                      // white
+  colors[8] = wxColour(50, 50, 50);     // gray
+  colors[9] = wxColour(0, 0, 255);      // lt blue
+  colors[10] = wxColour(0, 255, 0);     // lt green
+  colors[11] = wxColour(0, 255, 255);   // lt cyan
+  colors[12] = wxColour(255, 0, 0);     // lt red
+  colors[13] = wxColour(255, 0, 255);   // lt magenta
+  colors[14] = wxColour(255, 255, 0);   // yellow
+  colors[15] = wxColour(255, 255, 255); // white
 #endif
 #endif
 }
@@ -732,13 +724,12 @@ wxTerm::GetDefPCColors(wxColour colors[16])
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::GetPCColors(wxColour colors[16])
+void wxTerm::GetPCColors(wxColour colors[16])
 {
   int
-    i;
+      i;
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     colors[i] = m_pc_colors[i];
 }
 
@@ -752,20 +743,19 @@ wxTerm::GetPCColors(wxColour colors[16])
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SetPCColors(wxColour colors[16])
+void wxTerm::SetPCColors(wxColour colors[16])
 {
   int
-    i;
+      i;
 
   m_init = 1;
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_pc_colors[i] = colors[i];
 
-  if(GetMode() & PC)
+  if (GetMode() & PC)
     SetBackgroundColour(m_pc_colors[0]);
 
-  for(i = 0; i < 16; i++)
+  for (i = 0; i < 16; i++)
     m_pc_colorPens[i] = wxPen(m_pc_colors[i], 1, wxSOLID);
   m_init = 0;
 
@@ -782,24 +772,22 @@ wxTerm::SetPCColors(wxColour colors[16])
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SetCursorBlinkRate(int rate)
+void wxTerm::SetCursorBlinkRate(int rate)
 {
-  if(rate < 0 || rate > CURSOR_BLINK_MAX_TIMEOUT)
+  if (rate < 0 || rate > CURSOR_BLINK_MAX_TIMEOUT)
     return;
 
   m_init = 1;
-  if(rate != m_curBlinkRate)
+  if (rate != m_curBlinkRate)
   {
     m_curBlinkRate = rate;
-    if(!m_curBlinkRate)
+    if (!m_curBlinkRate)
       m_timer.Stop();
     else
       m_timer.Start(m_curBlinkRate);
   }
   m_init = 0;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////
 ///  private OnChar
@@ -811,44 +799,43 @@ wxTerm::SetCursorBlinkRate(int rate)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnChar(wxKeyEvent& event)
+void wxTerm::OnChar(wxKeyEvent &event)
 {
-  if(!(GetMode() & PC) && event.AltDown())
+  if (!(GetMode() & PC) && event.AltDown())
     event.Skip();
   else
   {
 
     int
-      rc,
-      keyCode = 0,
-      len;
+        rc,
+        keyCode = 0,
+        len;
 
     unsigned char
-      buf[10];
+        buf[10];
 
     /*
     **  Map control characters
     */
-    if(event.ControlDown())
+    if (event.ControlDown())
     {
-      if(event.GetKeyCode() >= 'a' && event.GetKeyCode() <= 'z')
+      if (event.GetKeyCode() >= 'a' && event.GetKeyCode() <= 'z')
         keyCode = event.GetKeyCode() - 'a' + 1;
-      else if(event.GetKeyCode() >= '[' && event.GetKeyCode() <= '_')
+      else if (event.GetKeyCode() >= '[' && event.GetKeyCode() <= '_')
         keyCode = event.GetKeyCode() - '[' + 0x1b;
-      else if(event.GetKeyCode() == '6')
+      else if (event.GetKeyCode() == '6')
         keyCode = 0x1e;
-      else if(event.GetKeyCode() == '-')
+      else if (event.GetKeyCode() == '-')
         keyCode = 0x1f;
     }
 
-    if(!keyCode && !(keyCode = MapKeyCode((int)event.GetKeyCode())))
+    if (!keyCode && !(keyCode = MapKeyCode((int)event.GetKeyCode())))
     {
       /*
       **  If the keycode wasn't mapped in the table and it is a special
       **  key, then we just ignore it.
       */
-      if(event.GetKeyCode() >= WXK_START)
+      if (event.GetKeyCode() >= WXK_START)
       {
         event.Skip();
         return;
@@ -859,27 +846,27 @@ wxTerm::OnChar(wxKeyEvent& event)
       keyCode = (int)event.GetKeyCode();
     }
 
-    if(GetMode() & PC)
+    if (GetMode() & PC)
       rc = TranslateKeyCode(keyCode, &len, (char *)buf, event.ShiftDown(),
-                        event.ControlDown(), event.AltDown());
+                            event.ControlDown(), event.AltDown());
     else
       rc = TranslateKeyCode(keyCode, &len, (char *)buf);
 
-    if(rc)
+    if (rc)
     {
-      if((GetMode() & NEWLINE) && !(GetMode() & PC) && (buf[len - 1] == 10))
+      if ((GetMode() & NEWLINE) && !(GetMode() & PC) && (buf[len - 1] == 10))
       {
         buf[len - 1] = 13;
         buf[len] = 10;
         len++;
       }
       ProcessOutput(len, buf);
-      if((GetMode() & LOCALECHO) && !(GetMode() & PC))
+      if ((GetMode() & LOCALECHO) && !(GetMode() & PC))
         ProcessInput(len, buf);
     }
-    else if(!(GetMode() & PC))
+    else if (!(GetMode() & PC))
     {
-      if((GetMode() & NEWLINE) && !(GetMode() & PC) && (keyCode == 10))
+      if ((GetMode() & NEWLINE) && !(GetMode() & PC) && (keyCode == 10))
       {
         len = 2;
         buf[0] = 13;
@@ -891,7 +878,7 @@ wxTerm::OnChar(wxKeyEvent& event)
         buf[0] = keyCode;
       }
       ProcessOutput(len, buf);
-      if((GetMode() & LOCALECHO) && !(GetMode() & PC))
+      if ((GetMode() & LOCALECHO) && !(GetMode() & PC))
         ProcessInput(len, buf);
     }
     else
@@ -909,16 +896,15 @@ wxTerm::OnChar(wxKeyEvent& event)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnKeyDown(wxKeyEvent& event)
+void wxTerm::OnKeyDown(wxKeyEvent &event)
 {
-  if(!(GetMode() & PC) && event.AltDown())
+  if (!(GetMode() & PC) && event.AltDown())
     event.Skip();
-  else if(event.AltDown())
+  else if (event.AltDown())
   {
-//    wxLogMessage("OnKeyDown() got KeyCode = %d", event.KeyCode());
-//    if(event.KeyCode() != 309)
-//      OnChar(event);
+    //    wxLogMessage("OnKeyDown() got KeyCode = %d", event.KeyCode());
+    //    if(event.KeyCode() != 309)
+    //      OnChar(event);
   }
   else
     event.Skip();
@@ -934,11 +920,10 @@ wxTerm::OnKeyDown(wxKeyEvent& event)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnPaint(wxPaintEvent& WXUNUSED(event))
+void wxTerm::OnPaint(wxPaintEvent &WXUNUSED(event))
 {
   wxPaintDC
-    dc(this);
+      dc(this);
 
   m_curDC = &dc;
   ExposeArea(0, 0, m_width, m_height);
@@ -955,10 +940,9 @@ wxTerm::OnPaint(wxPaintEvent& WXUNUSED(event))
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnLeftDown(wxMouseEvent& event)
+void wxTerm::OnLeftDown(wxMouseEvent &event)
 {
-	SetFocus();
+  SetFocus();
   ClearSelection();
   m_selx1 = m_selx2 = event.GetX() / m_charWidth;
   m_sely1 = m_sely2 = event.GetY() / m_charHeight;
@@ -976,14 +960,13 @@ wxTerm::OnLeftDown(wxMouseEvent& event)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnLeftUp(wxMouseEvent& event)
+void wxTerm::OnLeftUp(wxMouseEvent &event)
 {
 
   m_selecting = FALSE;
-  if(GetCapture() == this)
+  if (GetCapture() == this)
   {
-  ReleaseMouse();
+    ReleaseMouse();
   }
 }
 
@@ -997,23 +980,21 @@ wxTerm::OnLeftUp(wxMouseEvent& event)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnMouseMove(wxMouseEvent& event)
+void wxTerm::OnMouseMove(wxMouseEvent &event)
 {
 
-  if(m_selecting)
+  if (m_selecting)
   {
     m_selx2 = event.GetX() / m_charWidth;
-    if(m_selx2 >= Width())
+    if (m_selx2 >= Width())
       m_selx2 = Width() - 1;
     m_sely2 = event.GetY() / m_charHeight;
-    if(m_sely2 >= Height())
+    if (m_sely2 >= Height())
       m_sely2 = Height() - 1;
 
     MarkSelection();
     Refresh();
   }
-
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1024,36 +1005,34 @@ wxTerm::OnMouseMove(wxMouseEvent& event)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::ClearSelection()
+void wxTerm::ClearSelection()
 {
   int
-    x,
-    y;
+      x,
+      y;
 
   wxClientDC
-    *dc = 0;
+      *dc = 0;
 
   m_selx1 = m_sely1 = m_selx2 = m_sely2 = 0;
 
-  if(!m_curDC)
+  if (!m_curDC)
   {
     dc = new wxClientDC(this);
     m_curDC = dc;
   }
 
-  for(y = 0; y < Height(); y++)
-    for(x = 0; x < Width(); x++)
+  for (y = 0; y < Height(); y++)
+    for (x = 0; x < Width(); x++)
       Select(x, y, 0);
 
-  if(dc)
+  if (dc)
   {
-	  this->wxWindow::Update();
+    this->wxWindow::Update();
 
     m_curDC = 0;
     delete dc;
   }
-
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1064,65 +1043,64 @@ wxTerm::ClearSelection()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::MarkSelection()
+void wxTerm::MarkSelection()
 {
   int
-    x,
-    y;
+      x,
+      y;
 
   wxClientDC
-    *dc = 0;
+      *dc = 0;
 
   m_marking = TRUE;
 
-  if(!m_curDC)
+  if (!m_curDC)
   {
     dc = new wxClientDC(this);
     m_curDC = dc;
   }
 
-  for(y = 0; y < Height(); y++)
-    for(x = 0; x < Width(); x++)
+  for (y = 0; y < Height(); y++)
+    for (x = 0; x < Width(); x++)
       Select(x, y, 0);
 
-  if(m_sely1 == m_sely2)
+  if (m_sely1 == m_sely2)
   {
-    if(m_selx1 >= m_selx2)
-      for(x = m_selx1; x <= m_selx2; x++)
+    if (m_selx1 >= m_selx2)
+      for (x = m_selx1; x <= m_selx2; x++)
         Select(x, m_sely1, 1);
     else
-      for(x = m_selx2; x >= m_selx1; x--)
+      for (x = m_selx2; x >= m_selx1; x--)
         Select(x, m_sely1, 1);
   }
-  else if(m_sely1 < m_sely2)
+  else if (m_sely1 < m_sely2)
   {
-    for(x = m_selx1; x < Width(); x++)
+    for (x = m_selx1; x < Width(); x++)
       Select(x, m_sely1, 1);
 
-    for(y = m_sely1 + 1; y < m_sely2; y++)
-      for(x = 0; x < Width(); x++)
+    for (y = m_sely1 + 1; y < m_sely2; y++)
+      for (x = 0; x < Width(); x++)
         Select(x, y, 1);
 
-    for(x = 0; x <= m_selx2; x++)
+    for (x = 0; x <= m_selx2; x++)
       Select(x, m_sely2, 1);
   }
   else
   {
-    for(x = 0; x <= m_selx1; x++)
+    for (x = 0; x <= m_selx1; x++)
       Select(x, m_sely1, 1);
 
-    for(y = m_sely2 + 1; y < m_sely1; y++)
-      for(x = 0; x < Width(); x++)
+    for (y = m_sely2 + 1; y < m_sely1; y++)
+      for (x = 0; x < Width(); x++)
         Select(x, y, 1);
 
-    for(x = m_selx2; x < Width(); x++)
+    for (x = m_selx2; x < Width(); x++)
       Select(x, m_sely2, 1);
   }
 
-  //RA//this->wxWindow::Update();
+  // RA//this->wxWindow::Update();
 
-  if(dc)
+  if (dc)
   {
     m_curDC = 0;
     delete dc;
@@ -1139,10 +1117,9 @@ wxTerm::MarkSelection()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-bool
-wxTerm::HasSelection()
+bool wxTerm::HasSelection()
 {
-  return(m_selx1 != m_selx2 || m_sely1 != m_sely2);
+  return (m_selx1 != m_selx2 || m_sely1 != m_sely2);
 }
 
 wxString
@@ -1157,15 +1134,15 @@ wxString
 wxTerm::GetSelection()
 {
   int
-    x1,
-    y1,
-    x2,
-    y2;
+      x1,
+      y1,
+      x2,
+      y2;
 
   wxString
-    sel;
+      sel;
 
-  if(m_sely1 <= m_sely2)
+  if (m_sely1 <= m_sely2)
   {
     x1 = m_selx1;
     y1 = m_sely1;
@@ -1180,13 +1157,13 @@ wxTerm::GetSelection()
     y2 = m_sely1;
   }
 
-  while(x1 != x2 || y1 != y2)
+  while (x1 != x2 || y1 != y2)
   {
-    if(GetChar(x1, y1))
+    if (GetChar(x1, y1))
       sel.Append(GetChar(x1, y1));
 
     x1++;
-    if(x1 == Width())
+    if (x1 == Width())
     {
       sel.Trim(); // RA trim ends of lines
       sel.Append('\n');
@@ -1194,7 +1171,7 @@ wxTerm::GetSelection()
       y1++;
     }
   }
-  if(GetChar(x1, y1))
+  if (GetChar(x1, y1))
     sel.Append(GetChar(x1, y1));
 
   sel.Trim();
@@ -1209,8 +1186,7 @@ wxTerm::GetSelection()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SelectAll()
+void wxTerm::SelectAll()
 {
   m_selx1 = 0;
   m_sely1 = 0;
@@ -1240,64 +1216,62 @@ wxTerm::SelectAll()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::DrawText(int fg_color, int bg_color, int flags,
-                 int x, int y, int len, unsigned char *string)
+void wxTerm::DrawText(int fg_color, int bg_color, int flags,
+                      int x, int y, int len, unsigned char *string)
 {
   int
-    t;
-  
-  if(flags & BOLD && m_boldStyle == COLOR)
+      t;
+
+  if (flags & BOLD && m_boldStyle == COLOR)
     fg_color = (fg_color % 8) + 8;
 
-  if(flags & SELECTED)
-    {
+  if (flags & SELECTED)
+  {
     fg_color = 0;
     bg_color = 15;
   }
 
-  if(flags & INVERSE)
+  if (flags & INVERSE)
   {
     t = fg_color;
     fg_color = bg_color;
     bg_color = t;
   }
 
-  if(!m_curDC)
+  if (!m_curDC)
     return;
 
 #if defined(__WXGTK__) || defined(__WXMOTIF__)
   int
-    i;
+      i;
 
-  for(i = 0; string[i]; i++)
+  for (i = 0; string[i]; i++)
     string[i] = xCharMap[string[i]];
 #endif
 
+  wxString str1 = wxString((char *)string, wxConvLocal, 2048);
+  wxString str = str1.Left(len);
+  // str(string, len); // not compatible with wx2.8 which I still support for LisaEM - RA
 
-  wxString str1=wxString( (char *)string, wxConvLocal, 2048);
-  wxString str=str1.Left(len);
-    //str(string, len); // not compatible with wx2.8 which I still support for LisaEM - RA
-
-  if(m_boldStyle != FONT)
+  if (m_boldStyle != FONT)
   {
-    if(flags & UNDERLINE)
+    if (flags & UNDERLINE)
       m_curDC->SetFont(m_underlinedFont);
     else
       m_curDC->SetFont(m_normalFont);
   }
   else
   {
-    if(flags & BOLD)
+    if (flags & BOLD)
     {
-      if(flags & UNDERLINE)
+      if (flags & UNDERLINE)
         m_curDC->SetFont(m_boldUnderlinedFont);
       else
         m_curDC->SetFont(m_boldFont);
     }
     else
     {
-      if(flags & UNDERLINE)
+      if (flags & UNDERLINE)
         m_curDC->SetFont(m_underlinedFont);
       else
         m_curDC->SetFont(m_normalFont);
@@ -1312,7 +1286,7 @@ wxTerm::DrawText(int fg_color, int bg_color, int flags,
   y = y * m_charHeight;
 
   m_curDC->DrawText(str, x, y);
-  if(flags & BOLD && m_boldStyle == OVERSTRIKE)
+  if (flags & BOLD && m_boldStyle == OVERSTRIKE)
   {
     m_curDC->SetBackgroundMode(wxTRANSPARENT);
     m_curDC->DrawText(str, x + 1, y);
@@ -1334,22 +1308,21 @@ wxTerm::DrawText(int fg_color, int bg_color, int flags,
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
-                   int x, int y, unsigned char c)
+void wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
+                          int x, int y, unsigned char c)
 {
 
-  if(flags & BOLD && m_boldStyle == COLOR)
+  if (flags & BOLD && m_boldStyle == COLOR)
     fg_color = (fg_color % 8) + 8;
 
-  if(flags & INVERSE)
+  if (flags & INVERSE)
   {
     int t = fg_color;
     fg_color = bg_color;
     bg_color = t;
   }
 
-  if(!m_curDC)
+  if (!m_curDC)
     return;
 
 #if defined(__WXGTK__) || defined(__WXMOTIF__)
@@ -1359,25 +1332,25 @@ wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
   wxString str(_T(""));
   str << ((char)c);
 
-  if(m_boldStyle != FONT)
+  if (m_boldStyle != FONT)
   {
-    if(flags & UNDERLINE)
+    if (flags & UNDERLINE)
       m_curDC->SetFont(m_underlinedFont);
     else
       m_curDC->SetFont(m_normalFont);
   }
   else
   {
-    if(flags & BOLD)
+    if (flags & BOLD)
     {
-      if(flags & UNDERLINE)
+      if (flags & UNDERLINE)
         m_curDC->SetFont(m_boldUnderlinedFont);
       else
         m_curDC->SetFont(m_boldFont);
     }
     else
     {
-      if(flags & UNDERLINE)
+      if (flags & UNDERLINE)
         m_curDC->SetFont(m_underlinedFont);
       else
         m_curDC->SetFont(m_normalFont);
@@ -1390,7 +1363,7 @@ wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
   m_curDC->SetTextBackground(m_colors[fg_color]);
   m_curDC->SetTextForeground(m_colors[bg_color]);
   m_curDC->DrawText(str, x, y);
-  if(flags & BOLD && m_boldStyle == OVERSTRIKE)
+  if (flags & BOLD && m_boldStyle == OVERSTRIKE)
     m_curDC->DrawText(str, x + 1, y);
 }
 
@@ -1410,9 +1383,8 @@ wxTerm::DoDrawCursor(int fg_color, int bg_color, int flags,
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::DrawCursor(int fg_color, int bg_color, int flags,
-                   int x, int y, unsigned char c)
+void wxTerm::DrawCursor(int fg_color, int bg_color, int flags,
+                        int x, int y, unsigned char c)
 {
   m_curX = x;
   m_curY = y;
@@ -1421,12 +1393,10 @@ wxTerm::DrawCursor(int fg_color, int bg_color, int flags,
   m_curFlags = flags;
   m_curChar = c;
 
-
-
-  if(m_timer.IsRunning())
+  if (m_timer.IsRunning())
     m_timer.Stop();
   DoDrawCursor(fg_color, bg_color, flags, x, y, c);
-  if(m_curBlinkRate)
+  if (m_curBlinkRate)
   {
     m_timer.Start(m_curBlinkRate);
     m_curState = 1;
@@ -1443,40 +1413,39 @@ wxTerm::DrawCursor(int fg_color, int bg_color, int flags,
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::OnTimer(wxTimerEvent& WXUNUSED(event))
+void wxTerm::OnTimer(wxTimerEvent &WXUNUSED(event))
 {
   wxClientDC
-    *dc = 0;
+      *dc = 0;
 
-  if(m_init)
+  if (m_init)
     return;
 
-  if(m_curX == -1 || m_curY == -1)
+  if (m_curX == -1 || m_curY == -1)
     return;
 
-  if(GetMode() & CURSORINVISIBLE)
+  if (GetMode() & CURSORINVISIBLE)
   {
-	  //wxLogDebug("Skipping cursor");
+    // wxLogDebug("Skipping cursor");
     return;
   }
-  //wxLogDebug("Drawing cursor");
-  if(!m_curDC)
+  // wxLogDebug("Drawing cursor");
+  if (!m_curDC)
   {
     dc = new wxClientDC(this);
     m_curDC = dc;
   }
 
-  if(m_curBlinkRate)
+  if (m_curBlinkRate)
   {
     m_curState++;
-    if(m_curState & 1 && m_curX != -1 && m_curY != -1)
+    if (m_curState & 1 && m_curX != -1 && m_curY != -1)
       DoDrawCursor(m_curFG, m_curBG, m_curFlags, m_curX, m_curY, m_curChar);
     else
       DoDrawCursor(m_curBG, m_curFG, m_curFlags, m_curX, m_curY, m_curChar);
   }
 
-  if(dc)
+  if (dc)
   {
     delete dc;
     m_curDC = 0;
@@ -1499,12 +1468,12 @@ wxTerm::OnTimer(wxTimerEvent& WXUNUSED(event))
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::MoveChars(int sx, int sy, int dx, int dy, int w, int h)
+void wxTerm::MoveChars(int sx, int sy, int dx, int dy, int w, int h)
 {
-  if(!m_marking)
-    {
-    ClearSelection();}
+  if (!m_marking)
+  {
+    ClearSelection();
+  }
 
   sx = sx * m_charWidth;
   sy = sy * m_charHeight;
@@ -1532,11 +1501,10 @@ wxTerm::MoveChars(int sx, int sy, int dx, int dy, int w, int h)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
+void wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
 {
-  //RA//if(!m_marking)
-  //RA//  {ClearSelection();}
+  // RA//if(!m_marking)
+  // RA//  {ClearSelection();}
 
   x = x * m_charWidth;
   y = y * m_charHeight;
@@ -1544,19 +1512,19 @@ wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
   h = h * m_charHeight;
 
   bool deleteDC = false;
-  if(!m_curDC)
+  if (!m_curDC)
   {
-	  m_curDC = new wxClientDC(this);
-	  deleteDC = true;
+    m_curDC = new wxClientDC(this);
+    deleteDC = true;
   }
   m_curDC->SetPen(m_colorPens[bg_color]);
   m_curDC->SetBrush(wxBrush(m_colors[bg_color], wxSOLID));
   m_curDC->DrawRectangle(x, y, w /* + 1*/, h /*+ 1*/);
 
-  if(deleteDC)
+  if (deleteDC)
   {
-	  delete m_curDC;
-	  m_curDC = 0;
+    delete m_curDC;
+    m_curDC = 0;
   }
 }
 
@@ -1570,12 +1538,11 @@ wxTerm::ClearChars(int bg_color, int x, int y, int w, int h)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::ModeChange(int state)
+void wxTerm::ModeChange(int state)
 {
-  //RA//ClearSelection();
+  // RA//ClearSelection();
 
-  if(state & GTerm::PC)
+  if (state & GTerm::PC)
   {
     m_colors = m_pc_colors;
     m_colorPens = m_pc_colorPens;
@@ -1585,7 +1552,7 @@ wxTerm::ModeChange(int state)
     m_colors = m_vt_colors;
     m_colorPens = m_vt_colorPens;
   }
-  GTerm/*lnet*/::ModeChange(state);
+  GTerm /*lnet*/ ::ModeChange(state);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1596,8 +1563,7 @@ wxTerm::ModeChange(int state)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::Bell()
+void wxTerm::Bell()
 {
   wxBell();
 }
@@ -1612,58 +1578,58 @@ wxTerm::Bell()
 //////////////////////////////////////////////////////////////////////////////
 void wxTerm::UpdateSize()
 {
-	// prevent any nasty recursion
-	if(m_inUpdateSize)
-	{
-		return;
-	}
+  // prevent any nasty recursion
+  if (m_inUpdateSize)
+  {
+    return;
+  }
 
-	m_inUpdateSize = true;
-	int charWidth, charHeight;
+  m_inUpdateSize = true;
+  int charWidth, charHeight;
 
-	wxClientDC* dc = new wxClientDC(this);
+  wxClientDC *dc = new wxClientDC(this);
 
-	if(!m_curDC)
-	{
-		m_curDC = dc;
-	}
+  if (!m_curDC)
+  {
+    m_curDC = dc;
+  }
 
-	dc->SetFont(m_normalFont);
-	dc->GetTextExtent(_T("M"), &charWidth, &charHeight);
-	wxSize currentClientSize = GetClientSize();
-	int numCharsInLine = currentClientSize.GetX() / charWidth;
-	int numLinesShown  = currentClientSize.GetY() / charHeight;
+  dc->SetFont(m_normalFont);
+  dc->GetTextExtent(_T("M"), &charWidth, &charHeight);
+  wxSize currentClientSize = GetClientSize();
+  int numCharsInLine = currentClientSize.GetX() / charWidth;
+  int numLinesShown = currentClientSize.GetY() / charHeight;
 
-	if( (numCharsInLine != m_charsInLine) || (numLinesShown != m_linesDisplayed))
-	{
-		wxString message;
+  if ((numCharsInLine != m_charsInLine) || (numLinesShown != m_linesDisplayed))
+  {
+    wxString message;
 
-		// FINALLY!  Finally killed the memory leak!  The problem is that somehow a size event
-		// was generating negative numbers for these values, which led to weird things happening.
-		if( (numCharsInLine > 0) && (numLinesShown > 0))
-		{
-			m_charsInLine = numCharsInLine;
-			m_linesDisplayed = numLinesShown;
-			// tell the GTerm core to resize itself
-			ResizeTerminal(numCharsInLine, numLinesShown);
+    // FINALLY!  Finally killed the memory leak!  The problem is that somehow a size event
+    // was generating negative numbers for these values, which led to weird things happening.
+    if ((numCharsInLine > 0) && (numLinesShown > 0))
+    {
+      m_charsInLine = numCharsInLine;
+      m_linesDisplayed = numLinesShown;
+      // tell the GTerm core to resize itself
+      ResizeTerminal(numCharsInLine, numLinesShown);
 
-			UpdateRemoteSize(m_charsInLine, m_linesDisplayed);
-			/*
-			wxString remoteResizeCommand = wxString::Format("stty rows %d cols %d", m_linesDisplayed, m_charsInLine);
-			wxLogDebug("Resizing terminal: %s", remoteResizeCommand);
-			wxStringBuffer tempBuffer(remoteResizeCommand, 256);
-			SendBack(tempBuffer);
-			*/
-		}
-	}
+      UpdateRemoteSize(m_charsInLine, m_linesDisplayed);
+      /*
+      wxString remoteResizeCommand = wxString::Format("stty rows %d cols %d", m_linesDisplayed, m_charsInLine);
+      wxLogDebug("Resizing terminal: %s", remoteResizeCommand);
+      wxStringBuffer tempBuffer(remoteResizeCommand, 256);
+      SendBack(tempBuffer);
+      */
+    }
+  }
 
-	m_inUpdateSize = false;
+  m_inUpdateSize = false;
 
-	if(dc)
-	{
-		delete dc;
-		m_curDC = 0;
-	}
+  if (dc)
+  {
+    delete dc;
+    m_curDC = 0;
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1677,12 +1643,11 @@ void wxTerm::UpdateSize()
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::ResizeTerminal(int width, int height)
+void wxTerm::ResizeTerminal(int width, int height)
 {
   int
-    w,
-    h;
+      w,
+      h;
 
   ClearSelection();
 
@@ -1690,9 +1655,9 @@ wxTerm::ResizeTerminal(int width, int height)
   **  Determine window size from current font
   */
   wxClientDC
-    dc(this);
+      dc(this);
 
-  if(m_boldStyle != FONT)
+  if (m_boldStyle != FONT)
     dc.SetFont(m_normalFont);
   else
     dc.SetFont(m_boldFont);
@@ -1703,7 +1668,7 @@ wxTerm::ResizeTerminal(int width, int height)
   /*
   **  Create our bitmap for copying
   */
-  if(m_bitmap)
+  if (m_bitmap)
   {
     m_memDC.SelectObject(wxNullBitmap);
     delete m_bitmap;
@@ -1730,12 +1695,11 @@ wxTerm::ResizeTerminal(int width, int height)
   /*
   **  Send event
   */
-  if(!m_init)
+  if (!m_init)
   {
     wxCommandEvent e(wxEVT_COMMAND_TERM_RESIZE, GetId());
     e.SetEventObject(this);
     GetParent()->GetEventHandler()->ProcessEvent(e);
-
   }
 }
 
@@ -1750,8 +1714,7 @@ wxTerm::ResizeTerminal(int width, int height)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::RequestSizeChange(int w, int h)
+void wxTerm::RequestSizeChange(int w, int h)
 {
   ResizeTerminal(w, h);
 }
@@ -1770,11 +1733,10 @@ wxTerm::RequestSizeChange(int w, int h)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::ProcessInput(int len, unsigned char *data)
+void wxTerm::ProcessInput(int len, unsigned char *data)
 {
   wxClientDC
-    dc(this);
+      dc(this);
 
   m_curDC = &dc;
   GTerm::ProcessInput(len, data);
@@ -1793,14 +1755,13 @@ wxTerm::ProcessInput(int len, unsigned char *data)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-int
-wxTerm::MapKeyCode(int keyCode)
+int wxTerm::MapKeyCode(int keyCode)
 {
   int
-    i;
+      i;
 
-  for(i = 0; keyMapTable[i].keyCode; i++)
-    if(keyMapTable[i].keyCode == keyCode)
+  for (i = 0; keyMapTable[i].keyCode; i++)
+    if (keyMapTable[i].keyCode == keyCode)
       return keyMapTable[i].VTKeyCode;
   return 0;
 }
@@ -1815,31 +1776,30 @@ wxTerm::MapKeyCode(int keyCode)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::SelectPrinter(char *PrinterName)
+void wxTerm::SelectPrinter(char *PrinterName)
 {
-  if(m_printerFN)
+  if (m_printerFN)
   {
-    if(m_printerName[0] == '#')
+    if (m_printerName[0] == '#')
       fclose(m_printerFN);
     else
 #if defined(__WXGTK__) || defined(__WXMOTIF__)
       pclose(m_printerFN);
 #endif
 #if defined(__WXMSW__)
-      fclose(m_printerFN);
+    fclose(m_printerFN);
 #endif
 
     m_printerFN = 0;
   }
 
-  if(m_printerName)
+  if (m_printerName)
   {
     free(m_printerName);
     m_printerName = 0;
   }
 
-  if(strlen(PrinterName))
+  if (strlen(PrinterName))
   {
     m_printerName = strdup(PrinterName);
   }
@@ -1856,18 +1816,17 @@ wxTerm::SelectPrinter(char *PrinterName)
 ///
 ///  @author Derry Bryson @date 04-22-2004
 //////////////////////////////////////////////////////////////////////////////
-void
-wxTerm::PrintChars(int len, unsigned char *data)
+void wxTerm::PrintChars(int len, unsigned char *data)
 {
   char
-    pname[100];
+      pname[100];
 
-  if(!m_printerFN)
+  if (!m_printerFN)
   {
-    if(!m_printerName)
+    if (!m_printerName)
       return;
 
-    if(m_printerName[0] == '#')
+    if (m_printerName[0] == '#')
     {
 #if defined(__WXGTK__) || defined(__WXMOTIF__)
       sprintf(pname, "/dev/lp%d", m_printerName[1] - '0');
@@ -1889,12 +1848,11 @@ wxTerm::PrintChars(int len, unsigned char *data)
     }
   }
 
-  if(m_printerFN)
+  if (m_printerFN)
   {
     fwrite(data, len, 1, m_printerFN);
   }
 }
-
 
 //////////////////////////////////////////////////////////////////////////////
 ///  private OnGainFocus
@@ -1908,9 +1866,9 @@ wxTerm::PrintChars(int len, unsigned char *data)
 //////////////////////////////////////////////////////////////////////////////
 void wxTerm::OnGainFocus(wxFocusEvent &event)
 {
-	this->clear_mode_flag(CURSORINVISIBLE);
-	wxLogDebug(_T("TerminalWx Gained focus") );
-	GTerm::Update();
+  this->clear_mode_flag(CURSORINVISIBLE);
+  wxLogDebug(_T("TerminalWx Gained focus"));
+  GTerm::Update();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1925,9 +1883,9 @@ void wxTerm::OnGainFocus(wxFocusEvent &event)
 //////////////////////////////////////////////////////////////////////////////
 void wxTerm::OnLoseFocus(wxFocusEvent &event)
 {
-	this->set_mode_flag(CURSORINVISIBLE);
-	wxLogDebug( _T("TerminalWx Lost focus") );
-	GTerm::Update();
+  this->set_mode_flag(CURSORINVISIBLE);
+  wxLogDebug(_T("TerminalWx Lost focus"));
+  GTerm::Update();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1942,10 +1900,9 @@ void wxTerm::OnLoseFocus(wxFocusEvent &event)
 //////////////////////////////////////////////////////////////////////////////
 void wxTerm::OnSize(wxSizeEvent &event)
 {
-	UpdateSize();
+  UpdateSize();
 }
 
 void wxTerm::UpdateRemoteSize(int width, int height)
 {
-
 }

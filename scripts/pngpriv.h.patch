@@ -1,0 +1,11 @@
+--- ./wxWidgets-3.2.7/src/png/pngpriv.h.bak	2025-04-08 20:33:50
++++ ./wxWidgets-3.2.7/src/png/pngpriv.h	2025-04-08 20:34:07
+@@ -527,7 +527,7 @@
+ #  include <float.h>
+ 
+ #  if (defined(__MWERKS__) && defined(macintosh)) || defined(applec) || \
+-    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)
++    defined(THINK_C) || defined(__SC__)
+    /* We need to check that <math.h> hasn't already been included earlier
+     * as it seems it doesn't agree with <fp.h>, yet we should really use
+     * <fp.h> if possible.

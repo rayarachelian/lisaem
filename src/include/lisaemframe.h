@@ -26,9 +26,9 @@
 // Event table for LisaEmFrame
 enum
 {
-    ID_SCREENSHOT=10001,           // anti-aliased screenshot
-    ID_SCREENSHOT2,                // screenshot with screen
-    ID_SCREENSHOT3,                // raw screenshot - no aliasing
+    ID_SCREENSHOT = 10001, // anti-aliased screenshot
+    ID_SCREENSHOT2,        // screenshot with screen
+    ID_SCREENSHOT3,        // raw screenshot - no aliasing
 
     ID_FUSH_PRNT,
 
@@ -83,7 +83,7 @@ enum
 
     ID_VID_AA,
     ID_VID_AAG,
-    //ID_VID_SCALED,
+    // ID_VID_SCALED,
     ID_VID_DY,
     ID_VID_SY,
     ID_VID_2X3Y,
@@ -101,136 +101,127 @@ enum
 
 // Declare our main frame class
 
-
-
-
 class LisaEmFrame : public wxFrame
 {
 public:
-
-    int running;          // is the Lisa running?  0=off, 1=running, 10=paused/locked.
+    int running; // is the Lisa running?  0=off, 1=running, 10=paused/locked.
 
     // Constructor
-    LisaEmFrame(const wxString& title);
+    LisaEmFrame(const wxString &title);
 
     void LoadImages(void);
     void UnloadImages(void);
 
-    // Event handlers
-    #ifdef __WXOSX__
-    void OnQuit(wxCommandEvent& event);
-    #endif
+// Event handlers
+#ifdef __WXOSX__
+    void OnQuit(wxCommandEvent &event);
+#endif
 
-    void OnAbout(wxCommandEvent& event);
+    void OnAbout(wxCommandEvent &event);
 
-    void OnLisaWeb(wxCommandEvent& event);
-    void OnLisaFaq(wxCommandEvent& event);
+    void OnLisaWeb(wxCommandEvent &event);
+    void OnLisaFaq(wxCommandEvent &event);
 
-    void OnConfig(wxCommandEvent& event);
-    void OnOpen(wxCommandEvent& event);
-    void OnSaveAs(wxCommandEvent& event);
+    void OnConfig(wxCommandEvent &event);
+    void OnOpen(wxCommandEvent &event);
+    void OnSaveAs(wxCommandEvent &event);
 
+    void OnRun(wxCommandEvent &event);
+    void OnPause(wxCommandEvent &event);
 
-    void OnRun(wxCommandEvent& event);
-    void OnPause(wxCommandEvent& event);
-
-    void OnScreenshot(wxCommandEvent& event);
-    void OnDebugger(wxCommandEvent& event);
-    void OnPOWERKEY(wxCommandEvent& event);
-    void OnAPPLEPOWERKEY(wxCommandEvent& event);
-    void OnTraceLog(wxCommandEvent& event);
-    void OnKEY_APL_DOT(wxCommandEvent& event);
-    void OnKEY_APL_S(wxCommandEvent& event);
-    void OnKEY_APL_ENTER(wxCommandEvent& event);
-    void OnKEY_APL_RENTER(wxCommandEvent& event);
-    void OnKEY_APL_1(wxCommandEvent& event);
-    void OnKEY_APL_2(wxCommandEvent& event);
-    void OnKEY_APL_3(wxCommandEvent& event);
-    void OnKEY_NMI(wxCommandEvent& event);
-    void OnKEY_RESET(wxCommandEvent& event);
-    void OnProFilePower(wxCommandEvent& event);
-    void OnFLOPPY(wxCommandEvent& event);
-    void OnNewFLOPPY(wxCommandEvent& event);
+    void OnScreenshot(wxCommandEvent &event);
+    void OnDebugger(wxCommandEvent &event);
+    void OnPOWERKEY(wxCommandEvent &event);
+    void OnAPPLEPOWERKEY(wxCommandEvent &event);
+    void OnTraceLog(wxCommandEvent &event);
+    void OnKEY_APL_DOT(wxCommandEvent &event);
+    void OnKEY_APL_S(wxCommandEvent &event);
+    void OnKEY_APL_ENTER(wxCommandEvent &event);
+    void OnKEY_APL_RENTER(wxCommandEvent &event);
+    void OnKEY_APL_1(wxCommandEvent &event);
+    void OnKEY_APL_2(wxCommandEvent &event);
+    void OnKEY_APL_3(wxCommandEvent &event);
+    void OnKEY_NMI(wxCommandEvent &event);
+    void OnKEY_RESET(wxCommandEvent &event);
+    void OnProFilePower(wxCommandEvent &event);
+    void OnFLOPPY(wxCommandEvent &event);
+    void OnNewFLOPPY(wxCommandEvent &event);
 
     void OnxFLOPPY(void);
     void OnxNewFLOPPY(void);
 
-    void OnKEY_OPT_0(wxCommandEvent& event);
-    void OnKEY_OPT_4(wxCommandEvent& event);
-    void OnKEY_OPT_7(wxCommandEvent& event);
-    void OnKEYBOARD(wxCommandEvent& event);
+    void OnKEY_OPT_0(wxCommandEvent &event);
+    void OnKEY_OPT_4(wxCommandEvent &event);
+    void OnKEY_OPT_7(wxCommandEvent &event);
+    void OnKEYBOARD(wxCommandEvent &event);
 
-    void OnASCIIKB(wxCommandEvent& event);
-    void OnRAWKB(wxCommandEvent& event);
-    void OnRAWKBBUF(wxCommandEvent& event);
+    void OnASCIIKB(wxCommandEvent &event);
+    void OnRAWKB(wxCommandEvent &event);
+    void OnRAWKBBUF(wxCommandEvent &event);
     void reset_throttle_clock(void);
 
-    void OnThrottle5(wxCommandEvent& event);
-    void OnThrottle8(wxCommandEvent& event);
-    void OnThrottle10(wxCommandEvent& event);
-    void OnThrottle12(wxCommandEvent& event);
-    void OnThrottle16(wxCommandEvent& event);
-    void OnThrottle32(wxCommandEvent& event);
-    void OnThrottleX(wxCommandEvent& event);
-
+    void OnThrottle5(wxCommandEvent &event);
+    void OnThrottle8(wxCommandEvent &event);
+    void OnThrottle10(wxCommandEvent &event);
+    void OnThrottle12(wxCommandEvent &event);
+    void OnThrottle16(wxCommandEvent &event);
+    void OnThrottle32(wxCommandEvent &event);
+    void OnThrottleX(wxCommandEvent &event);
 
     void SetStatusBarText(wxString &msg);
-    void Update_Status(long elapsed,long idleentry);
+    void Update_Status(long elapsed, long idleentry);
     void VidRefresh(long now);
     int EmulateLoop(long idleentry);
 
-    //void OnIdleEvent(wxIdleEvent& event);
-    void OnEmulationTimer(wxTimerEvent& event);
+    // void OnIdleEvent(wxIdleEvent& event);
+    void OnEmulationTimer(wxTimerEvent &event);
 
-    void OnPasteToKeyboard(wxCommandEvent&event);
-
+    void OnPasteToKeyboard(wxCommandEvent &event);
 
     void FloppyAnimation(void);
     // menu commands that switch video mode
-    void OnVideoAntiAliased(wxCommandEvent& event);
-    void OnVideoAAGray(wxCommandEvent& event);
-    //void OnVideoScaled(wxCommandEvent& event);
-    void OnVideoDoubleY(wxCommandEvent& event);
-    void OnVideoSingleY(wxCommandEvent& event);
-    void OnVideo2X3Y(wxCommandEvent& event);
+    void OnVideoAntiAliased(wxCommandEvent &event);
+    void OnVideoAAGray(wxCommandEvent &event);
+    // void OnVideoScaled(wxCommandEvent& event);
+    void OnVideoDoubleY(wxCommandEvent &event);
+    void OnVideoSingleY(wxCommandEvent &event);
+    void OnVideo2X3Y(wxCommandEvent &event);
 
-    void OnSkinsOn(wxCommandEvent& event);
-    void OnSkinsOff(wxCommandEvent& event);
+    void OnSkinsOn(wxCommandEvent &event);
+    void OnSkinsOff(wxCommandEvent &event);
 
-    void OnRefresh60Hz(wxCommandEvent& event);
-    void OnRefresh20Hz(wxCommandEvent& event);
-    void OnRefresh12Hz(wxCommandEvent& event);
-    void OnRefresh8Hz(wxCommandEvent& event);
+    void OnRefresh60Hz(wxCommandEvent &event);
+    void OnRefresh20Hz(wxCommandEvent &event);
+    void OnRefresh12Hz(wxCommandEvent &event);
+    void OnRefresh8Hz(wxCommandEvent &event);
 
-    void OnFlushPrint(wxCommandEvent& event);
-    void OnHideHostMouse(wxCommandEvent& event);
+    void OnFlushPrint(wxCommandEvent &event);
+    void OnHideHostMouse(wxCommandEvent &event);
 
-
-
-    //class LisaWin *win;
-    int screensizex,screensizey;
+    // class LisaWin *win;
+    int screensizex, screensizey;
     int depth;
 
-    wxStopWatch runtime;               // idle loop stopwatch
+    wxStopWatch runtime; // idle loop stopwatch
     wxStopWatch soundsw;
     int soundplaying;
 
     uint16 lastt2;
-    long    last_runtime_sample;
-    long    last_decisecond;
+    long last_runtime_sample;
+    long last_decisecond;
     XTIMER clx;
     XTIMER lastclk;
     XTIMER cpu68k_reference;
     XTIMER last_runtime_cpu68k_clx;
-    int dwx,dwy;
+    int dwx, dwy;
 
-    wxString     wspaste_to_keyboard;
+    wxString wspaste_to_keyboard;
     volatile char *paste_to_keyboard;
-    uint32         idx_paste_to_kb;
-    int            loops;
-    float          throttle;
-    float          clockfactor;
-    float          mhzactual;
+    uint32 idx_paste_to_kb;
+    int loops;
+    float throttle;
+    float clockfactor;
+    float mhzactual;
 
     wxString floppy_to_insert;
     long lastcrtrefresh;
@@ -239,7 +230,7 @@ public:
     long onidle_calls;
     XTIMER cycles_wanted;
 
-    wxTimer* m_emulation_timer;
+    wxTimer *m_emulation_timer;
     int barrier;
     DECLARE_EVENT_TABLE()
 };

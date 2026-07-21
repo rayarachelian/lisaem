@@ -27,7 +27,9 @@ export OSMIDDLE=$( printf "%02d" $( echo $OSVER | cut -d'.' -f2 ))
 export BINARYEXTENSION="-${MACHINE}-${OSMAJOR}.$OSMIDDLE"
 export MACOSX_VERSION=$( printf "%02d.%02d.%02d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
 
-export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
+export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
+[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(basename $(ls -1d $(xcode-select -p )/Platforms/MacOSX.platform/Developer/SDKs/* | grep -E "MacOSX[0-9]"| sort -V | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
+[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
 [[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION=$( printf "%02d.%d.%d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
 
@@ -122,7 +124,7 @@ function windres() {
 true 
 }
 
-# i.e. macospkg #"net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+# i.e. macospkg #"net.sunder.lisaem" "../../pkg/lisaem-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
 # must call this from the root directory
 function macospkg() {
          REVERSECO="$1"

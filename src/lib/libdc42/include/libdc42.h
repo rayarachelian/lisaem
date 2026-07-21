@@ -217,43 +217,10 @@ options: string containing any of the following (last option takes precedence)
  If you want to simulate the 'p' option on a low memory system, you should first copy the disk image to a temporary file, then
  open the temporary file with "wn".  After you close the temporary file, delete it.
 
-
-
-
-int dc42_close_image(DC42ImageType *F);
-
-  or
-
-int dc42_close_image_by_handle(DC42ImageType *F)
-
-
-
-These functions close the disk image and if it was requested on the call, will write the data back to the disk, updating the
-checksums.
-
-Danger! You must call the appropriate function.  If you used dc42_open_by_handle, you must call dc42_close_image_by_handle.
-
-
-
-
-
 int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize)    // create a blank new disk image
                                                                                    // sizes are in bytes.  pass *1024 for KB.
                                                                                    // does not open the image, only creates it, so
                                                                                    // call open if you want to open it after creating it.
-
-uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
-   read calls return a pointer to the sector's data or tag.  Note that if you're not using mmapped I/O or RAM, the pointer to
-   the data will be re-used between calls, and therefore old pointers from previous reads cannot be considered to be valid!
-
-   write will write the data you provide to the image.  Write returns any error numbers.
-
-   You can access F->errormsg and F->retval to get the results of the requested operation.
-
 
 These next functions will NOT actually open a disk image, but will open a file handle to them.
 
@@ -292,19 +259,17 @@ return codes:
 
 \**************************************************************************************************************************/
 
-
 // The following define enables LZH decompression.  It's needed in order to open compressed DART
 // files.  The code that enables this is not GPL, although it has been released in 1989
 // as free for non-commercial use on usenet.  See the comments at the bottom of this file for details.
 //
 // Remove this if your code needs pure GPL compatibility, or is of a commercial nature.
 //
-#define USE_LZHUF  1
+#define USE_LZHUF 1
 
 // needed for LisaEm compatibility, you can remove this, but you must
 // define int8, int16, int32, uint8, uint16, uint32.
 #include <machine.h>
-
 
 // normal includes
 #include <stdio.h>
@@ -329,7 +294,6 @@ extern char *strcasestr(const char *haystack, const char *needle);
 #include <strings.h>
 #include <ctype.h>
 
-
 ////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef fgetc
@@ -337,154 +301,139 @@ extern char *strcasestr(const char *haystack, const char *needle);
 #endif
 
 #define DC42_HEADERSIZE 84
-#define DART_CHUNK      20960
+#define DART_CHUNK 20960
 #define DART_CHUNK_TAGS 20480
 
 #define TWIG860KFLOPPY 0
 #define SONY800KFLOPPY 2
 #define SONY400KFLOPPY 1
 
+typedef struct DC42ImageType DC42ImageType;
 
-typedef struct                          // floppy type
-{
-  int    fd;                            // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
-  FILE  *fh;                            // file handle on Win32
+struct DC42ImageType {
+  int fd;   // file descriptor (valid if >2, invalid if negative 0=stdin, 1=stdout, invalid too)
+  FILE *fh; // file handle on Win32
 
+  uint32 size; // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
+               // used for mmap fn's
 
-  uint32 size;                          // size in bytes of the disk image file on disk (i.e. the dc42 file itself incl. headers.)
-                                        // used for mmap fn's
+  char fname[FILENAME_MAX + 2]; // File name of this disk image (needed for future use to re-create/re-open the image)
+                                // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
+                                // to set this to whatever is reasonable for your OS.  ie. 256 or 1024, etc.
+                                //
+                                // Also can be used to automatically copy a r/o master disk to a private r/w copy - not yet implemented
+                                // copy made on open.
 
-  char   fname[FILENAME_MAX+2];         // File name of this disk image (needed for future use to re-create/re-open the image)
-                                        // FILENAME_MAX should be set by your OS via includes such as stdio.h, if not, you'll need
-                                        // to set this to whatever is reasonable for your OS.  ie. 256 or 1024, etc.
-                                        //
-                                        // Also can be used to automatically copy a r/o master disk to a private r/w copy - not yet implemented
-                                        // copy made on open.
+  char mfname[FILENAME_MAX + 2]; // r/o master filename path - not yet implemented.
 
-  char  mfname[FILENAME_MAX+2];         // r/o master filename path - not yet implemented.
+  uint8 readonly; // 0 read/write image - writes are sync'ed to disk image and checksums recalculated on close
+                  // 1 read only flag - writes return error and not saved, not even in RAM
+                  // 2 if writes saved in RAM, but not saved to disk when image closed
 
+  uint8 synconwrite; // sync writes to disk immediately, but note that this is very very slow!
+                     // only used for mmap'ed I/O
 
-  uint8  readonly;                      // 0 read/write image - writes are sync'ed to disk image and checksums recalculated on close
-                                        // 1 read only flag - writes return error and not saved, not even in RAM
-                                        // 2 if writes saved in RAM, but not saved to disk when image closed
+  uint8 mmappedio; // 0 = do not use mmapped I/O, nor RAM; 1 = use mmapped I/O (if the OS supports it), not RAM, 2 = use RAM, not mmapped I/O
 
-  uint8  synconwrite;                   // sync writes to disk immediately, but note that this is very very slow!
-                                        // only used for mmap'ed I/O
+  uint8 ftype; // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
 
-  uint8  mmappedio;                     // 0 if disabled, 1 if enabled.
+  uint32 tagsize;  // 12 for floppy disk images, 20 for ProFile/Widget hard disk images
+  uint32 datasize; // must set to 512. TODO: remove this attribute and use sectorsize instead
 
-  uint8  ftype;                         // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
+  uint32 datasizetotal; // data size (in bytes of all sectors added together)
+  uint32 tagsizetotal;  // tag size total in bytes
 
+  uint32 sectoroffset; // how far into the file is the 1st sector
+  uint16 sectorsize;   // must set to 512 
+  uint32 tagstart;     // how far into the file to 1st tag - similar to sectoroffset
 
-  uint32 tagsize;                       // must set to 12 - expect ProFile/Widget to use 24 byte tags
-  uint32 datasize;                      // must set to 512
+  uint32 maxtrk, maxsec, maxside, numblocks; // unused by these routines, but used by the Lisa Emulator
 
-  uint32 datasizetotal;                 // data size (in bytes of all sectors added together)
-  uint32 tagsizetotal;                  // tag size total in bytes
+  uint8 *RAM; // memory mapped file pointer - or a single sector's tags + data
 
-  uint32 sectoroffset;                  // how far into the file is the 1st sector
-  uint16 sectorsize;                    // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
-  uint32 tagstart;                      // how far into the file to 1st tag - similar to sectoroffset
+  long dc42seekstart; // when opening an existing fd, points to start of dc42 image
 
-  uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by the Lisa Emulator
+  char returnmsg[256]; // error message buffer - used internally for storage, instead, access error via errormsg
+  char *errormsg;      // pointer to error message, use this to read text of error returned.
+  int retval;          // error number of last operation
 
-  uint8 *RAM;                           // memory mapped file pointer - or a single sector's tags + data
+  // These function pointers are poor man's object-riented feature in C: We can implement support for different image formats
+  // by "pointing" these functions to the corresponsing implementations. For an example of how to use them with DC42 image format, 
+  // see the code in dc42_open()
+  // "read" calls return a pointer to the sector's data or tag.  Note that if you're not using mmapped I/O or RAM, the pointer to
+  // the data will be re-used between calls, and therefore old pointers from previous reads cannot be considered to be valid!
+  // "write" calls will write the data you provide to the image.  Write returns error numbers.
+  // You can access F->errormsg and F->retval to get the results of the requested operation.
+  uint8 *(*read_sector_tags)(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
+  uint8 *(*read_sector_data)(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
+  int (*write_sector_data)(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
+  int (*write_sector_tags)(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write the tag data for a sector
 
-  long  dc42seekstart;                  // when opening an existing fd, points to start of dc42 image
+  // These functions close the disk image.
+  // You must call the appropriate function: if you used dc42_open_by_handle, you must call close_image_by_handle.
+  int (*close_image)(DC42ImageType *F);           // close the image: fix checksums and sync data
+  int (*close_image_by_handle)(DC42ImageType *F); // close, but don't call close on the fd.
+};
 
-  char returnmsg[256];                  // error message buffer - used internally for storage, instead, access error via errormsg
-  char *errormsg;                       // pointer to error message, use this to read text of error returned.
-  int retval;                           // error number of last operation
+int dc42_open(DC42ImageType *F, char *filename, char *options);      // open a disk image, map it and fill structure
+int dc42_auto_open(DC42ImageType *F, char *filename, char *options); // oops, was missing!
 
-} DC42ImageType;
+int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options); // open an embedded dc42 image in an already
+                                                                                            // opened file descriptor at the curren file
+                                                                                            // position.
 
+int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize); // create a blank new disk image
+                                                                                 // does not open the image, may not be called
+                                                                                 // while the image file is open.
 
+uint32 dc42_has_tags(DC42ImageType *F); // returns 0 if no tags, 1 if it has tags
 
+uint32 dc42_calc_tag_checksum(DC42ImageType *F);  // calculate the current tag checksum
+uint32 dc42_calc_tag0_checksum(DC42ImageType *F); // used by DART
+uint32 dc42_calc_data_checksum(DC42ImageType *F); // calculate the current sector data checksum
+int dc42_recalc_checksums(DC42ImageType *F); // calculate checksums and save'em in the image
+int dc42_check_checksums(DC42ImageType *F); // 0 if both data and tags match
+                                            // 1 if tags don't match
+                                            // 2 if data
+                                            // 3 if both data and tags don't match
+uint32 dc42_get_tagchecksum(DC42ImageType *F);  // return the image's stored tag checksum
+uint32 dc42_get_datachecksum(DC42ImageType *F); // return the image's stored data checksum
 
-int dc42_open(DC42ImageType *F, char *filename, char *options);                    // open a disk image, map it and fill structure
-int dc42_auto_open(DC42ImageType *F, char *filename, char *options);               // oops, was missing!
+int dart_to_dc42(char *dartfilename, char *dc42filename); // converts a DART fast-compressed/uncompressed
+                                                          // image to a DiskCopy42 image.  Does not (yet)
+                                                          // work with LZH compressed images
 
-int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options);
-                                                                                   // open an embedded dc42 image in an already
-                                                                                   // opened file descriptor at the curren file
-                                                                                   // position.
+int dc42_is_valid_image(char *filename); // returns 0 if it can't open the image, or the image is not a valid dc42 image.
 
-
-int dc42_close_image(DC42ImageType *F);                                            // close the image: fix checksums and sync data
-int dc42_close_image_by_handle(DC42ImageType *F);                                  // close, but don't call close on the fd.
-
-int dc42_create(char *filename,char *volname, uint32 datasize,uint32 tagsize);     // create a blank new disk image
-                                                                                   // does not open the image, may not be called
-                                                                                   // while the image file is open.
-
-int dc42_add_tags(char *filename, uint32 tagsize);                                 // add tags to a dc42 image that lacks them.
-                                                                                   // if tagsize is zero adds 12 bytes of tags for
-                                                                                   // every 512 bytes of data.  Does not open the
-                                                                                   // image, can be used pre-emptively when opening
-                                                                                   // and image for access.  Call it with 0 as the tag
-                                                                                   // size before calling dc42 open to ensure it has tags.
-                                                                                   // does not open the image, may not be called
-                                                                                   // while theimage file is open.
-
-uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
-int dc42_sync_to_disk(DC42ImageType *F);                                           // like fsync, sync's writes back to file. Does
-                                                                                   // NOT write proper tag/data checksums, as that
-                                                                                   // would be too slow.  Call recalc_checksums yourself
-                                                                                   // when you need it, or call dc42_close_image.
-
-uint32 dc42_has_tags(DC42ImageType *F);                                            // returns 0 if no tags, 1 if it has tags
-
-uint32 dc42_calc_tag_checksum(DC42ImageType *F);                                   // calculate the current tag checksum
-uint32 dc42_calc_tag0_checksum(DC42ImageType *F);                                  // used by DART
-
-uint32 dc42_calc_data_checksum(DC42ImageType *F);                                  // calculate the current sector data checksum
-
-int dc42_recalc_checksums(DC42ImageType *F);                                       // calculate checksums and save'em in the image
-
-int dc42_check_checksums(DC42ImageType *F);                                        // 0 if both data and tags match
-                                                                                   // 1 if tags don't match
-                                                                                   // 2 if data
-                                                                                   // 3 if both data and tags don't match
-
-
-uint32 dc42_get_tagchecksum(DC42ImageType *F);                                     // return the image's stored tag checksum
-uint32 dc42_get_datachecksum(DC42ImageType *F);                                    // return the image's stored data checksum
-
-
-
-
-
-int dart_to_dc42(char *dartfilename, char *dc42filename);                          // converts a DART fast-compressed/uncompressed
-                                                                                   // image to a DiskCopy42 image.  Does not (yet)
-                                                                                   // work with LZH compressed images
-
-
-int dc42_is_valid_image(char *filename);    // returns 0 if it can't open the image, or the image is not a valid dc42 image.
+// dc42_classify_image() - identify what kind of Lisa disk a file holds, for the Preferences file pickers.
+// Classified from the dc42/DART header only (no size guessing): tagsize 20 = ProFile/Widget, 12 = floppy;
+// a Lisa floppy is <= 1742 blocks. Anything not a recognizable dc42/DART image is reported as raw (the
+// caller may allow it but should say the format couldn't be identified). Returns one of:
+#define DC42_KIND_RAW 0     // not a recognizable dc42/DART image (e.g. a raw .image, or empty/unreadable)
+#define DC42_KIND_PROFILE 1 // dc42 ProFile/Widget hard disk (tagsize 20, or > 1742 blocks)
+#define DC42_KIND_FLOPPY 2  // dc42 floppy (tagsize 12 / <= 1742 blocks)
+int dc42_classify_image(char *filename);
 
 int dart_is_valid_image(char *dartfilename); // returns 0 if it can't open the image, or the image is not a valid DART image
 
-int dc42_is_valid_macbinii(char *infilename, char *creatortype);                   // returns 1 if file is macbinII encapsulated
-                                                                                   // if creatortype is passed a non-NULL ponter
-                                                                                   // the Macintosh creator and type are returned
-                                                                                   // by thefunction.  This must be at leat 9 bytes!
+int dc42_is_valid_macbinii(char *infilename, char *creatortype); // returns 1 if file is macbinII encapsulated
+                                                                 // if creatortype is passed a non-NULL ponter
+                                                                 // the Macintosh creator and type are returned
+                                                                 // by thefunction.  This must be at leat 9 bytes!
 
-int dc42_set_volname(DC42ImageType *F,char *name); // set/get the disk image volume name
+int dc42_set_volname(DC42ImageType *F, char *name); // set/get the disk image volume name
 char *dc42_get_volname(DC42ImageType *F);
 
+int dc42_extract_macbinii(char *infilename); // extracts macbin2 header if one exists
+                                             // returns 1 if converted, 0 if it's not
+                                             // a macbinII header. negative on error
+                                             // NOTE: filename is overwritten with
+                                             // extracted file name!  On negative return
+                                             // the filename has been altered!
 
-
-int dc42_extract_macbinii(char *infilename);                                       // extracts macbin2 header if one exists
-                                                                                   // returns 1 if converted, 0 if it's not
-                                                                                   // a macbinII header. negative on error
-                                                                                   // NOTE: filename is overwritten with
-                                                                                   // extracted file name!  On negative return
-                                                                                   // the filename has been altered!
-
-int searchseccount( DC42ImageType *F, int sector, int size, uint8 *s);
+int searchseccount(DC42ImageType *F, int sector, int size, uint8 *s);
 int replacesec(DC42ImageType *F, int sector, int size, uint8 *s, uint8 *r);
+
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options);
 
 ////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -42,7 +42,7 @@ void mmu_refresh_context(void);
 #ifdef DEBUG
 void checkcontext(uint8 c, char *text)
 #else
-nline checkcontext(uint8 c, char *text) {;}
+nline checkcontext(uint8 c, char *text) { ; }
 #endif
 
 #endif MMUHINCLUDED

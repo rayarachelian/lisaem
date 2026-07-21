@@ -52,9 +52,6 @@ function OpenBSDPackage() {
 
   pushd . >/dev/null 2>/dev/null
 
-  SUFFIX=""
-  [[ "${STABILITY}" != "RELEASE" ]] && [[ "${STABILITY}" != "PRODUCTION" ]] && export SUFFIX="-${STABILITY}-${RELEASEDATE}"
-
   export STAGEDIR="${XTLD}/pkg/build/tmp/openbsd/"
   export DESC="${XTLD}/pkg/build/tmp/openbsd/+DESC"
   export CONTENTS="${XTLD}/pkg/build/tmp/openbsd/+CONTENTS"
@@ -64,7 +61,7 @@ function OpenBSDPackage() {
   cd           "${STAGEDIR}"
 
 cat >"${DESC}" <<ENDOBSDDESCEND
-${SOFTWARE} ${VER}${SUFFIX}
+${SOFTWARE} ${VER}
 
 comment: ${DESCRIPTION}
 
@@ -150,8 +147,8 @@ ENDOBSDCONTENTSEND
   cd "${XTLD}/pkg/build/tmp/openbsd"
   pkg_create -f +CONTENTS 2>&1 | tee "${XTLD}/pkg/openbsd-pkg_create.log"
   #echo "  + Using sudo to set perms and tarring, cleaning" 1>&2
-  #sudo bash -c "chown -R root:wheel .; chown root:bin +*; tar czf ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz *; cd ..; rm -rf openbsd"
-  echo "  + Created ${XTLD}/pkg/${LCNAME}-${VERSION}_openbsd_pkg.tgz - rename to ${LCNAME}-${VERSION}.tgz and then run pkg_sign" 1>&2
+  #sudo bash -c "chown -R root:wheel .; chown root:bin +*; tar czf ${XTLD}/pkg/${LCNAME}_openbsd_pkg.tgz *; cd ..; rm -rf openbsd"
+  echo "  + Created ${XTLD}/pkg/${LCNAME}_openbsd_pkg.tgz - rename to ${LCNAME}.tgz and then run pkg_sign" 1>&2
    
   popd . >/dev/null 2>/dev/null
 }

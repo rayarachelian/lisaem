@@ -30,17 +30,17 @@ public:
      LisaWin(wxWindow *parent);
      ~LisaWin();
 
-     int doubley;          // this doubles the number of vertical lines
+     int doubley; // this doubles the number of vertical lines
 
-     int dirtyscreen;      // indicated dirty lisa vidram
+     int dirtyscreen; // indicated dirty lisa vidram
 
      uint8 brightness;
 
-     //void SetStatusBarText(wxString &msg);
+     // void SetStatusBarText(wxString &msg);
 
-     int refresh_bytemap;  // flag indicating contrast change
-     int floppystate;      // animation state of floppy
-     int powerstate;       // animation state of power button
+     int refresh_bytemap; // flag indicating contrast change
+     int floppystate;     // animation state of floppy
+     int powerstate;      // animation state of power button
 
      void RepaintNow(void);
 
@@ -52,12 +52,11 @@ public:
      void RePaint_AntiAliased(void);
      void RePaint_DoubleY(void);
      void RePaint_SingleY(void);
-     //void RePaint_Scaled(void);
+     // void RePaint_Scaled(void);
      void RePaint_3A(void);
      void RePaint_2X3Y(void);
 
-     void (LisaWin::*RePainter)(void);   // pointer method to one of the above
-
+     void (LisaWin::*RePainter)(void); // pointer method to one of the above
 
      void SetVideoMode(int mode);
 
@@ -70,20 +69,20 @@ public:
      long mousemoved;
 
      void OnMouseMove(wxMouseEvent &event);
-     void OnKeyDown(wxKeyEvent& event);
-     void OnKeyUp(wxKeyEvent& event);
-     void OnChar(wxKeyEvent& event);
+     void OnKeyDown(wxKeyEvent &event);
+     void OnKeyUp(wxKeyEvent &event);
+     void OnChar(wxKeyEvent &event);
 
-     void LogKeyEvent(const wxChar *name, wxKeyEvent& event,int keydir);
+     void LogKeyEvent(const wxChar *name, wxKeyEvent &event, int keydir);
      void ContrastChange(void);
 
      int lastkeystroke;
 
-     uint8 bright[8];       // brightness levels for ContrastChange and repaint routines.
-     
+     uint8 bright[8]; // brightness levels for ContrastChange and repaint routines.
+
      int repaintall;
-     int ox,oy,ex,ey;
-     int dwx,dwy;
+     int ox, oy, ex, ey;
+     int dwx, dwy;
 
      int rawcodes[128];
      int rawidx;
@@ -97,4 +96,3 @@ private:
 
      DECLARE_EVENT_TABLE()
 };
-

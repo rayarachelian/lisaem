@@ -73,7 +73,7 @@
 static int fd[NUMSERPORTS];
 struct termios options;
 
-static char input[NUMSERPORTS][150];  // data buffer
+static char input[NUMSERPORTS][150]; // data buffer
 
 extern int verifybaud(int baud);
 
@@ -83,164 +83,290 @@ extern int verifybaud(int baud);
 extern void disconnect_serial(int port);
 extern uint32 get_baud_rate(unsigned int port);
 
-
 void set_port_baud_tty(int port, uint32 baud)
 {
-  if (port<0 || port>NUMSERPORTS) return;
+  if (port < 0 || port > NUMSERPORTS)
+    return;
 
-  if (fd[port]<2) return;  // -1=error, 0=stdin, 1=stdout, 2=stderr; so fd should be at least 3 if valid.
+  if (fd[port] < 2)
+    return; // -1=error, 0=stdin, 1=stdout, 2=stderr; so fd should be at least 3 if valid.
 
-  if (baudoverride[port]) baud=baudoverride[port]; // if the user selected a specific baud rate, use that no matter what the Lisa says.
+  if (baudoverride[port])
+    baud = baudoverride[port]; // if the user selected a specific baud rate, use that no matter what the Lisa says.
 
   tcgetattr(fd[port], &options);
 
-  switch (baud) {
-         case 50:     cfsetispeed(&options, B50    ); cfsetospeed(&options, B50    );  break;
-         case 75:     cfsetispeed(&options, B75    ); cfsetospeed(&options, B75    );  break;
-         case 110:    cfsetispeed(&options, B110   ); cfsetospeed(&options, B110   );  break;
-         case 134:    cfsetispeed(&options, B134   ); cfsetospeed(&options, B134   );  break;
-         case 150:    cfsetispeed(&options, B150   ); cfsetospeed(&options, B150   );  break;
-         case 200:    cfsetispeed(&options, B200   ); cfsetospeed(&options, B200   );  break;
-         case 300:    cfsetispeed(&options, B300   ); cfsetospeed(&options, B300   );  break;
-         case 600:    cfsetispeed(&options, B600   ); cfsetospeed(&options, B600   );  break;
-         case 1200:   cfsetispeed(&options, B1200  ); cfsetospeed(&options, B1200  );  break;
-         case 1800:   cfsetispeed(&options, B1800  ); cfsetospeed(&options, B1800  );  break;
-//       case 2000:   cfsetispeed(&options, B2000  ); cfsetospeed(&options, B2000  );  break;
-         case 2400:   cfsetispeed(&options, B2400  ); cfsetospeed(&options, B2400  );  break;
-//       case 3600:   cfsetispeed(&options, B3600  ); cfsetospeed(&options, B3600  );  break;
-         case 4800:   cfsetispeed(&options, B4800  ); cfsetospeed(&options, B4800  );  break;
-         case 9600:   cfsetispeed(&options, B9600  ); cfsetospeed(&options, B9600  );  break;
-         case 19200:  cfsetispeed(&options, B19200 ); cfsetospeed(&options, B19200 );  break;
-         case 38400:  cfsetispeed(&options, B38400 ); cfsetospeed(&options, B38400 );  break;
-         case 57600:  cfsetispeed(&options, B57600 ); cfsetospeed(&options, B57600 );  break;
-//       case 76800:  cfsetispeed(&options, B76800 ); cfsetospeed(&options, B76800 );  break;
-         case 115200: cfsetispeed(&options, B115200); cfsetospeed(&options, B115200);  break;
+  switch (baud)
+  {
+  case 50:
+    cfsetispeed(&options, B50);
+    cfsetospeed(&options, B50);
+    break;
+  case 75:
+    cfsetispeed(&options, B75);
+    cfsetospeed(&options, B75);
+    break;
+  case 110:
+    cfsetispeed(&options, B110);
+    cfsetospeed(&options, B110);
+    break;
+  case 134:
+    cfsetispeed(&options, B134);
+    cfsetospeed(&options, B134);
+    break;
+  case 150:
+    cfsetispeed(&options, B150);
+    cfsetospeed(&options, B150);
+    break;
+  case 200:
+    cfsetispeed(&options, B200);
+    cfsetospeed(&options, B200);
+    break;
+  case 300:
+    cfsetispeed(&options, B300);
+    cfsetospeed(&options, B300);
+    break;
+  case 600:
+    cfsetispeed(&options, B600);
+    cfsetospeed(&options, B600);
+    break;
+  case 1200:
+    cfsetispeed(&options, B1200);
+    cfsetospeed(&options, B1200);
+    break;
+  case 1800:
+    cfsetispeed(&options, B1800);
+    cfsetospeed(&options, B1800);
+    break;
+    //       case 2000:   cfsetispeed(&options, B2000  ); cfsetospeed(&options, B2000  );  break;
+  case 2400:
+    cfsetispeed(&options, B2400);
+    cfsetospeed(&options, B2400);
+    break;
+    //       case 3600:   cfsetispeed(&options, B3600  ); cfsetospeed(&options, B3600  );  break;
+  case 4800:
+    cfsetispeed(&options, B4800);
+    cfsetospeed(&options, B4800);
+    break;
+  case 9600:
+    cfsetispeed(&options, B9600);
+    cfsetospeed(&options, B9600);
+    break;
+  case 19200:
+    cfsetispeed(&options, B19200);
+    cfsetospeed(&options, B19200);
+    break;
+  case 38400:
+    cfsetispeed(&options, B38400);
+    cfsetospeed(&options, B38400);
+    break;
+  case 57600:
+    cfsetispeed(&options, B57600);
+    cfsetospeed(&options, B57600);
+    break;
+    //       case 76800:  cfsetispeed(&options, B76800 ); cfsetospeed(&options, B76800 );  break;
+  case 115200:
+    cfsetispeed(&options, B115200);
+    cfsetospeed(&options, B115200);
+    break;
   }
   tcsetattr(fd[port], TCSANOW, &options);
-
 }
 
-
-void init_tty_serial_port(int port, char *config)  {
+void init_tty_serial_port(int port, char *config)
+{
   int i, rc;
   char ptyname[1024];
 
-// want to always set these for PTY/TTY
-  scc_r[port].s.rr0.r.tx_buffer_empty=1;
-  scc_r[port].s.rr0.r.dcd=1;
-  scc_r[port].s.rr0.r.cts=1;
+  // want to always set these for PTY/TTY
+  scc_r[port].s.rr0.r.tx_buffer_empty = 1;
+  scc_r[port].s.rr0.r.dcd = 1;
+  scc_r[port].s.rr0.r.cts = 1;
 
-  int bps=get_baud_rate(port);
+  int bps = get_baud_rate(port);
 
-  char *s, *dev, *settings;  
+  char *s, *dev, *settings;
   char device[64];
 
-  uint32 baud=0;
-  int bits=8, stopbits=1;
-  char parity='N';
+  uint32 baud = 0;
+  int bits = 8, stopbits = 1;
+  char parity = 'N';
   // /dev/ttyUSB0
   // "/dev/ttyUSB0|9600,N,8,1"
-  memset(device,0,63);
-  strncpy(device,config,63);
-  s=strchr(device,'|'); if (s) *s=0;
+  memset(device, 0, 63);
+  strncpy(device, config, 63);
+  s = strchr(device, '|');
+  if (s)
+    *s = 0;
 
-  if (strlen(device)==0) {disconnect_serial(port); return;}
+  if (strlen(device) == 0)
+  {
+    disconnect_serial(port);
+    return;
+  }
 
-  settings=strchr(config,'|'); if (settings[0]=='|') settings++;
+  settings = strchr(config, '|');
+  if (settings[0] == '|')
+    settings++;
 
-  ALERT_LOG(0,"Device: %s Settings:%s",device,settings);
+  ALERT_LOG(0, "Device: %s Settings:%s", device, settings);
 
-  baud=verifybaud(atol(settings));  // ensure sane baud rates
+  baud = verifybaud(atol(settings)); // ensure sane baud rates
 
-  if (strstr(settings,",8")!=NULL) bits=8;
-  if (strstr(settings,",7")!=NULL) bits=7;
-  
-  if (strstr(settings,",1")!=NULL) stopbits=1;
-  if (strstr(settings,",2")!=NULL) stopbits=2;
+  if (strstr(settings, ",8") != NULL)
+    bits = 8;
+  if (strstr(settings, ",7") != NULL)
+    bits = 7;
 
-  if (strstr(settings,",N")!=NULL) parity='N';
-  if (strstr(settings,",n")!=NULL) parity='N';
+  if (strstr(settings, ",1") != NULL)
+    stopbits = 1;
+  if (strstr(settings, ",2") != NULL)
+    stopbits = 2;
 
-  if (strstr(settings,",E")!=NULL) parity='E';
-  if (strstr(settings,",e")!=NULL) parity='E';
+  if (strstr(settings, ",N") != NULL)
+    parity = 'N';
+  if (strstr(settings, ",n") != NULL)
+    parity = 'N';
 
-  if (strstr(settings,",O")!=NULL) parity='E';
-  if (strstr(settings,",o")!=NULL) parity='E';
+  if (strstr(settings, ",E") != NULL)
+    parity = 'E';
+  if (strstr(settings, ",e") != NULL)
+    parity = 'E';
 
-  ALERT_LOG(0,"%d bits, %c parity, %d stop bits\n",bits,parity,stopbits);
+  if (strstr(settings, ",O") != NULL)
+    parity = 'E';
+  if (strstr(settings, ",o") != NULL)
+    parity = 'E';
 
-  fd[port] = open(device, O_RDWR | O_NOCTTY | O_NDELAY);  if (fd[port] == -1)  { ALERT_LOG(0,"could not open %s - disconnecting\n",device); disconnect_serial(port); return; }
+  ALERT_LOG(0, "%d bits, %c parity, %d stop bits\n", bits, parity, stopbits);
+
+  fd[port] = open(device, O_RDWR | O_NOCTTY | O_NDELAY);
+  if (fd[port] == -1)
+  {
+    ALERT_LOG(0, "could not open %s - disconnecting\n", device);
+    disconnect_serial(port);
+    return;
+  }
   fcntl(fd[port], F_SETFL, 0);
 
-  if (baud) { baudoverride[port]=baud; set_port_baud_tty(port,baud); }
+  if (baud)
+  {
+    baudoverride[port] = baud;
+    set_port_baud_tty(port, baud);
+  }
 
   tcgetattr(fd[port], &options);
 
   options.c_cflag |= (CLOCAL | CREAD); // Enable the receiver and set local mode
 
-  if (parity=='N' || parity=='S')                                      { options.c_cflag &= ~PARENB;                                 }
-  if (parity=='E')                                                     { options.c_cflag |=  PARENB;     options.c_cflag  &=~PARODD; }  
-  if (parity=='O')                                                     { options.c_cflag |=  PARENB;     options.c_cflag  |= PARODD; } 
-  if (bits=='7'  )                                                     { options.c_cflag &= ~CSTOPB;     options.c_cflag &= ~CSIZE; options.c_cflag |= CS7;}
-  else                                                                 { options.c_cflag &= ~CSTOPB;     options.c_cflag &= ~CSIZE; options.c_cflag |= CS8;}
-  if (strstr(settings,",hw")!=NULL || strstr(settings,",HW")!=NULL )   { options.c_cflag |=  CRTSCTS;                               }  // enable hw handshaking
-  else                                                                 { options.c_cflag &= ~CRTSCTS;                               }  // disable hw handshaking
+  if (parity == 'N' || parity == 'S')
+  {
+    options.c_cflag &= ~PARENB;
+  }
+  if (parity == 'E')
+  {
+    options.c_cflag |= PARENB;
+    options.c_cflag &= ~PARODD;
+  }
+  if (parity == 'O')
+  {
+    options.c_cflag |= PARENB;
+    options.c_cflag |= PARODD;
+  }
+  if (bits == '7')
+  {
+    options.c_cflag &= ~CSTOPB;
+    options.c_cflag &= ~CSIZE;
+    options.c_cflag |= CS7;
+  }
+  else
+  {
+    options.c_cflag &= ~CSTOPB;
+    options.c_cflag &= ~CSIZE;
+    options.c_cflag |= CS8;
+  }
+  if (strstr(settings, ",hw") != NULL || strstr(settings, ",HW") != NULL)
+  {
+    options.c_cflag |= CRTSCTS;
+  } // enable hw handshaking
+  else
+  {
+    options.c_cflag &= ~CRTSCTS;
+  } // disable hw handshaking
 
-  if (strstr(settings,",xon")!=NULL || strstr(settings,",XON")!=NULL || xonenabled[port])
-                                                                      { options.c_iflag |=  (IXON | IXOFF | IXANY); } // enable software handshaking
-  else                                                                { options.c_iflag &= ~(IXON | IXOFF | IXANY); } // disable software handshaking
+  if (strstr(settings, ",xon") != NULL || strstr(settings, ",XON") != NULL || xonenabled[port])
+  {
+    options.c_iflag |= (IXON | IXOFF | IXANY);
+  } // enable software handshaking
+  else
+  {
+    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+  } // disable software handshaking
 
-  if (strstr(settings,",-xon")!=NULL || strstr(settings,",-XON"))     { options.c_iflag &= ~(IXON | IXOFF | IXANY); } // force disable software handshaking even if xonenabled
+  if (strstr(settings, ",-xon") != NULL || strstr(settings, ",-XON"))
+  {
+    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+  } // force disable software handshaking even if xonenabled
 
-  options.c_oflag &=  ~OPOST;                         // raw output
+  options.c_oflag &= ~OPOST;                          // raw output
   options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // raw input
 
   tcsetattr(fd[port], TCSANOW, &options);
 }
 
+int poll_tty_serial_read(int port)
+{
+  int rc;
+  fd_set fd_in;
 
-
-int poll_tty_serial_read(int port) { 
-    int rc;
-    fd_set fd_in;
-
-    FD_ZERO(         &fd_in);
-    FD_SET(0,        &fd_in);
-    FD_SET(fd[port], &fd_in);
-    struct timeval tmo;
-    tmo.tv_sec=0;
-    tmo.tv_usec=1;
-  //tmo.tv_nsec=1;
-    //          num fd's       fd in   fdout, fdexcept, timeout
-    rc = select(fd[port] + 1, &fd_in, NULL, NULL, &tmo);
-    if (rc<0) { ALERT_LOG(0,"got rc %d error from poll on port %d",rc,port); disconnect_serial(port); return 0;}
-    return rc; //return (FD_ISSET(0, &fd_in));
+  FD_ZERO(&fd_in);
+  FD_SET(0, &fd_in);
+  FD_SET(fd[port], &fd_in);
+  struct timeval tmo;
+  tmo.tv_sec = 0;
+  tmo.tv_usec = 1;
+  // tmo.tv_nsec=1;
+  //           num fd's       fd in   fdout, fdexcept, timeout
+  rc = select(fd[port] + 1, &fd_in, NULL, NULL, &tmo);
+  if (rc < 0)
+  {
+    ALERT_LOG(0, "got rc %d error from poll on port %d", rc, port);
+    disconnect_serial(port);
+    return 0;
+  }
+  return rc; // return (FD_ISSET(0, &fd_in));
 }
 
-char read_serial_port_tty(int port) {
-  int rc=0;
+char read_serial_port_tty(int port)
+{
+  int rc = 0;
 
-  if (poll_tty_serial_read(port)>0) {
+  if (poll_tty_serial_read(port) > 0)
+  {
     rc = read(fd[port], input[port], 1);
-    if (rc > 0) {
-      ALERT_LOG(0,"read: char %c, %02x port:%d",input[port][0],input[port][0],port);
+    if (rc > 0)
+    {
+      ALERT_LOG(0, "read: char %c, %02x port:%d", input[port][0], input[port][0], port);
       return (int)(input[port][0]);
     }
-    if (rc<0) ALERT_LOG(0,"got rc %d error from poll on port %d",rc,port);
+    if (rc < 0)
+      ALERT_LOG(0, "got rc %d error from poll on port %d", rc, port);
   }
 
   return -1;
 }
 
-int write_serial_port_tty(int port, uint8 data) {
-  input[port][0]=data;
-  ALERT_LOG(0,"Sending character %c(%d 0x%2x) to tty port %d",data,data,data,port);
+int write_serial_port_tty(int port, uint8 data)
+{
+  input[port][0] = data;
+  ALERT_LOG(0, "Sending character %c(%d 0x%2x) to tty port %d", data, data, data, port);
   return write(fd[port], input, 1);
 }
 
-void close_tty(int port) {
+void close_tty(int port)
+{
   close(fd[port]);
-  fd[port]=-1;
+  fd[port] = -1;
 }
 
 #else
@@ -248,8 +374,8 @@ void close_tty(int port) {
 #include <vars.h>
 // fake out fn
 
-char read_serial_port_tty(int port) {return 0;}
-void write_serial_port_tty(int port, uint8 data) {};
-int poll_tty_serial_read(int port) {return 0;}
+char read_serial_port_tty(int port) { return 0; }
+void write_serial_port_tty(int port, uint8 data){};
+int poll_tty_serial_read(int port) { return 0; }
 
 #endif

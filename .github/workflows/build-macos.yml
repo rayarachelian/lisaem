@@ -1,0 +1,62 @@
+name: Build and package LisaEm for MacOS
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        required: true
+        type: string
+      today:
+        required: true
+        type: string
+      version_in_file_name:
+        required: true
+        type: string
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check-out the repository
+        uses: actions/checkout@v4
+
+      - name: List the checked out LisaEm files (the top folder only)
+        run: ls -la .
+
+      - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
+        run: |
+          echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
+          echo "Exported environment variable VER=${{ inputs.version_id }}"
+          echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
+          echo "Exported environment variable RELEASEDATE=${{ inputs.today }}"
+
+      - name: Download, build and install wxWidgets
+        run: |
+          ./scripts/build-wx3.2.9-modern-macosx.sh
+          # Add wxWidgets to PATH. Sample location: "/usr/local/wx3.2.9-cocoa-macOS-15.7-x86_64,arm64/bin"
+          echo "/usr/local/wx3.2.9-cocoa-macOS-$(sw_vers -productVersion | cut -d. -f1-2)-x86_64,arm64/bin" >> $GITHUB_PATH
+
+      - name: Verify that wxWidgets is available
+        run: |
+          echo " The MacOS version is: $(sw_vers -productVersion | cut -d. -f1-2)"
+          which wx-config
+          wx-config --list
+          
+      - name: Build and package LisaEm
+        run: ./build.sh clean build package
+
+      - name: List the generated artifacts
+        run: ls -la ./bin && ls -la ./pkg
+
+      - name: Rename the artifact file to include version and date
+        run: |
+          MACOS_VERSION="$(sw_vers -productVersion | cut -d. -f1-2)"
+          MACOS_PKG_FILENAME="pkg/LisaEm-${{ inputs.version_in_file_name }}-MacOS-${MACOS_VERSION}_arm64.pkg"
+          mv pkg/lisaem-macos-${MACOS_VERSION}-arm64.pkg $MACOS_PKG_FILENAME
+          echo "ARTIFACT_PATH=$MACOS_PKG_FILENAME" >> $GITHUB_ENV
+          
+      - name: Upload the artifact file
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifact
+          path: ${{ env.ARTIFACT_PATH }}
+  

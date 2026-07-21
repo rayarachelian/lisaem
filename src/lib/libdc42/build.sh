@@ -34,8 +34,7 @@ fi
    SOFTWARE="libdc42"                      # name of the software (can contain upper case)
      LCNAME="libdc42"                      # lower case name used for the directory
 DESCRIPTION="libdc42 disk image library"   # description of the package
-        VER="0.9.6"                        # just the version number
-  STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+        VER="0.9.6"                        # the version number
 RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
   AUTHEMAIL="ray@arachelian.com"           # email address for this software
@@ -45,12 +44,10 @@ RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
 
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
@@ -83,7 +80,7 @@ then
 fi
 
 CHECKDIRS include lib obj resources src
-CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h src/libdc42.c resources/libdc42-banner.png
+CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h src/libdc42.c src/lib_raw_profile_image.c resources/libdc42-banner.png
 
 # Parse command line options if any, overriding defaults.
 #echo parsing options
@@ -129,14 +126,13 @@ do
 
  uninstall)
            if [[ -n "$DARWIN" ]]; then
-             echo Uninstall commands not yet implemented.
+             echo Uninstall commands not implemented.
              exit 1
            fi
 
            if [[ -n "$CYGWIN" ]]; then
-              [ -n "$PREFIX" ]    && echo Deleting $PREFIX    && rm -rf $PREFIX
-              [ -n "$PREFIXLIB" ] && echo Deleting $PREFIXLIB && rm -rf $PREFIXLIB
-              exit 0
+              echo Uninstall commands not implemented.
+              exit 1
            fi
 
            #Linux, etc.
@@ -279,9 +275,16 @@ COMPILED=""
 if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
+fi
 
-   echo "  Making libdc42.a library..." 1>&2
-   makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
+if needed lib_raw_profile_image.c ../obj/lib_raw_profile_image.o || needed lib_raw_profile_image.c ../lib/libdc42.a; then
+   qjob "!!  Compiled lib_raw_profile_image.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c lib_raw_profile_image.c -o ../obj/lib_raw_profile_image.o || exit 1
+   waitqall
+fi
+
+if needed ../obj/libdc42.o ../lib/libdc42.a || needed ../obj/lib_raw_profile_image.o ../lib/libdc42.a; then
+    echo "  Making libdc42.a library..." 1>&2
+    makelibs  ../lib libdc42 "${VERSION}" static "../obj/libdc42.o ../obj/lib_raw_profile_image.o"
 fi
 
 cd ..

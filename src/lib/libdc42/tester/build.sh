@@ -33,8 +33,7 @@ fi
    SOFTWARE="dc42 tester"                  # name of the software (can contain upper case)
      LCNAME="dc42 tester"                  # lower case name used for the directory
 DESCRIPTION="dc42 tester for Apple Lisa"   # description of the package
-        VER="0.9.7"                        # just the version number
-  STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+        VER="0.9.7"                        # the version number
 RELEASEDATE="2020.03.31"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
   AUTHEMAIL="ray@arachelian.com"           # email address for this software
@@ -43,12 +42,10 @@ RELEASEDATE="2020.03.31"                   # release date.  must be YYYY.MM.DD
         URL="https://lisaem.sunder.net"    # url to website of package
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
@@ -121,14 +118,13 @@ for i in $@; do
 
  uninstall)
            if [[ -n "$DARWIN" ]]; then
-             echo Uninstall commands not yet implemented.
+             echo Uninstall commands not implemented.
              exit 1
            fi
 
            if [[ -n "$CYGWIN" ]]; then
-              [[ -n "$PREFIX" ]]    && echo Deleting $PREFIX    && rm -rf $PREFIX
-              [[ -n "$PREFIXLIB" ]] && echo Deleting $PREFIXLIB && rm -rf $PREFIXLIB
-              exit 0
+             echo Uninstall commands not implemented.
+             exit 1
            fi
 
            #Linux, etc.

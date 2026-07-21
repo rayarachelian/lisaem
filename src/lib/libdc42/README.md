@@ -13,7 +13,7 @@ The library itself is used by LisaEm as well as DiskCopy 4.2 specific tools.
 
 On systems that support memory mapping, it uses the mmap function to load the whole image into RAM and uses the page in/out features of your OS for speed.
 
-Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. The Disk image format is stored in .Image files, but I use .dc42 to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
+Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. I recommend using the .dc42 file extension to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
 
 LibDC42 has an interface similar to the fopen, fread/frwrite fclose API of libstdc, except that creating a new disk image does not open it. A DC42ImageType structure pointer is passed arround to the functions when various operations are called. The open function can take extra parameters flagging whether to use memory mapping (when available), whether to access an image in Read Only format, and so on. Upon closing the DC42ImageType file, checksums are recalculated and saved. Additionally the errormsg structure member is used to store informational messages when an error occurs and should be used to display error messages to the user as they occur. The retval (return value) member is equivalent to the errno variable, and when set is an indicator that an error has occured and that errormsg should be passed to the user.
 
@@ -152,6 +152,10 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
                                                                                    // i.e. if you use 'w', the fd must have been opened
                                                                                    // in read/write mode, not read only!
 
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options)        // opens a raw profile disk image,
+                                                                                   // like the ones used by popular hardware emulators:
+                                                                                   // IDEFile, ESProfile, Cameo/Aphid and future ones.
+
 
 F: pointer to DC42ImageType - you must allocate this yourself before calling the open function.  You'll need to pass the pointer
                       to this structure to most of these calls.
@@ -199,40 +203,11 @@ options: string containing any of the following (last option takes precedence)
 
 
 
-int dc42_close_image(DC42ImageType *F);
-
-  or
-
-int dc42_close_image_by_handle(DC42ImageType *F)
-
-
-
-These functions close the disk image and if it was requested on the call, will write the data back to the disk, updating the
-checksums.
-
-Danger! You must call the appropriate function.  If you used dc42_open_by_handle, you must call dc42_close_image_by_handle.
-
-
-
-
 
 int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize)    // create a blank new disk image
                                                                                    // sizes are in bytes.  pass *1024 for KB.
                                                                                    // does not open the image, only creates it, so
                                                                                    // call open if you want to open it after creating it.
-
-uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
-   read calls return a pointer to the sector's data or tag.  Note that if you're not using mmapped I/O or RAM, the pointer to
-   the data will be re-used between calls, and therefore old pointers from previous reads cannot be considered to be valid!
-
-   write will write the data you provide to the image.  Write returns any error numbers.
-
-   You can access F->errormsg and F->retval to get the results of the requested operation.
-
 
 These next functions will NOT actually open a disk image, but will open a file handle to them.
 
@@ -312,14 +287,14 @@ typedef struct                          // floppy type
   uint8  ftype;                         // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
 
 
-  uint32 tagsize;                       // must set to 12 - expect ProFile/Widget to use 24 byte tags
-  uint32 datasize;                      // must set to 512
+  uint32 tagsize;                       // 12 for floppy disk images, 20 for ProFile/Widget hard disk images
+  uint32 datasize;                      // must set to 512. TODO: remove this attribute and use sectorsize instead
 
   uint32 datasizetotal;                 // data size (in bytes of all sectors added together)
   uint32 tagsizetotal;                  // tag size total in bytes
 
   uint32 sectoroffset;                  // how far into the file is the 1st sector
-  uint16 sectorsize;                    // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
+  uint16 sectorsize;                    // must set to 512
   uint32 tagstart;                      // how far into the file to 1st tag - similar to sectoroffset
 
   uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by the Lisa Emulator
@@ -332,22 +307,32 @@ typedef struct                          // floppy type
   char *errormsg;                       // pointer to error message, use this to read text of error returned.
   int retval;                           // error number of last operation
 
+  // These function pointers are poor man's object-riented feature in C: We can implement support for different image formats
+  // by "pointing" these functions to the corresponsing implementations. For an example of how to use them with DC42 image format, 
+  // see the code in dc42_open()
+  // "read" calls return a pointer to the sector's data or tag.  Note that if you're not using mmapped I/O or RAM, the pointer to
+  // the data will be re-used between calls, and therefore old pointers from previous reads cannot be considered to be valid!
+  // "write" calls will write the data you provide to the image.  Write returns error numbers.
+  // You can access F->errormsg and F->retval to get the results of the requested operation.
+  uint8 *(*read_sector_tags)(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
+  uint8 *(*read_sector_data)(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
+  int (*write_sector_data)(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
+  int (*write_sector_tags)(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write the tag data for a sector
+
+  // These functions close the disk image.
+  // You must call the appropriate function: if you used dc42_open_by_handle, you must call close_image_by_handle.
+  int close_image(DC42ImageType *F);            // close the image; also, if applicable, fix checksums and sync data
+  int close_image_by_handle(DC42ImageType *F)   // close, but don't call close on the fd.
+
 } DC42ImageType;
 
-
-
-
-extern int dc42_open(DC42ImageType *F, char *filename, char *options);             // open a disk image, map it and fill structure
+extern int dc42_open(DC42ImageType *F, char *filename, char *options);             // open a DC42 disk image, map it and fill structure
 extern int dc42_auto_open(DC42ImageType *F, char *filename, char *options);        // oops, was missing!
 
 extern int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options);
                                                                                    // open an embedded dc42 image in an already
                                                                                    // opened file descriptor at the curren file
                                                                                    // position.
-
-
-extern int dc42_close_image(DC42ImageType *F);                                            // close the image: fix checksums and sync data
-extern int dc42_close_image_by_handle(DC42ImageType *F);                                  // close, but don't call close on the fd.
 
 extern int dc42_create(char *filename,char *volname, uint32 datasize,uint32 tagsize);     // create a blank new disk image
                                                                                    // does not open the image, may not be called
@@ -361,16 +346,6 @@ extern int dc42_add_tags(char *filename, uint32 tagsize);                       
                                                                                    // size before calling dc42 open to ensure it has tags.
                                                                                    // does not open the image, may not be called
                                                                                    // while theimage file is open.
-
-extern uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-extern uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-extern int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-extern int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
-extern int dc42_sync_to_disk(DC42ImageType *F);                                           // like fsync, sync's writes back to file. Does
-                                                                                   // NOT write proper tag/data checksums, as that
-                                                                                   // would be too slow.  Call recalc_checksums yourself
-                                                                                   // when you need it, or call dc42_close_image.
 
 extern uint32 dc42_has_tags(DC42ImageType *F);                                     // returns 0 if no tags, 1 if it has tags
 
@@ -419,5 +394,8 @@ extern int dc42_extract_macbinii(char *infilename);                             
                                                                                    // NOTE: filename is overwritten with
                                                                                    // extracted file name!  On negative return
                                                                                    // the filename has been altered!
-```
 
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options);       // opens a raw profile disk image,
+                                                                                   // like the ones used by popular hardware emulators:
+                                                                                   // IDEFile, ESProfile, Cameo/Aphid and future ones.
+```
