@@ -196,6 +196,7 @@ char read_serial_port_localport(unsigned int port);
 void write_serial_port_nothing(unsigned int port, char data);
 void write_serial_port_loopbackplug(unsigned int port, char data);
 void write_serial_port_localport(unsigned int port, char data);
+void write_serial_port_pipe(unsigned int port, char data);
 void write_serial_port_imagewriter(unsigned int port, char data);
 
 uint32 get_baud_rate(unsigned int port);
@@ -224,8 +225,8 @@ char read_serial_port_pty(unsigned int port) {return 0;}
 int  poll_telnet_serial_read(int portnum)    {return 0;}
 #endif
 
-void write_serial_port_terminal(int port, uint8 data);
-char read_serial_port_terminal(int port);
+void write_serial_port_terminal(unsigned int port, char data);
+char read_serial_port_terminal(unsigned int port);
 
 static inline void on_read_irq_handle(int port);
 
@@ -375,12 +376,56 @@ void scc_channel_reset_port(unsigned int port)
 }
 
 
-extern char read_serial_port_terminal(int port);
-extern void write_serial_port_terminal(int port, uint8 data);
+extern char read_serial_port_terminal(unsigned int port);
+extern void write_serial_port_terminal(unsigned int port, char data);
 
 void read_port_if_ready_nothing(unsigned int port) { (void)(port); return; }
+void read_port_if_ready_pipe(unsigned int port);
 
 void rx_char_available(int port) {RX_CHAR_AVAILABLE(port);}
+
+static int poll_serial_port_pipe_byte(unsigned int port)
+{
+    FILE *f = port ? scc_a_port_F : scc_b_port_F;
+    struct pollfd pfd;
+    unsigned char data;
+    int fd;
+    ssize_t n;
+
+    if (!f) return -1;
+
+    fd = fileno(f);
+    if (fd < 0) return -1;
+
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    if (poll(&pfd, 1, 0) <= 0) return -1;
+
+    if (!(pfd.revents & (POLLIN | POLLHUP))) return -1;
+
+    n = read(fd, &data, 1);
+    if (n == 1) return (int)data;
+
+    return -1;
+}
+
+void read_port_if_ready_pipe(unsigned int port)
+{
+    int data = poll_serial_port_pipe_byte(port);
+
+    if (data >= 0) {
+        fliflo_buff_add(&SCC_READ[port],
+                        (uint8)data & scc_bits_per_char_mask[port]);
+        RX_CHAR_AVAILABLE(port);
+
+        DEBUG_LOG(0,
+                  "Received 0x%02x (%d) from pipe on SCC port:%d",
+                  (uint8)data, data, port);
+    }
+}
+
 
 void read_port_if_ready_pty(unsigned int port)
 { 
@@ -522,6 +567,10 @@ void initialize_scc(int actual)
       {
       case SCC_LOCALPORT:     scc_fn[port].read_serial_port=read_serial_port_localport;
                               scc_fn[port].write_serial_port=write_serial_port_localport;    break;
+      case SCC_PIPE:          scc_fn[port].read_serial_port=read_serial_port_nothing;
+                              scc_fn[port].write_serial_port=write_serial_port_pipe;
+                              scc_fn[port].read_port_if_ready=read_port_if_ready_pipe;
+                              break;
       case SCC_IMAGEWRITER_PS:
       case SCC_IMAGEWRITER_PCL:
       case SCC_IMAGEWRITER:   scc_fn[port].read_serial_port=read_serial_port_imagewriter;
@@ -1388,6 +1437,9 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
 
               if (serial_b==SCC_TTY) read_port_if_ready_tty(0);
               if (serial_a==SCC_TTY) read_port_if_ready_tty(1);
+
+              if (serial_b==SCC_PIPE) read_port_if_ready_pipe(0);
+              if (serial_a==SCC_PIPE) read_port_if_ready_pipe(1);
 #endif
 
               if (serial_b==SCC_TERMINAL) read_port_if_ready_terminal(0);
@@ -1789,6 +1841,21 @@ void write_serial_port_localport(unsigned int port, char data)
     else        {  DEBUG_LOG(0,"wrote %02x to port %d",data,port);if (serial_b==SCC_LOCALPORT) {if (scc_b_port_F) fputc(data,scc_b_port_F);  }}
 }
 
+void write_serial_port_pipe(unsigned int port, char data)
+{
+    FILE *f = port ? scc_a_port_F : scc_b_port_F;
+    unsigned char out = (unsigned char)data;
+    int fd;
+
+    if (!f) return;
+
+    fd = fileno(f);
+    if (fd < 0) return;
+
+    (void)write(fd, &out, 1);
+}
+
+
 void write_serial_port(unsigned port, char data)
 {
     DEBUG_LOG(0,"r %p %p w %p %p",SCC_READ[0].buffer,&SCC_READ[1].buffer,SCC_WRITE[0].buffer,SCC_WRITE[1].buffer);
@@ -1796,7 +1863,7 @@ void write_serial_port(unsigned port, char data)
     if (port)
     {
         if (serial_a==SCC_NOTHING)     return;
-        if (serial_a==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[!port & 1],data & scc_bits_per_char_mask[port]); return;}
+        if (serial_a==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[(!port) & 1],data & scc_bits_per_char_mask[port]); return;}
         if (serial_a==SCC_IMAGEWRITER)
         {
             if (scc_a_IW!=-1)      ImageWriterLoop(scc_a_IW,data);
@@ -1810,7 +1877,7 @@ void write_serial_port(unsigned port, char data)
     {
 
         if (serial_b==SCC_NOTHING)     return;
-        if (serial_b==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[!port & 1],data & scc_bits_per_char_mask[port]); return;}
+        if (serial_b==SCC_LOOPBACKPLUG) {fliflo_buff_add(&SCC_READ[(!port) & 1],data & scc_bits_per_char_mask[port]); return;}
         if (serial_b==SCC_IMAGEWRITER)
         {
             if (scc_b_IW!=-1)

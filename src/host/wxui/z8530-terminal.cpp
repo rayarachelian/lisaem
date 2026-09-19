@@ -225,7 +225,7 @@ void xwriteport(uint8 data, int port) {
 }
 
 
-extern "C" void write_serial_port_terminal(int portnum, uint8 data);
+extern "C" void write_serial_port_terminal(unsigned int portnum, char data);
 
 
 // interface for console output from uniplus, Xenix (future), LPW (future)
@@ -886,7 +886,7 @@ void TerminalWx::DisplayCharsUnsafe(const wxString& str)
 void TerminalWx::OnTerminalInput(TerminalInputEvent& evt) { DisplayCharsUnsafe(evt.GetString()); }
 
 // interface function called by LisaEm main z8530, must be C call
-extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
+extern "C" void write_serial_port_terminal(unsigned int portnum, char data) {
     wxString s=_("");
 
     char *lastchars=TerminalFrame[portnum]->lastchars;
@@ -926,7 +926,7 @@ extern "C" void write_serial_port_terminal(int portnum, uint8 data) {
 }
 
 // interface function called by LisaEm main z8530 must be C call
-extern "C" char read_serial_port_terminal(int port) {
+extern "C" char read_serial_port_terminal(unsigned int port) {
     if  (fliflo_buff_has_data(&SCC_READ[port]))
         {
             rx_char_available(port); 
