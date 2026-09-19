@@ -297,6 +297,8 @@ void romless_setvia_and_flopram(int profileboot)
           0x00, 0x00, 0x00, 0x00, 0x00
         };
 
+        // Floppy-only configurations have no motherboard ProFile.
+        if (via[2].ProFile) {
         via[2].ProFile->Command=-2;
         via[2].ProFile->StateMachineStep=0x00;
         via[2].ProFile->indexread=0x0218;
@@ -308,6 +310,8 @@ void romless_setvia_and_flopram(int profileboot)
         via[2].ProFile->VIA_PA=0x08;
         via[2].ProFile->last_a_accs=0x00;
         
+        }
+
       memcpy(floppy_ram,romless_floppyram,0xb0);
 
     } // above - booted from floppy

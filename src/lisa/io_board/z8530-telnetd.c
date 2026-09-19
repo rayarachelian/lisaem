@@ -66,8 +66,11 @@ unsigned  telnet_buffer[MAX_SERIAL_PORTS][BUFFSIZE];
 struct    sockaddr_in telnetserver[MAX_SERIAL_PORTS],
                       telnetclient[MAX_SERIAL_PORTS];
 
-int       serversock[MAX_SERIAL_PORTS],
-          clientsock[MAX_SERIAL_PORTS];
+int       serversock[MAX_SERIAL_PORTS] = {-1, -1},
+          clientsock[MAX_SERIAL_PORTS] = {-1, -1};
+
+// TCP may split telnet commands across any byte boundary.
+static unsigned char telnet_state[MAX_SERIAL_PORTS];
 
 
 // stuff to send to telnet client.
@@ -83,27 +86,43 @@ char read_serial_port_telnetd(unsigned int port)
 
 void write_serial_port_telnetd(unsigned int port, char c)
 {
-  char buffer[2];
-  buffer[0]=c;
-  ALERT_LOG(0,"Write char %02x %c to port %d",c,(c>31 ? c:'.'),port);
-  send(clientsock[(unsigned)port],buffer,1,0);  // should this be telnetserver?
+  if (port >= MAX_SERIAL_PORTS || port_state[port] != 1) return;
+  unsigned char buffer[2] = {(unsigned char)c, (unsigned char)c};
+  int len = (buffer[0] == 255) ? 2 : 1; // IAC is escaped on the wire.
+  for (int sent = 0; sent < len;) {
+    int n = send(clientsock[port], buffer + sent, len - sent, 0);
+    if (n < 0 && errno == EINTR) continue;
+    if (n <= 0) {
+      close(clientsock[port]); clientsock[port] = -1;
+      port_state[port] = 0; telnet_state[port] = 0;
+      return;
+    }
+    sent += n;
+  }
 }
 
 
 void init_telnet_serial_port(int portnum)
 {
+  if (portnum < 0 || portnum >= MAX_SERIAL_PORTS) return;
+  if (clientsock[portnum] >= 0) close(clientsock[portnum]);
+  if (serversock[portnum] >= 0) close(serversock[portnum]);
+  clientsock[portnum] = serversock[portnum] = -1;
+  telnet_state[portnum] = 0;
   // this sets up the listener
 
 ALERT_LOG(0,"Initializing telnetd for serial port #%d",portnum);
 
 /*Create the TCP socket*/
-if ((serversock[portnum]=socket(PF_INET,SOCK_STREAM,IPPROTO_TCP|SO_REUSEADDR)) < 0)
+if ((serversock[portnum]=socket(PF_INET,SOCK_STREAM,IPPROTO_TCP)) < 0)
 {
         ALERT_LOG(0,"could not create the socket for serial port #%d - port now disabled because:%d %s",portnum,errno,strerror(errno));
         port_state[portnum]=-1;
         return;
 }
 
+int reuse = 1;
+setsockopt(serversock[portnum], SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 /*Construct the server sock addr_instructure*/
 
 memset(&telnetserver[portnum].sin_zero,0,8);     /*Clearstruct*/
@@ -149,9 +168,9 @@ return;
 int poll_telnet_serial_read(int portnum)
 {
   int pollret=0, received=0;
-  unsigned char buffer[MAX_SERIAL_PORTS][3];
+  unsigned char byte;
 
-  if (portnum<0 || portnum>MAX_SERIAL_PORTS)
+  if (portnum<0 || portnum>=MAX_SERIAL_PORTS)
                                return -1;      // non existant port
   if (port_state[portnum]==-1) return -1;      // port disabled
 
@@ -176,6 +195,11 @@ int poll_telnet_serial_read(int portnum)
           return -1;                           // shit happens, rama, rama.
 
        ALERT_LOG(0,"Serial Port #%d Client connected:%s\n",portnum,inet_ntoa(telnetclient[portnum].sin_addr));
+       telnet_state[portnum] = 0;
+       #ifdef SO_NOSIGPIPE
+       int no_sigpipe = 1;
+       setsockopt(clientsock[portnum], SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
+       #endif
        port_state[portnum]=1;                  // change to connected state
 
        // on accept, send the telnet configuration string.
@@ -197,46 +221,36 @@ int poll_telnet_serial_read(int portnum)
      if (pfd_recv[portnum].revents & (POLLIN|POLLPRI)) // we got data
     {
 
-    /*Receiv emessage*/
-
-    if ((received=recv(clientsock[portnum],buffer[portnum],BUFFSIZE,0)) < 0)  // got an error, disconnect
-       {
-        // close this socket and start over
-        ALERT_LOG(0,"Failed to receive initial bytes from client, closing client connection.  Bye bye.");
-        port_state[portnum]=0;
-        close(clientsock[portnum]);
-       }
-
-    if (received>0)
-    {
-       if (buffer[portnum][0]==0xff)  // special telnet sequence?
-       {
-        switch (buffer[portnum][1])   // 3=^C, 8=^H
-        {
-          case 0xf3: return -2;  // printf("break\n");         break;
-          case 0xf1: return -1;  // printf("nop\n");           break;
-          case 0xef: return -1;  // printf("eor\n");           break;
-          case 0xee: return  3;  // printf("abort\n");         break;
-          case 0xf4: return  3;  // printf("interrupt process\n");     break;
-          case 0xf9: return -1;  // printf("Go ahead\n");      break;
-          case 0xf8: return -1;  // printf("Erase Line\n");        break;
-          case 0xf7: return  8;  // printf("Erase character\n");   break;
-          case 0xf6: return -1;  // printf("Are You there?\n");    break;
-          case 0xf5: return  3;  // printf("Abort Output\n");      break;
-
-          case 0x00: return 0xff; // printf("sync\n"); break;  // sync or maybe 0xff itself???
-
-          case 0xff: return 0xff; // maybe 0xff itself???
-
-          default:   return -1;  // printf("unknown\n");  break;
+    // Read one byte: the caller consumes one serial character per poll.
+    // The old three-byte recv discarded the second and third payload bytes.
+    received = recv(clientsock[portnum], &byte, 1, 0);
+    if (received <= 0) {
+      if (received < 0 && (errno == EINTR || errno == EAGAIN)) return -1;
+      close(clientsock[portnum]); clientsock[portnum] = -1;
+      port_state[portnum] = 0; telnet_state[portnum] = 0;
+      return -1;
+    }
+    switch (telnet_state[portnum]) {
+      case 0:
+        if (byte == 255) { telnet_state[portnum] = 1; return -1; }
+        return byte;
+      case 1:
+        telnet_state[portnum] = 0;
+        switch (byte) {
+          case 255: return 255;
+          case 251: case 252: case 253: case 254:
+            telnet_state[portnum] = 2; return -1; // option follows
+          case 250: telnet_state[portnum] = 3; return -1; // subnegotiation
+          case 243: return -2; // BREAK
+          case 238: case 244: case 245: return 3;
+          case 247: return 8;
+          default: return -1;
         }
-      }
-      buffer[portnum][1]=0; buffer[portnum][2]=0; // clear remaining buffers
-      DEBUG_LOG(0,"Got %c %02x",buffer[portnum][0],buffer[portnum][0]);
-
-      return buffer[portnum][0];
+      case 2: telnet_state[portnum] = 0; return -1;
+      case 3: if (byte == 255) telnet_state[portnum] = 4; return -1;
+      case 4: telnet_state[portnum] = (byte == 240) ? 0 : 3; return -1;
+    }
   }
- }
 
  return -1;                              // nothing for the client to deal with
 }

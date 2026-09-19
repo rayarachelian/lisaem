@@ -673,6 +673,8 @@ class LisaEmFrame : public wxFrame
 {
 public:
 
+    ~LisaEmFrame();
+    bool shutting_down = false; // Ignore queued events during deferred destruction.
     int running;          // is the Lisa running?  0=off, 1=running, 10=paused/locked.
     int force_display_refresh;
     int update_display_now;
@@ -1887,6 +1889,7 @@ bool DnDFile::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames)
 
 void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
 {
+  if (shutting_down) return;
   long now=runtime.Time();
   long idleentry=now;
 
@@ -4846,7 +4849,7 @@ void LisaWin::OnPaint(wxPaintEvent& event )
 
 //  screen_paint_update++;
 
-  if (!my_lisaframe || !my_lisawin) return; // not fully running yet, return so we don't crash
+  if (!my_lisaframe || !my_lisawin || my_lisaframe->shutting_down) return; // not fully running yet, return so we don't crash
 
   if (!my_lisaframe->running)   repaintall |= REPAINT_INVALID_WINDOW;
   if (refresh_bytemap) {ALERT_LOG(0,"Contrast change"); ContrastChange(); enable_vidram();}
@@ -5499,6 +5502,7 @@ extern "C" void lisa_rebooted(void)
 
 void LisaWin::OnMouseMove(wxMouseEvent &event)
 {
+    if (!my_lisaframe || my_lisaframe->shutting_down) return;
     DCTYPE dc(this);
     dc.SetUserScale(hidpi_scale,hidpi_scale);
     wxString str;
@@ -5971,17 +5975,52 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
 }
 
 extern "C" void close_all_terminalwx(void);
+extern "C" { extern DC42ImageType Floppy_l, Floppy_u; }
 
 //#ifdef __WXOSX__
 void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
-//#else
-//void LisaEmApp::OnQuit(wxCommandEvent& WXUNUSED(event))
-//#endif
 {
+    if (shutting_down) return;
+    shutting_down = true;
     save_global_prefs();
+    running = 0;
+    if (m_emulation_timer) m_emulation_timer->Stop();
+    EXTERMINATE(m_emulation_timer);
+    // Finish disk-image checksums and flush writes before releasing resources.
+    if (Floppy_l.RAM) dc42_close_image(&Floppy_l);
+    if (Floppy_u.RAM) dc42_close_image(&Floppy_u);
+    profile_unmount();
 
-    EXTERMINATE(my_lisabitmap          );
+    if (my_LisaConfigFrame) {
+        my_LisaConfigFrame->Destroy();
+        my_LisaConfigFrame = NULL;
+    }
+    close_all_terminals();
+    // Close() dispatches OnClose(), which calls this handler again.
+    // Destroy() defers deletion until pending GUI events have completed.
+    Destroy();
+}
+
+LisaEmFrame::~LisaEmFrame()
+{
+    // Child windows can still receive mouse/paint events until destruction.
+    DestroyChildren();
+    my_lisawin = NULL;
+    // Release DCs before the bitmaps selected into them.
     EXTERMINATE(my_memDC               );
+    EXTERMINATE(my_skinDC              );
+    EXTERMINATE(my_floppy0DC           );
+    EXTERMINATE(my_floppy1DC           );
+    EXTERMINATE(my_floppy2DC           );
+    EXTERMINATE(my_floppy3DC           );
+    EXTERMINATE(my_floppy4DC           );
+    EXTERMINATE(my_poweronDC           );
+    EXTERMINATE(my_poweroffDC          );
+    EXTERMINATE(my_skin0DC);
+    EXTERMINATE(my_skin1DC);
+    EXTERMINATE(my_skin2DC);
+    EXTERMINATE(my_skin3DC);
+    EXTERMINATE(my_lisabitmap          );
     //EXTERMINATE(my_lisa_sound          );
     EXTERMINATE(my_floppy_eject        );
     EXTERMINATE(my_floppy_insert       );
@@ -6004,45 +6043,8 @@ void LisaEmFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
     EXTERMINATE(my_floppy4             );
     EXTERMINATE(my_poweron             );
     EXTERMINATE(my_poweroff            );
-    EXTERMINATE(my_skinDC              );
-    EXTERMINATE(my_floppy0DC           );
-    EXTERMINATE(my_floppy1DC           );
-    EXTERMINATE(my_floppy2DC           );
-    EXTERMINATE(my_floppy3DC           );
-    EXTERMINATE(my_floppy4DC           );
-    EXTERMINATE(my_poweronDC           );
-    EXTERMINATE(my_poweroffDC          );
 
-    if (my_lisaframe)                                    // prevent segfault here
-        if (my_lisaframe->m_emulation_timer) 
-            my_lisaframe->m_emulation_timer->Stop();     // stop the timer
-
-    #ifdef __WXOSX__
-     wxMilliSleep(emulation_time*2);              // ensure that any pending timer events are allowed to finish
-     delete my_lisaframe->m_emulation_timer;      // delete the timer
-     if (my_LisaConfigFrame) // close any ConfigFrame 
-        {
-          my_LisaConfigFrame->Hide();
-          my_LisaConfigFrame->Close();
-          delete my_LisaConfigFrame; my_LisaConfigFrame=NULL;
-        }  
-     Close();                                      // and bye bye we go.
-    #else
-     if (my_LisaConfigFrame)                       // close any ConfigFrame 
-        {
-          my_LisaConfigFrame->Hide();
-          my_LisaConfigFrame->Close();
-          delete my_LisaConfigFrame; my_LisaConfigFrame=NULL;
-        }  
-      wxMilliSleep(750);
-      if (my_lisaframe) EXTERMINATE(my_lisaframe->m_emulation_timer);
-      wxMilliSleep(250);
-
-
-      close_all_terminalwx();
-      EXTERMINATE(my_lisaframe);
-      wxExit();
-    #endif
+    my_lisaframe = NULL;
 }
 
 extern "C" void on_lisa_exit(void) {

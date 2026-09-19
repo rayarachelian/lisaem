@@ -1046,7 +1046,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
        ipcs=(t_ipc **)calloc(sizeof(t_ipc *) , ipcs_to_get); if (!ipcs) EXITN(0,0,"Out of memory in makeipclist trying to get ipc pointers!");
     }
 
-    mmu_trn=&mmu_trans[( (pc )>>9) ];  if (mmu_trn->readfn==bad_page) {free(ipcs); return NULL;}
+    mmu_trn=&mmu_trans[( (pc )>>9) ];  if (mmu_trn->readfn==bad_page) {free(ipcs); ipcs=NULL; return NULL;}
 
     if (mmu_trn && mmu_trn->table) ipc = &(mmu_trn->table->ipc[(((pc)>>1) & 0xff)]); // Get the pointer to the IPC.
 
@@ -1059,7 +1059,7 @@ t_ipc_table *cpu68k_makeipclist(uint32 pc) {
         if (pc&1) EXITR(14,NULL,"odd pc!");
         #endif
 
-        ipc = &(table->ipc[((pc>>1) & 0xff)]);
+        ipc = &(mmu_trn->table->ipc[((pc>>1) & 0xff)]);
         DEBUG_LOG(200,"ipc is now %p at pc %08lx max %08lx",ipc,(long)pc,(long)xpc);
         if (!ipc) {EXITR(501,NULL,"cpu68k_makeipclist: But! ipc is null!"); }
     }

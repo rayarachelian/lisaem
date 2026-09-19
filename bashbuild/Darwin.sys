@@ -27,9 +27,14 @@ export OSMIDDLE=$( printf "%02d" $( echo $OSVER | cut -d'.' -f2 ))
 export BINARYEXTENSION="-${MACHINE}-${OSMAJOR}.$OSMIDDLE"
 export MACOSX_VERSION=$( printf "%02d.%02d.%02d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
 
-export MIN_MACOSX_VERSION="$(  xcodebuild -showsdks 2>/dev/null | grep macosx10 | cut -d'-' -f2 | sed -e 's/sdk macosx//g' | sort -n | head -1 )"
-[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION="$(basename $(ls -1d $(xcode-select -p )/SDKs/* | grep -i macosx10 | sort -n | head -1 ) | sed -e 's/.sdk$//g' -e 's/[Mm]ac[Oo][Ss][Xx]//g' )"
-[[ -z "$MIN_MACOSX_VERSION" ]] && export MIN_MACOSX_VERSION=$( printf "%02d.%d.%d" $(echo $OSVER | cut -d'.' -f1) $(echo $OSVER | cut -d'.' -f2) $(echo $OSVER | cut -d'.' -f3) )
+# Honour an explicit deployment target; ARM64 starts at macOS 11.
+if [[ -n "$MACOSX_DEPLOYMENT_TARGET" ]]; then
+    export MIN_MACOSX_VERSION="$MACOSX_DEPLOYMENT_TARGET"
+elif [[ "$MACHINE" == "arm64" ]]; then
+    export MIN_MACOSX_VERSION="11.0"
+else
+    export MIN_MACOSX_VERSION="$MACOSX_MAJOR_VER"
+fi
 
 #[[ -n "$MIN_MACOSX_VERSION" ]] && export SDKROOT="$MIN_MACOSX_VERSION"
 
